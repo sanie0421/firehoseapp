@@ -1,21 +1,77 @@
-```txt
-npm install
-npm run dev
-```
+# 🔥 消防団デジタルノート - 三谷分団
 
-```txt
-npm run deploy
-```
+## プロジェクト概要
+- **名称**: 消防団活動管理アプリ
+- **目的**: 手書き書類の完全廃止とデジタル化
+- **対象**: 三谷分団（16名）
+- **技術スタック**: Hono + TypeScript + Cloudflare Pages
 
-[For generating/synchronizing types based on your Worker configuration run](https://developers.cloudflare.com/workers/wrangler/commands/#types):
+## 現在の完了機能
+- ✅ プロジェクト基盤構築
+- ✅ データベース設計完了（D1 SQLite）
+- ✅ マイグレーションファイル作成
+- ✅ テストデータ作成
 
-```txt
-npm run cf-typegen
-```
+## まだ実装していない機能
+- ⏳ ログイン機能
+- ⏳ 活動日誌（一覧・記録・承認）
+- ⏳ ホース点検管理
+- ⏳ 訓練記録
+- ⏳ 団員管理
+- ⏳ 活動実績集計
 
-Pass the `CloudflareBindings` as generics when instantiation `Hono`:
+## 主な機能URIパス（計画）
+| 機能 | パス | 説明 |
+|------|------|------|
+| ログイン | `/login` | 団員がログイン |
+| ダッシュボード | `/` | ホーム画面 |
+| 活動日誌一覧 | `/logs` | 活動日誌一覧表示 |
+| 活動日誌記録 | `/logs/new` | 新規活動記録 |
+| 活動日誌詳細 | `/logs/:id` | 詳細表示・承認 |
+| ホース点検一覧 | `/hose` | ホース格納庫一覧 |
+| ホース点検記録 | `/hose/inspect` | 点検記録 |
+| 訓練記録一覧 | `/training` | 訓練記録一覧 |
+| 訓練記録追加 | `/training/new` | 新規訓練記録 |
+| 団員一覧 | `/members` | 団員一覧 |
+| 団員詳細 | `/members/:id` | 団員詳細情報 |
+| 活動集計 | `/stats` | 活動実績集計 |
 
-```ts
-// src/index.ts
-const app = new Hono<{ Bindings: CloudflareBindings }>()
-```
+## データモデル
+- **users**: 団員情報（16名）
+- **activity_logs**: 活動日誌
+- **hose_storages**: ホース格納庫マスタ
+- **hose_inspections**: ホース点検記録
+- **training_records**: 訓練記録
+
+## 使用しているストレージ
+- **Cloudflare D1**: SQLiteベースのデータベース（全データ保存）
+- **Cloudflare R2**: 写真・動画ファイル保存（将来実装）
+
+## 簡単な使い方ガイド
+1. ブラウザで https://webapp.pages.dev にアクセス
+2. メールアドレスとパスワードでログイン
+3. 活動日誌を記録（5分で完了）
+4. 分団長・班長が承認
+5. PDF出力で提出
+
+## デプロイ状況
+- **ローカル開発**: ✅ 準備完了
+- **Cloudflare Pages**: ⏳ 未デプロイ
+- **本番環境**: ⏳ 未稼働
+
+## 技術スタック
+- **フロントエンド**: HTML + TailwindCSS + Vanilla JavaScript
+- **バックエンド**: Hono (TypeScript)
+- **データベース**: Cloudflare D1 (SQLite)
+- **ホスティング**: Cloudflare Pages
+- **認証**: JWT + D1
+- **コスト**: 完全無料（Cloudflare無料枠）
+
+## 推奨する次のステップ
+1. ログイン機能の実装
+2. 活動日誌一覧画面の実装
+3. 活動日誌記録画面の実装
+4. 承認フローの実装
+
+## 最終更新日
+2024年11月5日
