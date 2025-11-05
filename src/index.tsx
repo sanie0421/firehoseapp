@@ -35,7 +35,7 @@ app.get('/', (c) => {
         <div class="text-center mb-8">
             <div class="text-6xl mb-4">🔥</div>
             <h1 class="text-3xl font-bold text-gray-800 mb-2">消防団デジタルノート</h1>
-            <p class="text-gray-600">三谷分団 活動管理システム</p>
+            <p class="text-gray-600">大井町消防団第一分団</p>
         </div>
 
         <!-- ログインフォーム -->
