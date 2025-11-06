@@ -1484,6 +1484,14 @@ app.get('/storage/:id', async (c) => {
                 <p class="text-white text-center py-4">読み込み中...</p>
             </div>
         </div>
+
+        <!-- 対応履歴 -->
+        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6 mb-6">
+            <h2 class="text-2xl font-bold text-white mb-4">🚨 対応履歴</h2>
+            <div id="actionHistory">
+                <p class="text-white text-center py-4">読み込み中...</p>
+            </div>
+        </div>
     </div>
 
     <!-- 点検記録モーダル -->
@@ -1541,6 +1549,7 @@ app.get('/storage/:id', async (c) => {
             document.getElementById('inspectionDate').value = today;
             loadStorageDetail();
             loadInspectionHistory();
+            loadActionHistory();
         };
 
         async function loadStorageDetail() {
@@ -1593,6 +1602,47 @@ app.get('/storage/:id', async (c) => {
                     '</div>' +
                     (insp.action_required ? '<p class="text-white mb-2">🚨 要対応: ' + insp.action_required + '</p>' : '') +
                     (insp.remarks ? '<p class="text-white opacity-90 text-sm">💬 ' + insp.remarks + '</p>' : '') +
+                '</div>';
+            }).join('');
+        }
+
+        async function loadActionHistory() {
+            try {
+                const response = await fetch('/api/inspection/action-history/' + storageId);
+                const data = await response.json();
+                renderActionHistory(data.actions || []);
+            } catch (error) {
+                document.getElementById('actionHistory').innerHTML = 
+                    '<p class="text-white text-center py-4">読み込みエラー</p>';
+            }
+        }
+
+        function renderActionHistory(actions) {
+            const container = document.getElementById('actionHistory');
+            
+            if (actions.length === 0) {
+                container.innerHTML = '<p class="text-white text-center py-4">対応履歴はありません</p>';
+                return;
+            }
+
+            container.innerHTML = actions.map(action => {
+                const inspectionDate = new Date(action.inspection_date).toLocaleDateString('ja-JP');
+                const completedDate = new Date(action.action_completed_at).toLocaleDateString('ja-JP');
+                
+                return '<div class="bg-white bg-opacity-10 rounded-lg p-4 mb-3">' +
+                    '<div class="flex justify-between items-start mb-3">' +
+                        '<span class="text-white font-bold">点検日: ' + inspectionDate + '</span>' +
+                        '<span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-bold">✅ 完了</span>' +
+                    '</div>' +
+                    '<div class="bg-red-500 bg-opacity-20 rounded p-3 mb-2">' +
+                        '<p class="text-white text-sm font-semibold mb-1">🚨 要対応内容:</p>' +
+                        '<p class="text-white text-sm">' + action.action_required + '</p>' +
+                    '</div>' +
+                    '<div class="bg-green-500 bg-opacity-20 rounded p-3 mb-2">' +
+                        '<p class="text-white text-sm font-semibold mb-1">✅ 対応内容:</p>' +
+                        '<p class="text-white text-sm">' + (action.action_content || '記載なし') + '</p>' +
+                    '</div>' +
+                    '<p class="text-white opacity-75 text-xs text-right">対応完了日: ' + completedDate + '</p>' +
                 '</div>';
             }).join('');
         }
@@ -1772,6 +1822,33 @@ app.get('/action-required', (c) => {
         </div>
     </div>
 
+    <!-- 対応完了モーダル -->
+    <div id="completeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">✅ 対応完了</h2>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        📝 対応内容 <span class="text-red-500">*</span>
+                    </label>
+                    <textarea id="actionContent" rows="4" required
+                        placeholder="実施した対応内容を記入してください"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+                </div>
+                
+                <div class="flex flex-col space-y-3">
+                    <button onclick="submitComplete()" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
+                        ✅ 完了する
+                    </button>
+                    <button onclick="hideCompleteModal()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
+                        キャンセル
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         window.onload = function() {
             loadActionRequired();
@@ -1816,6 +1893,12 @@ app.get('/action-required', (c) => {
                         '<p class="text-white font-semibold mb-2">🚨 要対応内容:</p>' +
                         '<p class="text-white">' + item.action_required + '</p>' +
                     '</div>' +
+                    (isCompleted && item.action_content ? 
+                        '<div class="bg-green-500 bg-opacity-20 rounded-lg p-4 mb-4">' +
+                            '<p class="text-white font-semibold mb-2">✅ 対応内容:</p>' +
+                            '<p class="text-white">' + item.action_content + '</p>' +
+                        '</div>' : ''
+                    ) +
                     (!isCompleted ? 
                         '<button onclick="markCompleted(\\'' + item.id + '\\')" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
                             '✅ 対応完了にする' +
@@ -1826,18 +1909,37 @@ app.get('/action-required', (c) => {
             }).join('');
         }
 
-        async function markCompleted(inspectionId) {
-            if (!confirm('この項目を対応完了にしますか？')) {
+        let currentInspectionId = null;
+
+        function markCompleted(inspectionId) {
+            currentInspectionId = inspectionId;
+            document.getElementById('actionContent').value = '';
+            document.getElementById('completeModal').classList.remove('hidden');
+        }
+
+        function hideCompleteModal() {
+            document.getElementById('completeModal').classList.add('hidden');
+            currentInspectionId = null;
+        }
+
+        async function submitComplete() {
+            const actionContent = document.getElementById('actionContent').value.trim();
+            
+            if (!actionContent) {
+                alert('対応内容を入力してください');
                 return;
             }
 
             try {
-                const response = await fetch('/api/inspection/mark-completed/' + inspectionId, {
-                    method: 'PUT'
+                const response = await fetch('/api/inspection/mark-completed/' + currentInspectionId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action_content: actionContent })
                 });
 
                 if (response.ok) {
                     alert('対応完了にしました！');
+                    hideCompleteModal();
                     loadActionRequired();
                 } else {
                     alert('更新に失敗しました');
@@ -1881,11 +1983,38 @@ app.get('/api/inspection/action-required', async (c) => {
 })
 
 // ==========================================
+// API: 対応履歴取得（特定の格納庫）
+// ==========================================
+app.get('/api/inspection/action-history/:storageId', async (c) => {
+  try {
+    const storageId = c.req.param('storageId')
+    const env = c.env as { DB: D1Database }
+    
+    const result = await env.DB.prepare(`
+      SELECT *
+      FROM hose_inspections
+      WHERE storage_id = ?
+        AND action_required IS NOT NULL 
+        AND action_required != ''
+        AND action_completed = 1
+      ORDER BY action_completed_at DESC
+      LIMIT 50
+    `).bind(storageId).all()
+    
+    return c.json({ actions: result.results })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ actions: [] })
+  }
+})
+
+// ==========================================
 // API: 対応完了マーク
 // ==========================================
 app.put('/api/inspection/mark-completed/:id', async (c) => {
   try {
     const id = c.req.param('id')
+    const data = await c.req.json()
     const env = c.env as { DB: D1Database }
     const now = new Date().toISOString()
     
@@ -1893,9 +2022,10 @@ app.put('/api/inspection/mark-completed/:id', async (c) => {
       UPDATE hose_inspections 
       SET action_completed = 1,
           action_completed_at = ?,
+          action_content = ?,
           updated_at = ?
       WHERE id = ?
-    `).bind(now, now, id).run()
+    `).bind(now, data.action_content || null, now, id).run()
     
     return c.json({ success: true })
   } catch (error) {
