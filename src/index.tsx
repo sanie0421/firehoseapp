@@ -79,17 +79,8 @@ app.get('/', (c) => {
                 </div>
             </a>
 
-            <!-- ホース格納庫管理 -->
-            <a href="/hose" class="card-gradient-2 rounded-2xl shadow-2xl p-6 card-hover">
-                <div class="text-white">
-                    <div class="text-5xl mb-4 text-center">🔧</div>
-                    <h2 class="text-xl font-bold mb-2 text-center">格納庫管理</h2>
-                    <p class="text-center opacity-90 text-sm">格納庫の登録・編集</p>
-                </div>
-            </a>
-
             <!-- 要対応事項一覧 -->
-            <a href="/action-required" class="card-gradient-3 rounded-2xl shadow-2xl p-6 card-hover">
+            <a href="/action-required" class="card-gradient-2 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
                     <div class="text-5xl mb-4 text-center">🚨</div>
                     <h2 class="text-xl font-bold mb-2 text-center">要対応事項</h2>
@@ -98,7 +89,7 @@ app.get('/', (c) => {
             </a>
 
             <!-- 活動日誌 -->
-            <a href="/logs" class="card-gradient-4 rounded-2xl shadow-2xl p-6 card-hover">
+            <a href="/logs" class="card-gradient-3 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
                     <div class="text-5xl mb-4 text-center">📝</div>
                     <h2 class="text-xl font-bold mb-2 text-center">活動日誌</h2>
@@ -107,7 +98,7 @@ app.get('/', (c) => {
             </a>
 
             <!-- 団員管理 -->
-            <a href="/members" class="card-gradient-5 rounded-2xl shadow-2xl p-6 card-hover">
+            <a href="/members" class="card-gradient-4 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
                     <div class="text-5xl mb-4 text-center">👥</div>
                     <h2 class="text-xl font-bold mb-2 text-center">団員管理</h2>
@@ -116,7 +107,7 @@ app.get('/', (c) => {
             </a>
 
             <!-- 活動集計 -->
-            <a href="/stats" class="card-gradient-1 rounded-2xl shadow-2xl p-6 card-hover">
+            <a href="/stats" class="card-gradient-5 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
                     <div class="text-5xl mb-4 text-center">📊</div>
                     <h2 class="text-xl font-bold mb-2 text-center">活動集計</h2>
@@ -125,11 +116,20 @@ app.get('/', (c) => {
             </a>
 
             <!-- データ管理 -->
-            <a href="/admin" class="card-gradient-2 rounded-2xl shadow-2xl p-6 card-hover">
+            <a href="/admin" class="card-gradient-1 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
                     <div class="text-5xl mb-4 text-center">⚙️</div>
                     <h2 class="text-xl font-bold mb-2 text-center">データ管理</h2>
                     <p class="text-center opacity-90 text-sm">データ確認・バックアップ</p>
+                </div>
+            </a>
+
+            <!-- ホース格納庫管理（一番下） -->
+            <a href="/hose" class="card-gradient-2 rounded-2xl shadow-2xl p-6 card-hover">
+                <div class="text-white">
+                    <div class="text-5xl mb-4 text-center">🔧</div>
+                    <h2 class="text-xl font-bold mb-2 text-center">格納庫管理</h2>
+                    <p class="text-center opacity-90 text-sm">格納庫の登録・編集</p>
                 </div>
             </a>
         </div>
@@ -319,10 +319,10 @@ app.get('/hose', (c) => {
                 <!-- CSV形式説明 -->
                 <div class="bg-gray-50 p-4 rounded">
                     <p class="font-bold mb-2">📝 CSV形式:</p>
-                    <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">格納庫番号,場所の目安,備考
-No.01,◯◯公民館前,2020年設置
-No.02,△△集会所裏,
-No.03,××消防団詰所前,</pre>
+                    <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">格納庫番号,場所の目安,地区,備考
+No.01,◯◯公民館前,金子地区,2020年設置
+No.02,△△集会所裏,大井地区,
+No.03,××消防団詰所前,金子地区,</pre>
                 </div>
 
                 <!-- ファイル選択 -->
@@ -379,6 +379,16 @@ No.03,××消防団詰所前,</pre>
                     </label>
                     <input type="text" id="location" required
                         placeholder="◯◯公民館前"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
+                </div>
+
+                <!-- 地区 -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        🏘️ 地区
+                    </label>
+                    <input type="text" id="district"
+                        placeholder="金子地区"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
                 </div>
 
@@ -562,11 +572,12 @@ No.03,××消防団詰所前,</pre>
                     const line = lines[i].trim();
                     if (!line) continue;
 
-                    const [storageNumber, location, remarks] = line.split(',');
+                    const [storageNumber, location, district, remarks] = line.split(',');
                     if (storageNumber && location) {
                         storagesData.push({
                             storage_number: storageNumber.trim(),
                             location: location.trim(),
+                            district: district ? district.trim() : '',
                             remarks: remarks ? remarks.trim() : ''
                         });
                     }
@@ -652,6 +663,7 @@ No.03,××消防団詰所前,</pre>
             document.getElementById('storageId').value = storage.id;
             document.getElementById('storageNumber').value = storage.storage_number;
             document.getElementById('location').value = storage.location;
+            document.getElementById('district').value = storage.district || '';
             document.getElementById('address').value = storage.address || '';
             document.getElementById('googleMapsUrl').value = storage.google_maps_url || '';
             document.getElementById('remarks').value = storage.remarks || '';
@@ -691,6 +703,7 @@ No.03,××消防団詰所前,</pre>
             const data = {
                 storage_number: storageNumber,
                 location: location,
+                district: document.getElementById('district').value,
                 address: document.getElementById('address').value,
                 google_maps_url: document.getElementById('googleMapsUrl').value,
                 latitude: currentLat,
@@ -790,14 +803,15 @@ app.post('/api/hose/storages', async (c) => {
     
     await env.DB.prepare(`
       INSERT INTO hose_storages (
-        id, storage_number, location, address, 
+        id, storage_number, location, district, address, 
         google_maps_url, latitude, longitude, remarks,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       data.storage_number,
       data.location,
+      data.district || null,
       data.address || null,
       data.google_maps_url || null,
       data.latitude || null,
@@ -829,6 +843,7 @@ app.put('/api/hose/storages/:id', async (c) => {
       UPDATE hose_storages 
       SET storage_number = ?,
           location = ?,
+          district = ?,
           address = ?,
           google_maps_url = ?,
           latitude = ?,
@@ -839,6 +854,7 @@ app.put('/api/hose/storages/:id', async (c) => {
     `).bind(
       data.storage_number,
       data.location,
+      data.district || null,
       data.address || null,
       data.google_maps_url || null,
       data.latitude || null,
@@ -870,13 +886,14 @@ app.post('/api/hose/storages/bulk', async (c) => {
       
       await env.DB.prepare(`
         INSERT INTO hose_storages (
-          id, storage_number, location, remarks,
+          id, storage_number, location, district, remarks,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `).bind(
         id,
         storage.storage_number,
         storage.location,
+        storage.district || null,
         storage.remarks || null,
         now,
         now
@@ -894,19 +911,19 @@ app.post('/api/hose/storages/bulk', async (c) => {
 // CSVテンプレート配信
 // ==========================================
 app.get('/templates/hose_storages_template.csv', (c) => {
-  const csvContent = `格納庫番号,場所の目安,備考
-No.01,◯◯公民館前,
-No.02,△△集会所裏,
-No.03,××消防団詰所前,
-No.04,,
-No.05,,
-No.06,,
-No.07,,
-No.08,,
-No.09,,
-No.10,,
-No.11,,
-No.12,,`
+  const csvContent = `格納庫番号,場所の目安,地区,備考
+No.01,◯◯公民館前,金子地区,
+No.02,△△集会所裏,大井地区,
+No.03,××消防団詰所前,金子地区,
+No.04,,,
+No.05,,,
+No.06,,,
+No.07,,,
+No.08,,,
+No.09,,,
+No.10,,,
+No.11,,,
+No.12,,,`
   
   return c.text(csvContent, 200, {
     'Content-Type': 'text/csv; charset=utf-8',
@@ -1238,7 +1255,14 @@ app.get('/inspection-priority', (c) => {
         <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6 mb-6">
             <div class="text-white">
                 <h1 class="text-3xl font-bold mb-2 drop-shadow-lg">⚠️ 点検優先度</h1>
-                <p class="text-base opacity-90">点検が必要な格納庫を確認しましょう</p>
+                <p class="text-base opacity-90 mb-4">点検が必要な格納庫を確認しましょう</p>
+                
+                <!-- 検索バー -->
+                <div class="mt-4">
+                    <input type="text" id="searchInput" placeholder="🔍 格納庫番号、場所、地区で検索..." 
+                        class="w-full px-4 py-3 rounded-xl border-2 border-white border-opacity-50 bg-white bg-opacity-20 text-white placeholder-white placeholder-opacity-70 focus:outline-none focus:border-opacity-100" 
+                        oninput="searchStorages()">
+                </div>
             </div>
         </div>
 
@@ -1249,6 +1273,8 @@ app.get('/inspection-priority', (c) => {
     </div>
 
     <script>
+        let allStorages = [];
+        
         window.onload = function() {
             loadPriorityList();
         };
@@ -1257,12 +1283,34 @@ app.get('/inspection-priority', (c) => {
             try {
                 const response = await fetch('/api/inspection/priority');
                 const data = await response.json();
-                renderPriorityList(data.storages || []);
+                allStorages = data.storages || [];
+                renderPriorityList(allStorages);
             } catch (error) {
                 document.getElementById('priorityList').innerHTML = 
                     '<p class="text-white text-center py-8">データの読み込みに失敗しました</p>';
                 console.error(error);
             }
+        }
+        
+        function searchStorages() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            if (!searchTerm) {
+                renderPriorityList(allStorages);
+                return;
+            }
+            
+            const filtered = allStorages.filter(storage => {
+                const storageNumber = (storage.storage_number || '').toLowerCase();
+                const location = (storage.location || '').toLowerCase();
+                const district = (storage.district || '').toLowerCase();
+                
+                return storageNumber.includes(searchTerm) || 
+                       location.includes(searchTerm) || 
+                       district.includes(searchTerm);
+            });
+            
+            renderPriorityList(filtered);
         }
 
         function renderPriorityList(storages) {
@@ -1293,10 +1341,12 @@ app.get('/inspection-priority', (c) => {
                     ? new Date(storage.last_inspection_date).toLocaleDateString('ja-JP')
                     : '未点検';
 
+                const districtText = storage.district ? ' | 🏘️ ' + storage.district : '';
+                
                 return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
                     '<div class="text-white">' +
                         '<div class="flex justify-between items-start mb-4">' +
-                            '<h3 class="text-2xl font-bold">📦 ' + storage.storage_number + '</h3>' +
+                            '<h3 class="text-2xl font-bold">📦 ' + storage.storage_number + districtText + '</h3>' +
                             '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full text-base font-bold border border-white border-opacity-50">' + priorityIcon + ' ' + priorityText + '</span>' +
                         '</div>' +
                         '<p class="text-lg mb-2 font-semibold">📍 ' + storage.location + '</p>' +
@@ -1321,8 +1371,8 @@ app.get('/api/inspection/priority', async (c) => {
   try {
     const env = c.env as { DB: D1Database }
     
-    // 各格納庫の最終点検日を取得してソート
-    const result = await env.DB.prepare(`
+    // 1. 全格納庫の最終点検日を取得して、最優先のものを1件取得
+    const topPriorityResult = await env.DB.prepare(`
       SELECT 
         s.*,
         i.inspection_date as last_inspection_date,
@@ -1339,9 +1389,39 @@ app.get('/api/inspection/priority', async (c) => {
           ELSE 1
         END,
         i.inspection_date ASC
-    `).all()
+      LIMIT 1
+    `).first()
     
-    return c.json({ storages: result.results })
+    if (!topPriorityResult) {
+      return c.json({ storages: [] })
+    }
+    
+    // 2. 同じ地区の格納庫で点検が古い順に3件取得（最優先のものは除く）
+    const sameDistrictResult = await env.DB.prepare(`
+      SELECT 
+        s.*,
+        i.inspection_date as last_inspection_date,
+        CAST((julianday('now') - julianday(i.inspection_date)) AS INTEGER) as days_since_inspection
+      FROM hose_storages s
+      LEFT JOIN (
+        SELECT storage_id, MAX(inspection_date) as inspection_date
+        FROM hose_inspections
+        GROUP BY storage_id
+      ) i ON s.id = i.storage_id
+      WHERE s.district = ? AND s.id != ?
+      ORDER BY 
+        CASE 
+          WHEN i.inspection_date IS NULL THEN 0
+          ELSE 1
+        END,
+        i.inspection_date ASC
+      LIMIT 3
+    `).bind(topPriorityResult.district || '', topPriorityResult.id).all()
+    
+    // 結果を結合（最優先1件 + 同地区3件）
+    const storages = [topPriorityResult, ...(sameDistrictResult.results || [])]
+    
+    return c.json({ storages })
   } catch (error) {
     console.error('Database error:', error)
     return c.json({ storages: [] })
