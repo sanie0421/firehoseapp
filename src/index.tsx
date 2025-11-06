@@ -377,14 +377,14 @@ No.03,××消防団詰所前,</pre>
                     </p>
                 </div>
 
-                <!-- 地図で位置を設定 -->
+                <!-- 地図で位置を設定（任意） -->
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-2">
-                        🗺️ 地図で位置を設定（タップして位置を決定）
+                        🗺️ 地図で位置を設定（任意）
                     </label>
                     <div id="map" class="rounded-lg border-2 border-gray-300"></div>
                     <p class="text-sm text-gray-600 mt-2">
-                        💡 地図をタップすると赤いピンが立ちます。位置を確認して保存してください。
+                        💡 地図をタップすると赤いピンが立ちます。位置設定は後からでも可能です。
                     </p>
                     <div id="coordsDisplay" class="hidden mt-2 p-3 bg-green-50 rounded">
                         <p class="text-sm text-green-800">
@@ -668,11 +668,11 @@ No.03,××消防団詰所前,</pre>
             };
 
             try {
-                const url = id ? \`/api/hose/storages/\${id}\` : '/api/hose/storages';
+                const url = id ? '/api/hose/storages/' + id : '/api/hose/storages';
                 const method = id ? 'PUT' : 'POST';
                 
                 const response = await fetch(url, {
-                    method,
+                    method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
@@ -696,17 +696,18 @@ No.03,××消防団詰所前,</pre>
             if (!storage || !storage.latitude) return;
 
             const detailContent = document.getElementById('detailContent');
-            detailContent.innerHTML = \`
-                <div class="space-y-4">
-                    <div class="bg-gray-50 p-4 rounded">
-                        <p class="font-bold">📍 \${storage.location}</p>
-                        \${storage.address ? \`<p class="text-gray-600">🏠 \${storage.address}</p>\` : ''}
-                    </div>
-                    <div id="detailMap" style="height: 400px; width: 100%;"></div>
-                </div>
-            \`;
+            let html = '<div class="space-y-4">';
+            html += '<div class="bg-gray-50 p-4 rounded">';
+            html += '<p class="font-bold">📍 ' + storage.location + '</p>';
+            if (storage.address) {
+                html += '<p class="text-gray-600">🏠 ' + storage.address + '</p>';
+            }
+            html += '</div>';
+            html += '<div id="detailMap" style="height: 400px; width: 100%;"></div>';
+            html += '</div>';
+            detailContent.innerHTML = html;
 
-            document.getElementById('detailTitle').textContent = \`🗺️ \${storage.storage_number}\`;
+            document.getElementById('detailTitle').textContent = '🗺️ ' + storage.storage_number;
             document.getElementById('detailModal').classList.remove('hidden');
 
             setTimeout(() => {
