@@ -5,13 +5,12 @@
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "shobodan-db",
+      "database_id": "local-dev-database-id"
+    }
   ]
-  // D1 Database configuration will be added after database creation
-  // "d1_databases": [
-  //   {
-  //     "binding": "DB",
-  //     "database_name": "shobodan-db",
-  //     "database_id": "YOUR_DATABASE_ID_HERE"
-  //   }
-  // ]
 }

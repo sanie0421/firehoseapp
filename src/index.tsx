@@ -2,7 +2,11 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 
-const app = new Hono()
+type Bindings = {
+  DB: D1Database
+}
+
+const app = new Hono<{ Bindings: Bindings }>()
 
 // Enable CORS
 app.use('/api/*', cors())
@@ -99,6 +103,15 @@ app.get('/', (c) => {
                     <div class="text-7xl mb-6 text-center">📊</div>
                     <h2 class="text-2xl font-bold mb-3 text-center">活動集計</h2>
                     <p class="text-center opacity-90">実績データ・グラフ表示</p>
+                </div>
+            </a>
+
+            <!-- データ管理 -->
+            <a href="/admin" class="card-gradient-5 rounded-2xl shadow-2xl p-8 card-hover">
+                <div class="text-white">
+                    <div class="text-7xl mb-6 text-center">⚙️</div>
+                    <h2 class="text-2xl font-bold mb-3 text-center">データ管理</h2>
+                    <p class="text-center opacity-90">データ確認・バックアップ</p>
                 </div>
             </a>
         </div>
@@ -807,6 +820,274 @@ No.12,,`
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': 'attachment; filename="hose_storages_template.csv"'
   })
+})
+
+// ==========================================
+// データ管理画面
+// ==========================================
+app.get('/admin', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>データ管理 - 消防団デジタルノート</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            min-height: 100vh;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .float-animation { animation: float 3s ease-in-out infinite; }
+        table { font-size: 0.875rem; }
+        th { background: rgba(255,255,255,0.2); }
+        tr:hover { background: rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body>
+    <!-- ナビゲーションバー -->
+    <nav class="bg-white bg-opacity-20 backdrop-blur-md border-b border-white border-opacity-30">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center space-x-3">
+                    <span class="text-4xl float-animation">🔥</span>
+                    <div class="text-white">
+                        <div class="font-bold text-xl">消防団デジタルノート</div>
+                        <div class="text-sm opacity-90">大井町消防団第一分団</div>
+                    </div>
+                </a>
+                <a href="/" class="text-white hover:underline text-sm bg-white bg-opacity-20 px-4 py-2 rounded-lg backdrop-blur-sm">
+                    ← ホームに戻る
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- メインコンテンツ -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- ヘッダー -->
+        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-8 mb-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="text-white mb-4 md:mb-0">
+                    <h1 class="text-4xl font-bold mb-2 drop-shadow-lg">⚙️ データ管理</h1>
+                    <p class="text-lg opacity-90">データベース内容の確認とバックアップ</p>
+                </div>
+                <button onclick="downloadBackup()" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-8 py-4 rounded-lg transition border border-white border-opacity-50 shadow-lg text-lg font-bold">
+                    💾 バックアップをダウンロード
+                </button>
+            </div>
+        </div>
+
+        <!-- テーブル選択 -->
+        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6 mb-6">
+            <label class="block text-white text-lg font-bold mb-4">📊 表示するテーブル:</label>
+            <select id="tableSelect" onchange="loadTable()" class="w-full px-4 py-3 rounded-lg text-gray-800 font-semibold">
+                <option value="hose_storages">ホース格納庫 (hose_storages)</option>
+                <option value="hose_inspections">ホース点検記録 (hose_inspections)</option>
+                <option value="activity_logs">活動日誌 (activity_logs)</option>
+                <option value="users">団員情報 (users)</option>
+            </select>
+        </div>
+
+        <!-- データ表示エリア -->
+        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white" id="tableName">ホース格納庫</h2>
+                <button onclick="exportCSV()" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-4 py-2 rounded-lg transition border border-white border-opacity-50">
+                    📥 CSV出力
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <div id="dataContainer" class="text-white">
+                    <p class="text-center py-8">データを読み込み中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = [];
+        let currentTable = 'hose_storages';
+
+        // ページ読み込み時
+        window.onload = function() {
+            loadTable();
+        };
+
+        // テーブルデータ読み込み
+        async function loadTable() {
+            const select = document.getElementById('tableSelect');
+            currentTable = select.value;
+            const tableName = select.options[select.selectedIndex].text;
+            document.getElementById('tableName').textContent = tableName;
+
+            try {
+                const response = await fetch('/api/admin/table/' + currentTable);
+                const data = await response.json();
+                currentData = data.rows || [];
+                renderTable(currentData);
+            } catch (error) {
+                document.getElementById('dataContainer').innerHTML = 
+                    '<p class="text-center py-8 text-red-300">データの読み込みに失敗しました</p>';
+                console.error(error);
+            }
+        }
+
+        // テーブル表示
+        function renderTable(data) {
+            const container = document.getElementById('dataContainer');
+            
+            if (data.length === 0) {
+                container.innerHTML = '<p class="text-center py-8">データがありません</p>';
+                return;
+            }
+
+            const keys = Object.keys(data[0]);
+            let html = '<table class="w-full border-collapse">';
+            
+            // ヘッダー
+            html += '<thead><tr>';
+            keys.forEach(key => {
+                html += '<th class="border border-white border-opacity-30 px-4 py-2 text-left">' + key + '</th>';
+            });
+            html += '</tr></thead>';
+            
+            // データ行
+            html += '<tbody>';
+            data.forEach(row => {
+                html += '<tr>';
+                keys.forEach(key => {
+                    const value = row[key] !== null ? row[key] : '';
+                    html += '<td class="border border-white border-opacity-30 px-4 py-2">' + value + '</td>';
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            
+            container.innerHTML = html;
+        }
+
+        // CSV出力
+        function exportCSV() {
+            if (currentData.length === 0) {
+                alert('データがありません');
+                return;
+            }
+
+            const keys = Object.keys(currentData[0]);
+            let csv = keys.join(',') + '\\n';
+            
+            currentData.forEach(row => {
+                const values = keys.map(key => {
+                    const value = row[key] !== null ? row[key] : '';
+                    return '"' + value + '"';
+                });
+                csv += values.join(',') + '\\n';
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            const dateStr = new Date().toISOString().split('T')[0];
+            link.download = currentTable + '_' + dateStr + '.csv';
+            link.click();
+        }
+
+        // バックアップダウンロード
+        async function downloadBackup() {
+            try {
+                const response = await fetch('/api/admin/backup');
+                const blob = await response.blob();
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                const dateStr = new Date().toISOString().split('T')[0];
+                link.download = 'shobodan_backup_' + dateStr + '.sql';
+                link.click();
+                alert('バックアップファイルをダウンロードしました！このファイルをGoogleドライブに保存してください。');
+            } catch (error) {
+                alert('バックアップの作成に失敗しました');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
+  `)
+})
+
+// ==========================================
+// API: テーブルデータ取得
+// ==========================================
+app.get('/api/admin/table/:tableName', async (c) => {
+  const tableName = c.req.param('tableName')
+  
+  // テーブル名のホワイトリストチェック
+  const allowedTables = ['hose_storages', 'hose_inspections', 'activity_logs', 'users', 'training_records']
+  if (!allowedTables.includes(tableName)) {
+    return c.json({ error: 'Invalid table name' }, 400)
+  }
+
+  try {
+    const env = c.env as { DB: D1Database }
+    const result = await env.DB.prepare(`SELECT * FROM ${tableName} ORDER BY created_at DESC LIMIT 100`).all()
+    return c.json({ rows: result.results })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ rows: [] })
+  }
+})
+
+// ==========================================
+// API: バックアップSQL生成
+// ==========================================
+app.get('/api/admin/backup', async (c) => {
+  try {
+    const env = c.env as { DB: D1Database }
+    
+    // 全テーブルのデータを取得してSQL形式で出力
+    const tables = ['users', 'hose_storages', 'hose_inspections', 'activity_logs', 'training_records']
+    const timestamp = new Date().toISOString()
+    const dateStr = new Date().toISOString().split('T')[0]
+    
+    let sqlBackup = '-- 消防団デジタルノート データバックアップ\\n'
+    sqlBackup += '-- 作成日時: ' + timestamp + '\\n\\n'
+
+    for (const table of tables) {
+      const result = await env.DB.prepare('SELECT * FROM ' + table).all()
+      
+      if (result.results.length > 0) {
+        sqlBackup += '-- ' + table + ' テーブル\\n'
+        
+        const keys = Object.keys(result.results[0])
+        const keysList = keys.join(', ')
+        
+        result.results.forEach((row: any) => {
+          const values = keys.map(key => {
+            const value = row[key]
+            if (value === null) return 'NULL'
+            if (typeof value === 'string') return "'" + value.replace(/'/g, "''") + "'"
+            return value
+          })
+          sqlBackup += 'INSERT INTO ' + table + ' (' + keysList + ') VALUES (' + values.join(', ') + ');\\n'
+        })
+        
+        sqlBackup += '\\n'
+      }
+    }
+
+    return c.text(sqlBackup, 200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="shobodan_backup_' + dateStr + '.sql"'
+    })
+  } catch (error) {
+    console.error('Backup error:', error)
+    return c.text('-- Backup failed', 500)
+  }
 })
 
 // ==========================================
