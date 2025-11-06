@@ -66,17 +66,8 @@ app.get('/', (c) => {
     <div class="container mx-auto px-4 py-12">
         <!-- 機能カード -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            <!-- 活動日誌 -->
-            <a href="/logs" class="card-gradient-1 rounded-2xl shadow-2xl p-8 card-hover">
-                <div class="text-white">
-                    <div class="text-7xl mb-6 text-center">📝</div>
-                    <h2 class="text-2xl font-bold mb-3 text-center">活動日誌</h2>
-                    <p class="text-center opacity-90">活動の記録・承認・PDF出力</p>
-                </div>
-            </a>
-
-            <!-- ホース点検 -->
-            <a href="/hose" class="card-gradient-2 rounded-2xl shadow-2xl p-8 card-hover">
+            <!-- ホース点検（最優先） -->
+            <a href="/hose" class="card-gradient-1 rounded-2xl shadow-2xl p-8 card-hover">
                 <div class="text-white">
                     <div class="text-7xl mb-6 text-center">🔧</div>
                     <h2 class="text-2xl font-bold mb-3 text-center">ホース点検</h2>
@@ -84,17 +75,17 @@ app.get('/', (c) => {
                 </div>
             </a>
 
-            <!-- 訓練記録 -->
-            <a href="/training" class="card-gradient-3 rounded-2xl shadow-2xl p-8 card-hover">
+            <!-- 活動日誌 -->
+            <a href="/logs" class="card-gradient-2 rounded-2xl shadow-2xl p-8 card-hover">
                 <div class="text-white">
-                    <div class="text-7xl mb-6 text-center">🏃</div>
-                    <h2 class="text-2xl font-bold mb-3 text-center">訓練記録</h2>
-                    <p class="text-center opacity-90">訓練内容・参加者記録</p>
+                    <div class="text-7xl mb-6 text-center">📝</div>
+                    <h2 class="text-2xl font-bold mb-3 text-center">活動日誌</h2>
+                    <p class="text-center opacity-90">活動・訓練の記録と承認</p>
                 </div>
             </a>
 
             <!-- 団員管理 -->
-            <a href="/members" class="card-gradient-4 rounded-2xl shadow-2xl p-8 card-hover">
+            <a href="/members" class="card-gradient-3 rounded-2xl shadow-2xl p-8 card-hover">
                 <div class="text-white">
                     <div class="text-7xl mb-6 text-center">👥</div>
                     <h2 class="text-2xl font-bold mb-3 text-center">団員管理</h2>
@@ -103,7 +94,7 @@ app.get('/', (c) => {
             </a>
 
             <!-- 活動集計 -->
-            <a href="/stats" class="card-gradient-5 rounded-2xl shadow-2xl p-8 card-hover">
+            <a href="/stats" class="card-gradient-4 rounded-2xl shadow-2xl p-8 card-hover">
                 <div class="text-white">
                     <div class="text-7xl mb-6 text-center">📊</div>
                     <h2 class="text-2xl font-bold mb-3 text-center">活動集計</h2>
@@ -822,7 +813,6 @@ No.12,,`
 // 未実装ページ（Coming Soon）
 // ==========================================
 app.get('/logs', (c) => c.html(comingSoonPage('活動日誌', '📝')))
-app.get('/training', (c) => c.html(comingSoonPage('訓練記録', '🏃')))
 app.get('/members', (c) => c.html(comingSoonPage('団員管理', '👥')))
 app.get('/stats', (c) => c.html(comingSoonPage('活動集計', '📊')))
 
