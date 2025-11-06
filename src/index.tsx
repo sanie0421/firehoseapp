@@ -142,28 +142,92 @@ app.get('/', (c) => {
 // ==========================================
 // API: 団員一覧取得
 // ==========================================
+// ==========================================
+// API: 団員一覧取得
+// ==========================================
 app.get('/api/members', async (c) => {
-  // テスト用団員データ
-  const members = [
-    { id: 'user_001', name: '三谷　誠', role: 'leader', position: '会計兼機械係長' },
-    { id: 'user_002', name: '瀬戸　毅', role: 'viceleader', position: 'ホース係' },
-    { id: 'user_003', name: '橋本　史哉', role: 'chief', position: '' },
-    { id: 'user_004', name: '斉藤　貴禎', role: 'member', position: '' },
-    { id: 'user_005', name: '石井　友祐', role: 'member', position: '' },
-    { id: 'user_006', name: '津田　和哉', role: 'member', position: '' },
-    { id: 'user_007', name: '渡辺　拓人', role: 'member', position: '' },
-    { id: 'user_008', name: '浅倉　伶', role: 'member', position: '' },
-    { id: 'user_009', name: '内藤　光', role: 'member', position: '' },
-    { id: 'user_010', name: '石岡　瑞輝', role: 'member', position: '' },
-    { id: 'user_011', name: '中村　裕太郎', role: 'member', position: '' },
-    { id: 'user_012', name: '野地　駿介', role: 'member', position: '' },
-    { id: 'user_013', name: '鍵和田　真吉', role: 'member', position: '' },
-    { id: 'user_014', name: '片野　聡介', role: 'member', position: '' },
-    { id: 'user_015', name: '中山　魁', role: 'member', position: '' },
-    { id: 'user_016', name: '鈴木　大慎', role: 'member', position: '' }
-  ]
+  try {
+    const env = c.env as { DB: D1Database }
+    const result = await env.DB.prepare(`
+      SELECT id, name, birth_date, join_year, created_at, updated_at
+      FROM users
+      ORDER BY join_year ASC, name ASC
+    `).all()
+    
+    return c.json({ members: result.results })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ members: [] })
+  }
+})
 
-  return c.json({ members })
+// ==========================================
+// API: 団員追加
+// ==========================================
+app.post('/api/members', async (c) => {
+  try {
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    
+    const id = 'member_' + Date.now()
+    const now = new Date().toISOString()
+    
+    await env.DB.prepare(`
+      INSERT INTO users (
+        id, name, birth_date, join_year,
+        email, password_hash, role,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      id,
+      data.name,
+      data.birth_date,
+      data.join_year,
+      '',  // email (不要だが必須カラム)
+      '',  // password_hash (不要だが必須カラム)
+      'member',  // デフォルトrole
+      now,
+      now
+    ).run()
+    
+    return c.json({ success: true, id })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
+// API: 団員更新
+// ==========================================
+app.put('/api/members/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    
+    const now = new Date().toISOString()
+    
+    await env.DB.prepare(`
+      UPDATE users 
+      SET name = ?,
+          birth_date = ?,
+          join_year = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).bind(
+      data.name,
+      data.birth_date,
+      data.join_year,
+      now,
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
 })
 
 // ==========================================
@@ -2038,7 +2102,247 @@ app.put('/api/inspection/mark-completed/:id', async (c) => {
 // 未実装ページ（Coming Soon）
 // ==========================================
 app.get('/logs', (c) => c.html(comingSoonPage('活動日誌', '📝')))
-app.get('/members', (c) => c.html(comingSoonPage('団員管理', '👥')))
+// ==========================================
+// 団員管理ページ
+// ==========================================
+app.get('/members', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>団員管理 - 消防団デジタルノート</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            min-height: 100vh;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .float-animation { animation: float 3s ease-in-out infinite; }
+        button {
+            -webkit-tap-highlight-color: transparent;
+            min-height: 48px;
+        }
+        input {
+            font-size: 16px !important;
+        }
+    </style>
+</head>
+<body>
+    <nav class="bg-white bg-opacity-20 backdrop-blur-md border-b border-white border-opacity-30">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center space-x-3">
+                    <span class="text-4xl float-animation">🔥</span>
+                    <div class="text-white">
+                        <div class="font-bold text-xl">消防団デジタルノート</div>
+                        <div class="text-sm opacity-90">大井町消防団第一分団</div>
+                    </div>
+                </a>
+                <a href="/" class="text-white hover:underline text-sm bg-white bg-opacity-20 px-4 py-2 rounded-lg backdrop-blur-sm">
+                    ← ホームに戻る
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6">
+        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6 mb-6">
+            <h1 class="text-3xl font-bold text-white mb-2 drop-shadow-lg">👥 団員管理</h1>
+            <p class="text-base text-white opacity-90 mb-4">団員情報の登録・編集</p>
+            
+            <button onclick="showAddModal()" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-6 py-4 rounded-xl transition border border-white border-opacity-50 shadow-lg font-bold text-lg">
+                ➕ 団員を追加
+            </button>
+        </div>
+
+        <div id="memberList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <p class="text-white text-center py-8 col-span-full">読み込み中...</p>
+        </div>
+    </div>
+
+    <!-- 団員追加/編集モーダル -->
+    <div id="memberModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800" id="modalTitle">👥 団員を追加</h2>
+                    <button onclick="hideModal()" class="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+                </div>
+
+                <div class="space-y-4">
+                    <input type="hidden" id="memberId" value="">
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">
+                            👤 名前 <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="memberName" required
+                            placeholder="山田　太郎"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">
+                            🎂 生年月日 <span class="text-red-500">*</span>
+                        </label>
+                        <input type="date" id="birthDate" required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">
+                            📅 入団年 <span class="text-red-500">*</span>
+                        </label>
+                        <input type="number" id="joinYear" required
+                            placeholder="2020"
+                            min="1900" max="2100"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div class="flex flex-col space-y-3 pt-4">
+                        <button onclick="saveMember()" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
+                            ✅ 保存する
+                        </button>
+                        <button onclick="hideModal()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
+                            キャンセル
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let members = [];
+
+        window.onload = function() {
+            loadMembers();
+        };
+
+        async function loadMembers() {
+            try {
+                const response = await fetch('/api/members');
+                const data = await response.json();
+                members = data.members || [];
+                renderMembers();
+            } catch (error) {
+                document.getElementById('memberList').innerHTML = 
+                    '<p class="text-white text-center py-8 col-span-full">データの読み込みに失敗しました</p>';
+                console.error(error);
+            }
+        }
+
+        function renderMembers() {
+            const list = document.getElementById('memberList');
+            
+            if (members.length === 0) {
+                list.innerHTML = '<div class="col-span-full bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-12 text-center"><p class="text-white text-xl">まだ団員が登録されていません</p></div>';
+                return;
+            }
+
+            list.innerHTML = members.map(member => {
+                const age = member.birth_date ? calculateAge(member.birth_date) : '不明';
+                const years = member.join_year ? new Date().getFullYear() - parseInt(member.join_year) + 1 : '不明';
+                
+                return '<div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6">' +
+                    '<h3 class="text-2xl font-bold text-white mb-4">👤 ' + member.name + '</h3>' +
+                    '<div class="space-y-2 mb-4">' +
+                        '<p class="text-white text-base">🎂 年齢: ' + age + '歳</p>' +
+                        '<p class="text-white text-base">📅 入団: ' + (member.join_year || '不明') + '年 (' + years + '年目)</p>' +
+                    '</div>' +
+                    '<button onclick="editMember(\\'' + member.id + '\\')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-4 py-3 rounded-lg transition border border-white border-opacity-50 font-bold">' +
+                        '✏️ 編集' +
+                    '</button>' +
+                '</div>';
+            }).join('');
+        }
+
+        function calculateAge(birthDate) {
+            const today = new Date();
+            const birth = new Date(birthDate);
+            let age = today.getFullYear() - birth.getFullYear();
+            const monthDiff = today.getMonth() - birth.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+                age--;
+            }
+            return age;
+        }
+
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = '👥 団員を追加';
+            document.getElementById('memberId').value = '';
+            document.getElementById('memberName').value = '';
+            document.getElementById('birthDate').value = '';
+            document.getElementById('joinYear').value = '';
+            document.getElementById('memberModal').classList.remove('hidden');
+        }
+
+        function editMember(id) {
+            const member = members.find(m => m.id === id);
+            if (!member) return;
+
+            document.getElementById('modalTitle').textContent = '✏️ 団員を編集';
+            document.getElementById('memberId').value = member.id;
+            document.getElementById('memberName').value = member.name;
+            document.getElementById('birthDate').value = member.birth_date || '';
+            document.getElementById('joinYear').value = member.join_year || '';
+            document.getElementById('memberModal').classList.remove('hidden');
+        }
+
+        function hideModal() {
+            document.getElementById('memberModal').classList.add('hidden');
+        }
+
+        async function saveMember() {
+            const id = document.getElementById('memberId').value;
+            const name = document.getElementById('memberName').value.trim();
+            const birthDate = document.getElementById('birthDate').value;
+            const joinYear = document.getElementById('joinYear').value;
+
+            if (!name || !birthDate || !joinYear) {
+                alert('すべての項目を入力してください');
+                return;
+            }
+
+            const data = {
+                name: name,
+                birth_date: birthDate,
+                join_year: parseInt(joinYear)
+            };
+
+            try {
+                const url = id ? '/api/members/' + id : '/api/members';
+                const method = id ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    alert(id ? '更新しました！' : '登録しました！');
+                    hideModal();
+                    loadMembers();
+                } else {
+                    alert('エラーが発生しました');
+                }
+            } catch (error) {
+                alert('保存中にエラーが発生しました');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
+  `)
+})
 app.get('/stats', (c) => c.html(comingSoonPage('活動集計', '📊')))
 
 // ==========================================
