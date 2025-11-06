@@ -503,38 +503,33 @@ No.03,××消防団詰所前,</pre>
             }
 
             const gradients = ['storage-gradient-1', 'storage-gradient-2', 'storage-gradient-3', 'storage-gradient-4', 'storage-gradient-5'];
-            list.innerHTML = storages.map((storage, index) => \`
-                <div class="\${gradients[index % 5]} rounded-2xl shadow-2xl p-6 storage-card" onclick="showDetail('\${storage.id}')">
-                    <div class="text-white">
-                        <div class="flex justify-between items-start mb-4">
-                            <h3 class="text-2xl font-bold">📦 \${storage.storage_number}</h3>
-                            \${storage.latitude ? '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">📍 地図設定済み</span>' : '<span class="bg-white bg-opacity-20 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">⚠️ 地図未設定</span>'}
-                        </div>
-                        <p class="text-lg mb-2 font-semibold">📍 \${storage.location}</p>
-                        \${storage.address ? \`<p class="opacity-90 mb-2">🏠 \${storage.address}</p>\` : ''}
-                        \${storage.remarks ? \`<p class="opacity-80 text-sm mb-4">💬 \${storage.remarks}</p>\` : ''}
-                        
-                        <div class="flex flex-col space-y-2 mt-6">
-                            \${storage.google_maps_url ? 
-                                \`<button onclick="event.stopPropagation(); window.open('\${storage.google_maps_url}', '_blank')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">
-                                    🗺️ Google Maps
-                                </button>\` : ''
-                            }
-                            \${storage.latitude ? 
-                                \`<button onclick="event.stopPropagation(); viewOnMap('\${storage.id}')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">
-                                    📍 地図を見る
-                                </button>\` : 
-                                \`<button onclick="event.stopPropagation(); editStorage('\${storage.id}')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">
-                                    📍 地図を設定
-                                </button>\`
-                            }
-                            <button onclick="event.stopPropagation(); editStorage('\${storage.id}')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">
-                                ✏️ 編集
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            \`).join('');
+            list.innerHTML = storages.map((storage, index) => {
+                const gradient = gradients[index % 5];
+                return '<div class="' + gradient + ' rounded-2xl shadow-2xl p-6 storage-card" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
+                    '<div class="text-white">' +
+                        '<div class="flex justify-between items-start mb-4">' +
+                            '<h3 class="text-2xl font-bold">📦 ' + storage.storage_number + '</h3>' +
+                            (storage.latitude ? '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">📍 地図設定済み</span>' : '<span class="bg-white bg-opacity-20 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">⚠️ 地図未設定</span>') +
+                        '</div>' +
+                        '<p class="text-lg mb-2 font-semibold">📍 ' + storage.location + '</p>' +
+                        (storage.address ? '<p class="opacity-90 mb-2">🏠 ' + storage.address + '</p>' : '') +
+                        (storage.remarks ? '<p class="opacity-80 text-sm mb-4">💬 ' + storage.remarks + '</p>' : '') +
+                        '<div class="flex flex-col space-y-2 mt-6">' +
+                            '<button onclick="event.stopPropagation(); location.href=\\'/storage/' + storage.id + '\\'" class="w-full bg-white bg-opacity-40 hover:bg-opacity-50 backdrop-blur-sm px-4 py-4 rounded-xl text-lg font-bold transition border border-white border-opacity-50">' +
+                                '📝 点検する' +
+                            '</button>' +
+                            (storage.google_maps_url ? 
+                                '<button onclick="event.stopPropagation(); window.open(\\'' + storage.google_maps_url + '\\', \\'_blank\\')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">' +
+                                    '🗺️ Google Maps' +
+                                '</button>' : ''
+                            ) +
+                            '<button onclick="event.stopPropagation(); editStorage(\\'' + storage.id + '\\')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">' +
+                                '✏️ 編集' +
+                            '</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
         }
 
         // CSV一括登録モーダル表示
@@ -753,18 +748,6 @@ No.03,××消防団詰所前,</pre>
                 }).addTo(detailMap);
                 L.marker([storage.latitude, storage.longitude]).addTo(detailMap);
             }, 100);
-        }
-
-        // 詳細表示
-        function showDetail(id) {
-            const storage = storages.find(s => s.id === id);
-            if (!storage) return;
-
-            if (storage.latitude) {
-                viewOnMap(id);
-            } else {
-                editStorage(id);
-            }
         }
 
         function hideDetailModal() {
