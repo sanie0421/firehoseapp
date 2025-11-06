@@ -20,71 +20,105 @@ app.get('/', (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ダッシュボード - 消防団デジタルノート</title>
+    <title>消防団デジタルノート</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            min-height: 100vh;
+        }
+        .card-gradient-1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-gradient-2 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .card-gradient-3 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .card-gradient-4 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .card-gradient-5 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .float-animation { animation: float 3s ease-in-out infinite; }
+        
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card-hover:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+    </style>
 </head>
-<body class="bg-gray-100">
-    <!-- ナビゲーションバー -->
-    <nav class="bg-red-500 text-white p-4 shadow-lg">
-        <div class="container mx-auto flex justify-between items-center">
-            <div class="flex items-center space-x-2">
-                <span class="text-2xl">🔥</span>
-                <div>
-                    <div class="font-bold text-xl">消防団デジタルノート</div>
-                    <div class="text-xs opacity-90">大井町消防団第一分団</div>
+<body>
+    <!-- ヘッダー -->
+    <div class="bg-white bg-opacity-20 backdrop-blur-md border-b border-white border-opacity-30">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-center space-x-4">
+                <div class="text-6xl float-animation">🔥</div>
+                <div class="text-white text-center">
+                    <h1 class="text-3xl md:text-4xl font-bold drop-shadow-lg">消防団デジタルノート</h1>
+                    <p class="text-lg opacity-90">大井町消防団第一分団</p>
                 </div>
             </div>
         </div>
-    </nav>
+    </div>
 
     <!-- メインコンテンツ -->
-    <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">ホーム</h1>
-        <p class="text-gray-600 mb-8">記録したい項目を選んでください</p>
-
+    <div class="container mx-auto px-4 py-12">
         <!-- 機能カード -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
             <!-- 活動日誌 -->
-            <a href="/logs" class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition transform hover:-translate-y-1">
-                <div class="text-5xl mb-4">📝</div>
-                <h2 class="text-xl font-bold text-gray-800 mb-2">活動日誌</h2>
-                <p class="text-gray-600 text-sm">活動の記録・承認・PDF出力</p>
+            <a href="/logs" class="card-gradient-1 rounded-2xl shadow-2xl p-8 card-hover">
+                <div class="text-white">
+                    <div class="text-7xl mb-6 text-center">📝</div>
+                    <h2 class="text-2xl font-bold mb-3 text-center">活動日誌</h2>
+                    <p class="text-center opacity-90">活動の記録・承認・PDF出力</p>
+                </div>
             </a>
 
             <!-- ホース点検 -->
-            <a href="/hose" class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition transform hover:-translate-y-1">
-                <div class="text-5xl mb-4">🔧</div>
-                <h2 class="text-xl font-bold text-gray-800 mb-2">ホース点検</h2>
-                <p class="text-gray-600 text-sm">格納庫管理・点検記録</p>
+            <a href="/hose" class="card-gradient-2 rounded-2xl shadow-2xl p-8 card-hover">
+                <div class="text-white">
+                    <div class="text-7xl mb-6 text-center">🔧</div>
+                    <h2 class="text-2xl font-bold mb-3 text-center">ホース点検</h2>
+                    <p class="text-center opacity-90">格納庫管理・点検記録</p>
+                </div>
             </a>
 
             <!-- 訓練記録 -->
-            <a href="/training" class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition transform hover:-translate-y-1">
-                <div class="text-5xl mb-4">🏃</div>
-                <h2 class="text-xl font-bold text-gray-800 mb-2">訓練記録</h2>
-                <p class="text-gray-600 text-sm">訓練内容・参加者記録</p>
+            <a href="/training" class="card-gradient-3 rounded-2xl shadow-2xl p-8 card-hover">
+                <div class="text-white">
+                    <div class="text-7xl mb-6 text-center">🏃</div>
+                    <h2 class="text-2xl font-bold mb-3 text-center">訓練記録</h2>
+                    <p class="text-center opacity-90">訓練内容・参加者記録</p>
+                </div>
             </a>
 
             <!-- 団員管理 -->
-            <a href="/members" class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition transform hover:-translate-y-1">
-                <div class="text-5xl mb-4">👥</div>
-                <h2 class="text-xl font-bold text-gray-800 mb-2">団員管理</h2>
-                <p class="text-gray-600 text-sm">団員情報・連絡先</p>
+            <a href="/members" class="card-gradient-4 rounded-2xl shadow-2xl p-8 card-hover">
+                <div class="text-white">
+                    <div class="text-7xl mb-6 text-center">👥</div>
+                    <h2 class="text-2xl font-bold mb-3 text-center">団員管理</h2>
+                    <p class="text-center opacity-90">団員情報・連絡先</p>
+                </div>
             </a>
 
             <!-- 活動集計 -->
-            <a href="/stats" class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition transform hover:-translate-y-1">
-                <div class="text-5xl mb-4">📊</div>
-                <h2 class="text-xl font-bold text-gray-800 mb-2">活動集計</h2>
-                <p class="text-gray-600 text-sm">実績データ・グラフ表示</p>
+            <a href="/stats" class="card-gradient-5 rounded-2xl shadow-2xl p-8 card-hover">
+                <div class="text-white">
+                    <div class="text-7xl mb-6 text-center">📊</div>
+                    <h2 class="text-2xl font-bold mb-3 text-center">活動集計</h2>
+                    <p class="text-center opacity-90">実績データ・グラフ表示</p>
+                </div>
             </a>
         </div>
 
         <!-- 使い方案内 -->
-        <div class="mt-8 bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
-            <p class="text-blue-800">
-                <strong>💡 使い方:</strong> 各カードをクリックすると記録画面が開きます。記録者は記入時に選べます！
-            </p>
+        <div class="mt-12 max-w-2xl mx-auto">
+            <div class="bg-white bg-opacity-20 backdrop-blur-md rounded-2xl p-6 border border-white border-opacity-30">
+                <p class="text-white text-center text-lg">
+                    <strong>💡 使い方:</strong> 各カードをタップすると記録画面が開きます
+                </p>
+            </div>
         </div>
     </div>
 </body>
@@ -657,6 +691,7 @@ app.get('/api/hose/storages', async (c) => {
       storage_number: 'No.01',
       location: '◯◯公民館前',
       address: '大井町金子1234-5',
+      google_maps_url: 'https://www.google.com/maps/@35.3340353,139.1516114,14z',
       latitude: 35.3604,
       longitude: 139.1386,
       remarks: '2020年設置'
@@ -666,6 +701,7 @@ app.get('/api/hose/storages', async (c) => {
       storage_number: 'No.02',
       location: '△△集会所裏',
       address: '',
+      google_maps_url: '',
       latitude: null,
       longitude: null,
       remarks: ''
