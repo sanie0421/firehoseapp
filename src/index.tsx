@@ -2248,7 +2248,7 @@ app.get('/members', (c) => {
 
             list.innerHTML = members.map(member => {
                 const age = member.birth_date ? calculateAge(member.birth_date) : '不明';
-                const years = member.join_year ? new Date().getFullYear() - parseInt(member.join_year) + 1 : '不明';
+                const years = member.join_year ? calculateYearsOfService(member.join_year) : '不明';
                 
                 return '<div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6">' +
                     '<h3 class="text-2xl font-bold text-white mb-4">👤 ' + member.name + '</h3>' +
@@ -2261,6 +2261,18 @@ app.get('/members', (c) => {
                     '</button>' +
                 '</div>';
             }).join('');
+        }
+        
+        function calculateYearsOfService(joinYear) {
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth() + 1; // 0-11 -> 1-12
+            
+            // 4月1日が年度の始まり
+            // 4月1日以降なら今年度、3月31日以前なら前年度
+            const fiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+            
+            return fiscalYear - parseInt(joinYear) + 1;
         }
 
         function calculateAge(birthDate) {
