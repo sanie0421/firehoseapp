@@ -743,59 +743,131 @@ No.03,××消防団詰所前,</pre>
 // API: 格納庫一覧取得
 // ==========================================
 app.get('/api/hose/storages', async (c) => {
-  // テストデータ
-  const storages = [
-    {
-      id: 'storage_001',
-      storage_number: 'No.01',
-      location: '◯◯公民館前',
-      address: '大井町金子1234-5',
-      google_maps_url: 'https://www.google.com/maps/@35.3340353,139.1516114,14z',
-      latitude: 35.3604,
-      longitude: 139.1386,
-      remarks: '2020年設置'
-    },
-    {
-      id: 'storage_002',
-      storage_number: 'No.02',
-      location: '△△集会所裏',
-      address: '',
-      google_maps_url: '',
-      latitude: null,
-      longitude: null,
-      remarks: ''
-    }
-  ]
-
-  return c.json({ storages })
+  try {
+    const env = c.env as { DB: D1Database }
+    const result = await env.DB.prepare(`
+      SELECT * FROM hose_storages 
+      ORDER BY storage_number ASC
+    `).all()
+    
+    return c.json({ storages: result.results })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ storages: [] })
+  }
 })
 
 // ==========================================
 // API: 格納庫追加
 // ==========================================
 app.post('/api/hose/storages', async (c) => {
-  const data = await c.req.json()
-  // TODO: D1に保存
-  return c.json({ success: true, id: 'storage_' + Date.now() })
+  try {
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    
+    const id = 'storage_' + Date.now()
+    const now = new Date().toISOString()
+    
+    await env.DB.prepare(`
+      INSERT INTO hose_storages (
+        id, storage_number, location, address, 
+        google_maps_url, latitude, longitude, remarks,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      id,
+      data.storage_number,
+      data.location,
+      data.address || null,
+      data.google_maps_url || null,
+      data.latitude || null,
+      data.longitude || null,
+      data.remarks || null,
+      now,
+      now
+    ).run()
+    
+    return c.json({ success: true, id })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false, error: 'Failed to save' }, 500)
+  }
 })
 
 // ==========================================
 // API: 格納庫更新
 // ==========================================
 app.put('/api/hose/storages/:id', async (c) => {
-  const id = c.req.param('id')
-  const data = await c.req.json()
-  // TODO: D1を更新
-  return c.json({ success: true })
+  try {
+    const id = c.req.param('id')
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    
+    const now = new Date().toISOString()
+    
+    await env.DB.prepare(`
+      UPDATE hose_storages 
+      SET storage_number = ?,
+          location = ?,
+          address = ?,
+          google_maps_url = ?,
+          latitude = ?,
+          longitude = ?,
+          remarks = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).bind(
+      data.storage_number,
+      data.location,
+      data.address || null,
+      data.google_maps_url || null,
+      data.latitude || null,
+      data.longitude || null,
+      data.remarks || null,
+      now,
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false, error: 'Failed to update' }, 500)
+  }
 })
 
 // ==========================================
 // API: CSV一括登録
 // ==========================================
 app.post('/api/hose/storages/bulk', async (c) => {
-  const { storages } = await c.req.json()
-  // TODO: D1に一括保存
-  return c.json({ success: true, count: storages.length })
+  try {
+    const { storages } = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    const now = new Date().toISOString()
+    
+    // トランザクション的に全件挿入
+    for (const storage of storages) {
+      const id = 'storage_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+      
+      await env.DB.prepare(`
+        INSERT INTO hose_storages (
+          id, storage_number, location, remarks,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        id,
+        storage.storage_number,
+        storage.location,
+        storage.remarks || null,
+        now,
+        now
+      ).run()
+    }
+    
+    return c.json({ success: true, count: storages.length })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false, error: 'Failed to bulk insert' }, 500)
+  }
 })
 
 // ==========================================
