@@ -69,67 +69,67 @@ app.get('/', (c) => {
     <!-- メインコンテンツ -->
     <div class="container mx-auto px-4 py-12">
         <!-- 機能カード -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             <!-- 点検優先度（最優先） -->
-            <a href="/inspection-priority" class="card-gradient-1 rounded-2xl shadow-2xl p-8 card-hover">
+            <a href="/inspection-priority" class="card-gradient-1 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
-                    <div class="text-7xl mb-6 text-center">⚠️</div>
-                    <h2 class="text-2xl font-bold mb-3 text-center">点検優先度</h2>
-                    <p class="text-center opacity-90">要点検の格納庫を確認</p>
+                    <div class="text-5xl mb-4 text-center">⚠️</div>
+                    <h2 class="text-xl font-bold mb-2 text-center">点検優先度</h2>
+                    <p class="text-center opacity-90 text-sm">要点検の格納庫を確認</p>
                 </div>
             </a>
 
             <!-- ホース格納庫管理 -->
-            <a href="/hose" class="card-gradient-2 rounded-2xl shadow-2xl p-8 card-hover">
+            <a href="/hose" class="card-gradient-2 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
-                    <div class="text-7xl mb-6 text-center">🔧</div>
-                    <h2 class="text-2xl font-bold mb-3 text-center">格納庫管理</h2>
-                    <p class="text-center opacity-90">格納庫の登録・編集</p>
+                    <div class="text-5xl mb-4 text-center">🔧</div>
+                    <h2 class="text-xl font-bold mb-2 text-center">格納庫管理</h2>
+                    <p class="text-center opacity-90 text-sm">格納庫の登録・編集</p>
                 </div>
             </a>
 
             <!-- 要対応事項一覧 -->
-            <a href="/action-required" class="card-gradient-3 rounded-2xl shadow-2xl p-8 card-hover">
+            <a href="/action-required" class="card-gradient-3 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
-                    <div class="text-7xl mb-6 text-center">🚨</div>
-                    <h2 class="text-2xl font-bold mb-3 text-center">要対応事項</h2>
-                    <p class="text-center opacity-90">対応が必要な項目一覧</p>
+                    <div class="text-5xl mb-4 text-center">🚨</div>
+                    <h2 class="text-xl font-bold mb-2 text-center">要対応事項</h2>
+                    <p class="text-center opacity-90 text-sm">対応が必要な項目一覧</p>
                 </div>
             </a>
 
             <!-- 活動日誌 -->
-            <a href="/logs" class="card-gradient-4 rounded-2xl shadow-2xl p-8 card-hover">
+            <a href="/logs" class="card-gradient-4 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
-                    <div class="text-7xl mb-6 text-center">📝</div>
-                    <h2 class="text-2xl font-bold mb-3 text-center">活動日誌</h2>
-                    <p class="text-center opacity-90">活動・訓練の記録と承認</p>
+                    <div class="text-5xl mb-4 text-center">📝</div>
+                    <h2 class="text-xl font-bold mb-2 text-center">活動日誌</h2>
+                    <p class="text-center opacity-90 text-sm">活動・訓練の記録と承認</p>
                 </div>
             </a>
 
             <!-- 団員管理 -->
-            <a href="/members" class="card-gradient-5 rounded-2xl shadow-2xl p-8 card-hover">
+            <a href="/members" class="card-gradient-5 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
-                    <div class="text-7xl mb-6 text-center">👥</div>
-                    <h2 class="text-2xl font-bold mb-3 text-center">団員管理</h2>
-                    <p class="text-center opacity-90">団員情報・連絡先</p>
+                    <div class="text-5xl mb-4 text-center">👥</div>
+                    <h2 class="text-xl font-bold mb-2 text-center">団員管理</h2>
+                    <p class="text-center opacity-90 text-sm">団員情報・連絡先</p>
                 </div>
             </a>
 
             <!-- 活動集計 -->
-            <a href="/stats" class="card-gradient-1 rounded-2xl shadow-2xl p-8 card-hover">
+            <a href="/stats" class="card-gradient-1 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
-                    <div class="text-7xl mb-6 text-center">📊</div>
-                    <h2 class="text-2xl font-bold mb-3 text-center">活動集計</h2>
-                    <p class="text-center opacity-90">実績データ・グラフ表示</p>
+                    <div class="text-5xl mb-4 text-center">📊</div>
+                    <h2 class="text-xl font-bold mb-2 text-center">活動集計</h2>
+                    <p class="text-center opacity-90 text-sm">実績データ・グラフ表示</p>
                 </div>
             </a>
 
             <!-- データ管理 -->
-            <a href="/admin" class="card-gradient-2 rounded-2xl shadow-2xl p-8 card-hover">
+            <a href="/admin" class="card-gradient-2 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
-                    <div class="text-7xl mb-6 text-center">⚙️</div>
-                    <h2 class="text-2xl font-bold mb-3 text-center">データ管理</h2>
-                    <p class="text-center opacity-90">データ確認・バックアップ</p>
+                    <div class="text-5xl mb-4 text-center">⚙️</div>
+                    <h2 class="text-xl font-bold mb-2 text-center">データ管理</h2>
+                    <p class="text-center opacity-90 text-sm">データ確認・バックアップ</p>
                 </div>
             </a>
         </div>
