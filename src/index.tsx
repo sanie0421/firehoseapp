@@ -1196,11 +1196,477 @@ app.get('/api/admin/backup', async (c) => {
 })
 
 // ==========================================
+// 点検優先度ページ
+// ==========================================
+app.get('/inspection-priority', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>点検優先度 - 消防団デジタルノート</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            min-height: 100vh;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .float-animation { animation: float 3s ease-in-out infinite; }
+        .priority-high { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .priority-medium { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+        .priority-low { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        button {
+            -webkit-tap-highlight-color: transparent;
+            min-height: 48px;
+        }
+    </style>
+</head>
+<body>
+    <!-- ナビゲーションバー -->
+    <nav class="bg-white bg-opacity-20 backdrop-blur-md border-b border-white border-opacity-30">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center space-x-3">
+                    <span class="text-4xl float-animation">🔥</span>
+                    <div class="text-white">
+                        <div class="font-bold text-xl">消防団デジタルノート</div>
+                        <div class="text-sm opacity-90">大井町消防団第一分団</div>
+                    </div>
+                </a>
+                <a href="/" class="text-white hover:underline text-sm bg-white bg-opacity-20 px-4 py-2 rounded-lg backdrop-blur-sm">
+                    ← ホームに戻る
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- メインコンテンツ -->
+    <div class="container mx-auto px-4 py-6">
+        <!-- ヘッダー -->
+        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6 mb-6">
+            <div class="text-white">
+                <h1 class="text-3xl font-bold mb-2 drop-shadow-lg">⚠️ 点検優先度</h1>
+                <p class="text-base opacity-90">点検が必要な格納庫を確認しましょう</p>
+            </div>
+        </div>
+
+        <!-- 格納庫一覧（優先度順） -->
+        <div id="priorityList" class="space-y-4">
+            <p class="text-white text-center py-8">読み込み中...</p>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            loadPriorityList();
+        };
+
+        async function loadPriorityList() {
+            try {
+                const response = await fetch('/api/inspection/priority');
+                const data = await response.json();
+                renderPriorityList(data.storages || []);
+            } catch (error) {
+                document.getElementById('priorityList').innerHTML = 
+                    '<p class="text-white text-center py-8">データの読み込みに失敗しました</p>';
+                console.error(error);
+            }
+        }
+
+        function renderPriorityList(storages) {
+            const list = document.getElementById('priorityList');
+            
+            if (storages.length === 0) {
+                list.innerHTML = '<div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-12 text-center"><p class="text-white text-xl">格納庫が登録されていません</p></div>';
+                return;
+            }
+
+            list.innerHTML = storages.map(storage => {
+                const daysAgo = storage.days_since_inspection;
+                let priorityClass = 'priority-low';
+                let priorityText = '正常';
+                let priorityIcon = '✅';
+                
+                if (daysAgo === null || daysAgo > 180) {
+                    priorityClass = 'priority-high';
+                    priorityText = '要点検';
+                    priorityIcon = '🚨';
+                } else if (daysAgo > 90) {
+                    priorityClass = 'priority-medium';
+                    priorityText = '注意';
+                    priorityIcon = '⚠️';
+                }
+
+                const lastInspection = storage.last_inspection_date 
+                    ? new Date(storage.last_inspection_date).toLocaleDateString('ja-JP')
+                    : '未点検';
+
+                return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
+                    '<div class="text-white">' +
+                        '<div class="flex justify-between items-start mb-4">' +
+                            '<h3 class="text-2xl font-bold">📦 ' + storage.storage_number + '</h3>' +
+                            '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full text-base font-bold border border-white border-opacity-50">' + priorityIcon + ' ' + priorityText + '</span>' +
+                        '</div>' +
+                        '<p class="text-lg mb-2 font-semibold">📍 ' + storage.location + '</p>' +
+                        '<p class="text-base opacity-90 mb-4">最終点検: ' + lastInspection + (daysAgo !== null ? ' (' + daysAgo + '日前)' : '') + '</p>' +
+                        '<button class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-xl text-base font-semibold transition border border-white border-opacity-50">' +
+                            '📝 点検する' +
+                        '</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+    </script>
+</body>
+</html>
+  `)
+})
+
+// ==========================================
+// API: 点検優先度取得
+// ==========================================
+app.get('/api/inspection/priority', async (c) => {
+  try {
+    const env = c.env as { DB: D1Database }
+    
+    // 各格納庫の最終点検日を取得してソート
+    const result = await env.DB.prepare(`
+      SELECT 
+        s.*,
+        i.inspection_date as last_inspection_date,
+        CAST((julianday('now') - julianday(i.inspection_date)) AS INTEGER) as days_since_inspection
+      FROM hose_storages s
+      LEFT JOIN (
+        SELECT storage_id, MAX(inspection_date) as inspection_date
+        FROM hose_inspections
+        GROUP BY storage_id
+      ) i ON s.id = i.storage_id
+      ORDER BY 
+        CASE 
+          WHEN i.inspection_date IS NULL THEN 0
+          ELSE 1
+        END,
+        i.inspection_date ASC
+    `).all()
+    
+    return c.json({ storages: result.results })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ storages: [] })
+  }
+})
+
+// ==========================================
+// 格納庫詳細・点検ページ
+// ==========================================
+app.get('/storage/:id', async (c) => {
+  const id = c.req.param('id')
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>格納庫詳細 - 消防団デジタルノート</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            min-height: 100vh;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .float-animation { animation: float 3s ease-in-out infinite; }
+        input, textarea, select {
+            font-size: 16px !important;
+        }
+        button {
+            -webkit-tap-highlight-color: transparent;
+            min-height: 48px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="bg-white bg-opacity-20 backdrop-blur-md border-b border-white border-opacity-30">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center space-x-3">
+                    <span class="text-4xl float-animation">🔥</span>
+                    <div class="text-white">
+                        <div class="font-bold text-xl">消防団デジタルノート</div>
+                        <div class="text-sm opacity-90">大井町消防団第一分団</div>
+                    </div>
+                </a>
+                <a href="/inspection-priority" class="text-white hover:underline text-sm bg-white bg-opacity-20 px-4 py-2 rounded-lg backdrop-blur-sm">
+                    ← 優先度一覧
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6">
+        <div id="storageDetail" class="mb-6">
+            <p class="text-white text-center py-8">読み込み中...</p>
+        </div>
+
+        <!-- 点検記録ボタン -->
+        <button onclick="showInspectionModal()" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg mb-6">
+            📝 点検を記録する
+        </button>
+
+        <!-- 点検履歴 -->
+        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6 mb-6">
+            <h2 class="text-2xl font-bold text-white mb-4">📋 点検履歴</h2>
+            <div id="inspectionHistory">
+                <p class="text-white text-center py-4">読み込み中...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 点検記録モーダル -->
+    <div id="inspectionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 my-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">📝 点検を記録</h2>
+                <button onclick="hideInspectionModal()" class="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">📅 点検日 <span class="text-red-500">*</span></label>
+                    <input type="date" id="inspectionDate" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">✅ 結果 <span class="text-red-500">*</span></label>
+                    <select id="inspectionResult" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        <option value="">選択してください</option>
+                        <option value="normal">正常</option>
+                        <option value="caution">要注意</option>
+                        <option value="abnormal">異常あり</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">🚨 要対応事項（あれば）</label>
+                    <textarea id="actionRequired" rows="4" placeholder="対応が必要な内容を記入してください" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">📝 備考</label>
+                    <textarea id="remarks" rows="3" placeholder="その他メモ" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                </div>
+
+                <div class="flex flex-col space-y-3 pt-4">
+                    <button type="button" onclick="saveInspection()" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
+                        ✅ 保存する
+                    </button>
+                    <button type="button" onclick="hideInspectionModal()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
+                        キャンセル
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const storageId = '${id}';
+        let storageData = null;
+
+        window.onload = function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('inspectionDate').value = today;
+            loadStorageDetail();
+            loadInspectionHistory();
+        };
+
+        async function loadStorageDetail() {
+            try {
+                const response = await fetch('/api/hose/storages');
+                const data = await response.json();
+                storageData = data.storages.find(s => s.id === storageId);
+                
+                if (storageData) {
+                    document.getElementById('storageDetail').innerHTML = 
+                        '<div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6">' +
+                            '<h1 class="text-3xl font-bold text-white mb-2">📦 ' + storageData.storage_number + '</h1>' +
+                            '<p class="text-xl text-white mb-2">📍 ' + storageData.location + '</p>' +
+                            (storageData.address ? '<p class="text-base text-white opacity-90">🏠 ' + storageData.address + '</p>' : '') +
+                        '</div>';
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function loadInspectionHistory() {
+            try {
+                const response = await fetch('/api/inspection/history/' + storageId);
+                const data = await response.json();
+                renderHistory(data.inspections || []);
+            } catch (error) {
+                document.getElementById('inspectionHistory').innerHTML = 
+                    '<p class="text-white text-center py-4">読み込みエラー</p>';
+            }
+        }
+
+        function renderHistory(inspections) {
+            const container = document.getElementById('inspectionHistory');
+            
+            if (inspections.length === 0) {
+                container.innerHTML = '<p class="text-white text-center py-4">まだ点検記録がありません</p>';
+                return;
+            }
+
+            container.innerHTML = inspections.map(insp => {
+                const date = new Date(insp.inspection_date).toLocaleDateString('ja-JP');
+                const resultText = {normal: '正常', caution: '要注意', abnormal: '異常あり'}[insp.result] || insp.result;
+                const resultColor = {normal: 'bg-green-500', caution: 'bg-yellow-500', abnormal: 'bg-red-500'}[insp.result] || 'bg-gray-500';
+                
+                return '<div class="bg-white bg-opacity-10 rounded-lg p-4 mb-3">' +
+                    '<div class="flex justify-between items-start mb-2">' +
+                        '<span class="text-white font-bold">' + date + '</span>' +
+                        '<span class="' + resultColor + ' text-white px-3 py-1 rounded-full text-sm font-bold">' + resultText + '</span>' +
+                    '</div>' +
+                    (insp.action_required ? '<p class="text-white mb-2">🚨 要対応: ' + insp.action_required + '</p>' : '') +
+                    (insp.remarks ? '<p class="text-white opacity-90 text-sm">💬 ' + insp.remarks + '</p>' : '') +
+                '</div>';
+            }).join('');
+        }
+
+        function showInspectionModal() {
+            document.getElementById('inspectionModal').classList.remove('hidden');
+        }
+
+        function hideInspectionModal() {
+            document.getElementById('inspectionModal').classList.add('hidden');
+        }
+
+        async function saveInspection() {
+            const date = document.getElementById('inspectionDate').value;
+            const result = document.getElementById('inspectionResult').value;
+            const actionRequired = document.getElementById('actionRequired').value;
+            const remarks = document.getElementById('remarks').value;
+
+            if (!date || !result) {
+                alert('点検日と結果は必須です');
+                return;
+            }
+
+            const data = {
+                storage_id: storageId,
+                storage_number: storageData.storage_number,
+                inspection_date: date,
+                result: result,
+                action_required: actionRequired,
+                remarks: remarks,
+                inspector_name: '団員'
+            };
+
+            try {
+                const response = await fetch('/api/inspection/record', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    alert('点検記録を保存しました！');
+                    hideInspectionModal();
+                    loadInspectionHistory();
+                    document.getElementById('inspectionResult').value = '';
+                    document.getElementById('actionRequired').value = '';
+                    document.getElementById('remarks').value = '';
+                } else {
+                    alert('保存に失敗しました');
+                }
+            } catch (error) {
+                alert('エラーが発生しました');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
+  `)
+})
+
+// ==========================================
+// API: 点検履歴取得
+// ==========================================
+app.get('/api/inspection/history/:storageId', async (c) => {
+  try {
+    const storageId = c.req.param('storageId')
+    const env = c.env as { DB: D1Database }
+    
+    const result = await env.DB.prepare(`
+      SELECT * FROM hose_inspections 
+      WHERE storage_id = ?
+      ORDER BY inspection_date DESC
+      LIMIT 50
+    `).bind(storageId).all()
+    
+    return c.json({ inspections: result.results })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ inspections: [] })
+  }
+})
+
+// ==========================================
+// API: 点検記録保存
+// ==========================================
+app.post('/api/inspection/record', async (c) => {
+  try {
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    
+    const id = 'inspection_' + Date.now()
+    const now = new Date().toISOString()
+    
+    await env.DB.prepare(`
+      INSERT INTO hose_inspections (
+        id, storage_id, storage_number, inspection_date,
+        result, action_required, remarks,
+        inspector_id, inspector_name,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      id,
+      data.storage_id,
+      data.storage_number,
+      data.inspection_date,
+      data.result,
+      data.action_required || null,
+      data.remarks || null,
+      'user_001',
+      data.inspector_name,
+      now,
+      now
+    ).run()
+    
+    return c.json({ success: true, id })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
 // 未実装ページ（Coming Soon）
 // ==========================================
 app.get('/logs', (c) => c.html(comingSoonPage('活動日誌', '📝')))
 app.get('/members', (c) => c.html(comingSoonPage('団員管理', '👥')))
 app.get('/stats', (c) => c.html(comingSoonPage('活動集計', '📊')))
+app.get('/action-required', (c) => c.html(comingSoonPage('要対応事項', '🚨')))
 
 // ==========================================
 // 旧ログインページへのリダイレクト
