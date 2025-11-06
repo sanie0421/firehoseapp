@@ -221,7 +221,7 @@ app.get('/hose', (c) => {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
             min-height: 100vh;
         }
-        #map { height: 300px; width: 100%; }
+        #map { height: 250px; width: 100%; }
         
         /* グラデーションカード */
         .storage-gradient-1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
@@ -299,8 +299,9 @@ app.get('/hose', (c) => {
     </div>
 
     <!-- CSV一括登録モーダル -->
-    <div id="uploadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8">
+    <div id="uploadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div class="min-h-full flex items-start justify-center p-4 py-8">
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">📥 CSV一括登録</h2>
                 <button onclick="hideUploadModal()" class="text-gray-500 hover:text-gray-700">✕</button>
@@ -345,12 +346,14 @@ No.03,××消防団詰所前,</pre>
                     </button>
                 </div>
             </div>
+            </div>
         </div>
     </div>
 
     <!-- 格納庫追加/編集モーダル -->
-    <div id="addModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-8 my-8">
+    <div id="addModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div class="min-h-full flex items-start justify-center p-4 py-8">
+            <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800" id="modalTitle">📦 格納庫を追加</h2>
                 <button onclick="hideAddModal()" class="text-gray-500 hover:text-gray-700">✕</button>
@@ -438,6 +441,7 @@ No.03,××消防団詰所前,</pre>
                     </button>
                 </div>
             </form>
+            </div>
         </div>
     </div>
 
