@@ -203,7 +203,7 @@ app.get('/hose', (c) => {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
             min-height: 100vh;
         }
-        #map { height: 400px; width: 100%; }
+        #map { height: 300px; width: 100%; }
         
         /* グラデーションカード */
         .storage-gradient-1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
@@ -215,10 +215,10 @@ app.get('/hose', (c) => {
         .storage-card {
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            -webkit-tap-highlight-color: transparent;
         }
-        .storage-card:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        .storage-card:active {
+            transform: scale(0.98);
         }
         
         @keyframes float {
@@ -226,6 +226,15 @@ app.get('/hose', (c) => {
             50% { transform: translateY(-20px); }
         }
         .float-animation { animation: float 3s ease-in-out infinite; }
+        
+        /* スマホ最適化 */
+        input, textarea, select {
+            font-size: 16px !important; /* iPhoneのズーム防止 */
+        }
+        button {
+            -webkit-tap-highlight-color: transparent;
+            min-height: 48px; /* タップしやすいサイズ */
+        }
     </style>
 </head>
 <body>
@@ -250,20 +259,18 @@ app.get('/hose', (c) => {
     <!-- メインコンテンツ -->
     <div class="container mx-auto px-4 py-8">
         <!-- ヘッダー -->
-        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-8 mb-8">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="text-white mb-4 md:mb-0">
-                    <h1 class="text-4xl font-bold mb-2 drop-shadow-lg">🔧 ホース格納庫管理</h1>
-                    <p class="text-lg opacity-90">格納庫の登録・地図設定・点検記録</p>
-                </div>
-                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                    <button onclick="showUploadModal()" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-6 py-3 rounded-lg transition border border-white border-opacity-50 shadow-lg">
-                        📥 CSV一括登録
-                    </button>
-                    <button onclick="showAddModal()" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-6 py-3 rounded-lg transition border border-white border-opacity-50 shadow-lg">
-                        ➕ 格納庫を追加
-                    </button>
-                </div>
+        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6 mb-6">
+            <div class="text-white mb-4">
+                <h1 class="text-3xl font-bold mb-2 drop-shadow-lg">🔧 ホース格納庫管理</h1>
+                <p class="text-base opacity-90">格納庫の登録・地図設定・点検記録</p>
+            </div>
+            <div class="flex flex-col space-y-3">
+                <button onclick="showAddModal()" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-6 py-4 rounded-xl transition border border-white border-opacity-50 shadow-lg font-bold text-lg">
+                    ➕ 格納庫を追加
+                </button>
+                <button onclick="showUploadModal()" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-6 py-4 rounded-xl transition border border-white border-opacity-50 shadow-lg font-bold text-lg">
+                    📥 CSV一括登録
+                </button>
             </div>
         </div>
 
@@ -311,11 +318,11 @@ No.03,××消防団詰所前,</pre>
                 </div>
 
                 <!-- アップロードボタン -->
-                <div class="flex space-x-2">
-                    <button onclick="uploadCSV()" class="flex-1 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition">
+                <div class="flex flex-col space-y-3">
+                    <button onclick="uploadCSV()" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
                         ✅ 一括登録する
                     </button>
-                    <button onclick="hideUploadModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-3 rounded-lg transition">
+                    <button onclick="hideUploadModal()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
                         キャンセル
                     </button>
                 </div>
@@ -404,11 +411,11 @@ No.03,××消防団詰所前,</pre>
                 </div>
 
                 <!-- ボタン -->
-                <div class="flex space-x-2">
-                    <button type="button" onclick="saveStorage()" class="flex-1 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition">
+                <div class="flex flex-col space-y-3">
+                    <button type="button" onclick="saveStorage()" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
                         ✅ 保存する
                     </button>
-                    <button type="button" onclick="hideAddModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-3 rounded-lg transition">
+                    <button type="button" onclick="hideAddModal()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
                         キャンセル
                     </button>
                 </div>
@@ -485,21 +492,21 @@ No.03,××消防団詰所前,</pre>
                         \${storage.address ? \`<p class="opacity-90 mb-2">🏠 \${storage.address}</p>\` : ''}
                         \${storage.remarks ? \`<p class="opacity-80 text-sm mb-4">💬 \${storage.remarks}</p>\` : ''}
                         
-                        <div class="flex space-x-2 mt-6">
+                        <div class="flex flex-col space-y-2 mt-6">
                             \${storage.google_maps_url ? 
-                                \`<button onclick="event.stopPropagation(); window.open('\${storage.google_maps_url}', '_blank')" class="flex-1 bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-lg text-sm transition border border-white border-opacity-50">
+                                \`<button onclick="event.stopPropagation(); window.open('\${storage.google_maps_url}', '_blank')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">
                                     🗺️ Google Maps
                                 </button>\` : ''
                             }
                             \${storage.latitude ? 
-                                \`<button onclick="event.stopPropagation(); viewOnMap('\${storage.id}')" class="flex-1 bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-lg text-sm transition border border-white border-opacity-50">
+                                \`<button onclick="event.stopPropagation(); viewOnMap('\${storage.id}')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">
                                     📍 地図を見る
                                 </button>\` : 
-                                \`<button onclick="event.stopPropagation(); editStorage('\${storage.id}')" class="flex-1 bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-lg text-sm transition border border-white border-opacity-50">
+                                \`<button onclick="event.stopPropagation(); editStorage('\${storage.id}')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">
                                     📍 地図を設定
                                 </button>\`
                             }
-                            <button onclick="event.stopPropagation(); editStorage('\${storage.id}')" class="flex-1 bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-lg text-sm transition border border-white border-opacity-50">
+                            <button onclick="event.stopPropagation(); editStorage('\${storage.id}')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">
                                 ✏️ 編集
                             </button>
                         </div>
