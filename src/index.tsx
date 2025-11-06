@@ -195,42 +195,71 @@ app.get('/hose', (c) => {
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            min-height: 100vh;
+        }
         #map { height: 400px; width: 100%; }
-        .storage-card { cursor: pointer; }
-        .storage-card:hover { transform: translateY(-2px); }
+        
+        /* グラデーションカード */
+        .storage-gradient-1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .storage-gradient-2 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .storage-gradient-3 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .storage-gradient-4 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .storage-gradient-5 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+        
+        .storage-card {
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .storage-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .float-animation { animation: float 3s ease-in-out infinite; }
     </style>
 </head>
-<body class="bg-gray-100">
-    <!-- ナビゲーションバー -->
-    <nav class="bg-red-500 text-white p-4 shadow-lg">
-        <div class="container mx-auto flex justify-between items-center">
-            <div class="flex items-center space-x-2">
-                <a href="/" class="flex items-center space-x-2">
-                    <span class="text-2xl">🔥</span>
-                    <div>
+<body>
+    <!-- ナビゲーションバー（ガラスモーフィズム） -->
+    <nav class="bg-white bg-opacity-20 backdrop-blur-md border-b border-white border-opacity-30">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center space-x-3">
+                    <span class="text-4xl float-animation">🔥</span>
+                    <div class="text-white">
                         <div class="font-bold text-xl">消防団デジタルノート</div>
-                        <div class="text-xs opacity-90">大井町消防団第一分団</div>
+                        <div class="text-sm opacity-90">大井町消防団第一分団</div>
                     </div>
                 </a>
+                <a href="/" class="text-white hover:underline text-sm bg-white bg-opacity-20 px-4 py-2 rounded-lg backdrop-blur-sm">
+                    ← ホームに戻る
+                </a>
             </div>
-            <a href="/" class="text-sm hover:underline">← ホームに戻る</a>
         </div>
     </nav>
 
     <!-- メインコンテンツ -->
     <div class="container mx-auto px-4 py-8">
-        <div class="flex justify-between items-center mb-8">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-800">🔧 ホース格納庫管理</h1>
-                <p class="text-gray-600">格納庫の登録・地図設定・点検記録</p>
-            </div>
-            <div class="space-x-2">
-                <button onclick="showUploadModal()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition">
-                    📥 CSV一括登録
-                </button>
-                <button onclick="showAddModal()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition">
-                    ➕ 格納庫を追加
-                </button>
+        <!-- ヘッダー -->
+        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-8 mb-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="text-white mb-4 md:mb-0">
+                    <h1 class="text-4xl font-bold mb-2 drop-shadow-lg">🔧 ホース格納庫管理</h1>
+                    <p class="text-lg opacity-90">格納庫の登録・地図設定・点検記録</p>
+                </div>
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                    <button onclick="showUploadModal()" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-6 py-3 rounded-lg transition border border-white border-opacity-50 shadow-lg">
+                        📥 CSV一括登録
+                    </button>
+                    <button onclick="showAddModal()" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-6 py-3 rounded-lg transition border border-white border-opacity-50 shadow-lg">
+                        ➕ 格納庫を追加
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -331,6 +360,19 @@ No.03,××消防団詰所前,</pre>
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
                 </div>
 
+                <!-- Google My Maps URL（任意） -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        🗺️ Google My Maps URL（任意）
+                    </label>
+                    <input type="url" id="googleMapsUrl"
+                        placeholder="https://www.google.com/maps/@35.3340353,139.1516114,14z"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
+                    <p class="text-sm text-gray-600 mt-1">
+                        💡 Google Mapsで場所を開き、URLをコピーして貼り付けてください
+                    </p>
+                </div>
+
                 <!-- 地図で位置を設定 -->
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-2">
@@ -410,42 +452,53 @@ No.03,××消防団詰所前,</pre>
             
             if (storages.length === 0) {
                 list.innerHTML = \`
-                    <div class="col-span-full text-center py-12">
-                        <div class="text-6xl mb-4">📦</div>
-                        <p class="text-xl text-gray-600 mb-4">まだ格納庫が登録されていません</p>
-                        <button onclick="showUploadModal()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition mr-2">
-                            📥 CSV一括登録
-                        </button>
-                        <button onclick="showAddModal()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition">
-                            ➕ 格納庫を追加
-                        </button>
+                    <div class="col-span-full text-center py-16">
+                        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-12">
+                            <div class="text-8xl mb-6">📦</div>
+                            <p class="text-2xl text-white font-bold mb-4">まだ格納庫が登録されていません</p>
+                            <p class="text-white opacity-90 mb-8">CSV一括登録または個別追加で格納庫を登録しましょう</p>
+                            <button onclick="showUploadModal()" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-8 py-4 rounded-lg transition mr-2 border border-white border-opacity-50 shadow-lg">
+                                📥 CSV一括登録
+                            </button>
+                            <button onclick="showAddModal()" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-8 py-4 rounded-lg transition border border-white border-opacity-50 shadow-lg">
+                                ➕ 格納庫を追加
+                            </button>
+                        </div>
                     </div>
                 \`;
                 return;
             }
 
-            list.innerHTML = storages.map(storage => \`
-                <div class="bg-white rounded-xl shadow-lg p-6 storage-card transition" onclick="showDetail('\${storage.id}')">
-                    <div class="flex justify-between items-start mb-4">
-                        <h3 class="text-xl font-bold text-gray-800">📦 \${storage.storage_number}</h3>
-                        \${storage.latitude ? '<span class="text-green-500 text-sm">📍 地図設定済み</span>' : '<span class="text-orange-500 text-sm">⚠️ 地図未設定</span>'}
-                    </div>
-                    <p class="text-gray-700 mb-2">📍 \${storage.location}</p>
-                    \${storage.address ? \`<p class="text-gray-600 text-sm mb-2">🏠 \${storage.address}</p>\` : ''}
-                    \${storage.remarks ? \`<p class="text-gray-500 text-sm mb-4">💬 \${storage.remarks}</p>\` : ''}
-                    
-                    <div class="flex space-x-2 mt-4">
-                        \${storage.latitude ? 
-                            \`<button onclick="event.stopPropagation(); viewOnMap('\${storage.id}')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm transition">
-                                🗺️ 地図を見る
-                            </button>\` : 
-                            \`<button onclick="event.stopPropagation(); editStorage('\${storage.id}')" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-sm transition">
-                                📍 地図を設定
-                            </button>\`
-                        }
-                        <button onclick="event.stopPropagation(); editStorage('\${storage.id}')" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded text-sm transition">
-                            ✏️ 編集
-                        </button>
+            const gradients = ['storage-gradient-1', 'storage-gradient-2', 'storage-gradient-3', 'storage-gradient-4', 'storage-gradient-5'];
+            list.innerHTML = storages.map((storage, index) => \`
+                <div class="\${gradients[index % 5]} rounded-2xl shadow-2xl p-6 storage-card" onclick="showDetail('\${storage.id}')">
+                    <div class="text-white">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-2xl font-bold">📦 \${storage.storage_number}</h3>
+                            \${storage.latitude ? '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">📍 地図設定済み</span>' : '<span class="bg-white bg-opacity-20 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">⚠️ 地図未設定</span>'}
+                        </div>
+                        <p class="text-lg mb-2 font-semibold">📍 \${storage.location}</p>
+                        \${storage.address ? \`<p class="opacity-90 mb-2">🏠 \${storage.address}</p>\` : ''}
+                        \${storage.remarks ? \`<p class="opacity-80 text-sm mb-4">💬 \${storage.remarks}</p>\` : ''}
+                        
+                        <div class="flex space-x-2 mt-6">
+                            \${storage.google_maps_url ? 
+                                \`<button onclick="event.stopPropagation(); window.open('\${storage.google_maps_url}', '_blank')" class="flex-1 bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-lg text-sm transition border border-white border-opacity-50">
+                                    🗺️ Google Maps
+                                </button>\` : ''
+                            }
+                            \${storage.latitude ? 
+                                \`<button onclick="event.stopPropagation(); viewOnMap('\${storage.id}')" class="flex-1 bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-lg text-sm transition border border-white border-opacity-50">
+                                    📍 地図を見る
+                                </button>\` : 
+                                \`<button onclick="event.stopPropagation(); editStorage('\${storage.id}')" class="flex-1 bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-lg text-sm transition border border-white border-opacity-50">
+                                    📍 地図を設定
+                                </button>\`
+                            }
+                            <button onclick="event.stopPropagation(); editStorage('\${storage.id}')" class="flex-1 bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-lg text-sm transition border border-white border-opacity-50">
+                                ✏️ 編集
+                            </button>
+                        </div>
                     </div>
                 </div>
             \`).join('');
@@ -572,6 +625,7 @@ No.03,××消防団詰所前,</pre>
             document.getElementById('storageNumber').value = storage.storage_number;
             document.getElementById('location').value = storage.location;
             document.getElementById('address').value = storage.address || '';
+            document.getElementById('googleMapsUrl').value = storage.google_maps_url || '';
             document.getElementById('remarks').value = storage.remarks || '';
             
             currentLat = storage.latitude;
@@ -603,6 +657,7 @@ No.03,××消防団詰所前,</pre>
                 storage_number: document.getElementById('storageNumber').value,
                 location: document.getElementById('location').value,
                 address: document.getElementById('address').value,
+                google_maps_url: document.getElementById('googleMapsUrl').value,
                 latitude: currentLat,
                 longitude: currentLng,
                 remarks: document.getElementById('remarks').value
