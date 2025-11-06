@@ -1661,12 +1661,200 @@ app.post('/api/inspection/record', async (c) => {
 })
 
 // ==========================================
+// 要対応事項一覧ページ
+// ==========================================
+app.get('/action-required', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>要対応事項 - 消防団デジタルノート</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            min-height: 100vh;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .float-animation { animation: float 3s ease-in-out infinite; }
+        button {
+            -webkit-tap-highlight-color: transparent;
+            min-height: 48px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="bg-white bg-opacity-20 backdrop-blur-md border-b border-white border-opacity-30">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center space-x-3">
+                    <span class="text-4xl float-animation">🔥</span>
+                    <div class="text-white">
+                        <div class="font-bold text-xl">消防団デジタルノート</div>
+                        <div class="text-sm opacity-90">大井町消防団第一分団</div>
+                    </div>
+                </a>
+                <a href="/" class="text-white hover:underline text-sm bg-white bg-opacity-20 px-4 py-2 rounded-lg backdrop-blur-sm">
+                    ← ホームに戻る
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6">
+        <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6 mb-6">
+            <h1 class="text-3xl font-bold text-white mb-2 drop-shadow-lg">🚨 要対応事項一覧</h1>
+            <p class="text-base text-white opacity-90">対応が必要な項目を確認しましょう</p>
+        </div>
+
+        <div id="actionList" class="space-y-4">
+            <p class="text-white text-center py-8">読み込み中...</p>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            loadActionRequired();
+        };
+
+        async function loadActionRequired() {
+            try {
+                const response = await fetch('/api/inspection/action-required');
+                const data = await response.json();
+                renderActionList(data.items || []);
+            } catch (error) {
+                document.getElementById('actionList').innerHTML = 
+                    '<p class="text-white text-center py-8">データの読み込みに失敗しました</p>';
+                console.error(error);
+            }
+        }
+
+        function renderActionList(items) {
+            const list = document.getElementById('actionList');
+            
+            if (items.length === 0) {
+                list.innerHTML = '<div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-12 text-center"><p class="text-white text-xl">対応が必要な項目はありません</p></div>';
+                return;
+            }
+
+            list.innerHTML = items.map(item => {
+                const date = new Date(item.inspection_date).toLocaleDateString('ja-JP');
+                const isCompleted = item.action_completed === 1;
+                
+                return '<div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6">' +
+                    '<div class="flex justify-between items-start mb-4">' +
+                        '<div class="flex-1">' +
+                            '<h3 class="text-xl font-bold text-white mb-2">📦 ' + item.storage_number + ' - ' + item.location + '</h3>' +
+                            '<p class="text-sm text-white opacity-90 mb-2">📅 点検日: ' + date + '</p>' +
+                        '</div>' +
+                        (isCompleted ? 
+                            '<span class="bg-green-500 text-white px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap ml-2">✅ 対応済み</span>' :
+                            '<span class="bg-red-500 text-white px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap ml-2">⚠️ 未対応</span>'
+                        ) +
+                    '</div>' +
+                    '<div class="bg-white bg-opacity-20 rounded-lg p-4 mb-4">' +
+                        '<p class="text-white font-semibold mb-2">🚨 要対応内容:</p>' +
+                        '<p class="text-white">' + item.action_required + '</p>' +
+                    '</div>' +
+                    (!isCompleted ? 
+                        '<button onclick="markCompleted(\\'' + item.id + '\\')" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
+                            '✅ 対応完了にする' +
+                        '</button>' :
+                        '<p class="text-white text-center opacity-75">対応完了日: ' + new Date(item.action_completed_at).toLocaleDateString('ja-JP') + '</p>'
+                    ) +
+                '</div>';
+            }).join('');
+        }
+
+        async function markCompleted(inspectionId) {
+            if (!confirm('この項目を対応完了にしますか？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/inspection/mark-completed/' + inspectionId, {
+                    method: 'PUT'
+                });
+
+                if (response.ok) {
+                    alert('対応完了にしました！');
+                    loadActionRequired();
+                } else {
+                    alert('更新に失敗しました');
+                }
+            } catch (error) {
+                alert('エラーが発生しました');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
+  `)
+})
+
+// ==========================================
+// API: 要対応事項一覧取得
+// ==========================================
+app.get('/api/inspection/action-required', async (c) => {
+  try {
+    const env = c.env as { DB: D1Database }
+    
+    const result = await env.DB.prepare(`
+      SELECT 
+        i.*,
+        s.location
+      FROM hose_inspections i
+      JOIN hose_storages s ON i.storage_id = s.id
+      WHERE i.action_required IS NOT NULL 
+        AND i.action_required != ''
+      ORDER BY 
+        i.action_completed ASC,
+        i.inspection_date DESC
+    `).all()
+    
+    return c.json({ items: result.results })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ items: [] })
+  }
+})
+
+// ==========================================
+// API: 対応完了マーク
+// ==========================================
+app.put('/api/inspection/mark-completed/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const env = c.env as { DB: D1Database }
+    const now = new Date().toISOString()
+    
+    await env.DB.prepare(`
+      UPDATE hose_inspections 
+      SET action_completed = 1,
+          action_completed_at = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).bind(now, now, id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
 // 未実装ページ（Coming Soon）
 // ==========================================
 app.get('/logs', (c) => c.html(comingSoonPage('活動日誌', '📝')))
 app.get('/members', (c) => c.html(comingSoonPage('団員管理', '👥')))
 app.get('/stats', (c) => c.html(comingSoonPage('活動集計', '📊')))
-app.get('/action-required', (c) => c.html(comingSoonPage('要対応事項', '🚨')))
 
 // ==========================================
 // 旧ログインページへのリダイレクト
