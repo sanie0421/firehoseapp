@@ -320,9 +320,10 @@ app.get('/hose', (c) => {
                 <div class="bg-gray-50 p-4 rounded">
                     <p class="font-bold mb-2">📝 CSV形式:</p>
                     <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">格納庫番号,場所の目安,地区,備考
-No.01,◯◯公民館前,金子地区,2020年設置
-No.02,△△集会所裏,大井地区,
-No.03,××消防団詰所前,金子地区,</pre>
+No.01,◯◯公民館前,市場,2020年設置
+No.02,△△集会所裏,馬場,
+No.03,××消防団詰所前,根岸下,</pre>
+                    <p class="text-sm text-gray-600 mt-2">💡 地区: 市場、馬場、根岸下、根岸上、宮地、坊村 のいずれか</p>
                 </div>
 
                 <!-- ファイル選択 -->
@@ -387,9 +388,16 @@ No.03,××消防団詰所前,金子地区,</pre>
                     <label class="block text-sm font-bold text-gray-700 mb-2">
                         🏘️ 地区
                     </label>
-                    <input type="text" id="district"
-                        placeholder="金子地区"
+                    <select id="district"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
+                        <option value="">地区を選択してください</option>
+                        <option value="市場">市場</option>
+                        <option value="馬場">馬場</option>
+                        <option value="根岸下">根岸下</option>
+                        <option value="根岸上">根岸上</option>
+                        <option value="宮地">宮地</option>
+                        <option value="坊村">坊村</option>
+                    </select>
                 </div>
 
                 <!-- 住所（任意） -->
@@ -912,9 +920,9 @@ app.post('/api/hose/storages/bulk', async (c) => {
 // ==========================================
 app.get('/templates/hose_storages_template.csv', (c) => {
   const csvContent = `格納庫番号,場所の目安,地区,備考
-No.01,◯◯公民館前,金子地区,
-No.02,△△集会所裏,大井地区,
-No.03,××消防団詰所前,金子地区,
+No.01,◯◯公民館前,市場,
+No.02,△△集会所裏,馬場,
+No.03,××消防団詰所前,根岸下,
 No.04,,,
 No.05,,,
 No.06,,,
