@@ -75,7 +75,7 @@ app.get('/', (c) => {
                 <div class="text-white">
                     <div class="text-5xl mb-4 text-center">⚠️</div>
                     <h2 class="text-xl font-bold mb-2 text-center">点検優先度</h2>
-                    <p class="text-center opacity-90 text-sm">要点検の格納庫を確認</p>
+                    <p class="text-center opacity-90 text-sm">要点検のホース格納庫を確認</p>
                 </div>
             </a>
 
@@ -121,15 +121,6 @@ app.get('/', (c) => {
                     <div class="text-5xl mb-4 text-center">⚙️</div>
                     <h2 class="text-xl font-bold mb-2 text-center">データ管理</h2>
                     <p class="text-center opacity-90 text-sm">データ確認・バックアップ</p>
-                </div>
-            </a>
-
-            <!-- ホース格納庫管理（一番下） -->
-            <a href="/hose" class="card-gradient-2 rounded-2xl shadow-2xl p-6 card-hover">
-                <div class="text-white">
-                    <div class="text-5xl mb-4 text-center">🔧</div>
-                    <h2 class="text-xl font-bold mb-2 text-center">格納庫管理</h2>
-                    <p class="text-center opacity-90 text-sm">格納庫の登録・編集</p>
                 </div>
             </a>
         </div>
@@ -280,11 +271,11 @@ app.get('/hose', (c) => {
         <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6 mb-6">
             <div class="text-white mb-4">
                 <h1 class="text-3xl font-bold mb-2 drop-shadow-lg">🔧 ホース格納庫管理</h1>
-                <p class="text-base opacity-90">格納庫の登録・地図設定・点検記録</p>
+                <p class="text-base opacity-90">ホース格納庫の登録・地図設定・点検記録</p>
             </div>
             <div class="flex flex-col space-y-3">
                 <button onclick="showAddModal()" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-6 py-4 rounded-xl transition border border-white border-opacity-50 shadow-lg font-bold text-lg">
-                    ➕ 格納庫を追加
+                    ➕ ホース格納庫を追加
                 </button>
                 <button onclick="showUploadModal()" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-6 py-4 rounded-xl transition border border-white border-opacity-50 shadow-lg font-bold text-lg">
                     📥 CSV一括登録
@@ -292,7 +283,7 @@ app.get('/hose', (c) => {
             </div>
         </div>
 
-        <!-- 格納庫一覧 -->
+        <!-- ホース格納庫一覧 -->
         <div id="storageList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- JavaScriptで動的に生成 -->
         </div>
@@ -319,7 +310,7 @@ app.get('/hose', (c) => {
                 <!-- CSV形式説明 -->
                 <div class="bg-gray-50 p-4 rounded">
                     <p class="font-bold mb-2">📝 CSV形式:</p>
-                    <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">格納庫番号,場所の目安,地区,備考
+                    <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">ホース格納庫番号,場所の目安,地区,備考
 No.01,◯◯公民館前,市場,2020年設置
 No.02,△△集会所裏,馬場,
 No.03,××消防団詰所前,根岸下,</pre>
@@ -356,7 +347,7 @@ No.03,××消防団詰所前,根岸下,</pre>
         <div class="min-h-full flex items-start justify-center p-4 py-8">
             <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-6">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800" id="modalTitle">📦 格納庫を追加</h2>
+                <h2 class="text-2xl font-bold text-gray-800" id="modalTitle">📦 ホース格納庫を追加</h2>
                 <button onclick="hideAddModal()" class="text-gray-500 hover:text-gray-700">✕</button>
             </div>
 
@@ -366,7 +357,7 @@ No.03,××消防団詰所前,根岸下,</pre>
                 <!-- 格納庫番号 -->
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-2">
-                        🏷️ 格納庫番号 <span class="text-red-500">*</span>
+                        🏷️ ホース格納庫番号 <span class="text-red-500">*</span>
                     </label>
                     <input type="text" id="storageNumber" required
                         placeholder="No.01"
@@ -453,7 +444,7 @@ No.03,××消防団詰所前,根岸下,</pre>
         </div>
     </div>
 
-    <!-- 格納庫詳細モーダル（地図表示） -->
+    <!-- ホース格納庫詳細モーダル（地図表示） -->
     <div id="detailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8">
             <div class="flex justify-between items-center mb-6">
@@ -475,7 +466,7 @@ No.03,××消防団詰所前,根岸下,</pre>
             loadStorages();
         };
 
-        // 格納庫一覧を読み込み
+        // ホース格納庫一覧を読み込み
         async function loadStorages() {
             try {
                 const response = await fetch('/api/hose/storages');
@@ -487,7 +478,7 @@ No.03,××消防団詰所前,根岸下,</pre>
             }
         }
 
-        // 格納庫一覧を表示
+        // ホース格納庫一覧を表示
         function renderStorages() {
             const list = document.getElementById('storageList');
             
@@ -496,13 +487,13 @@ No.03,××消防団詰所前,根岸下,</pre>
                     <div class="col-span-full text-center py-16">
                         <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-12">
                             <div class="text-8xl mb-6">📦</div>
-                            <p class="text-2xl text-white font-bold mb-4">まだ格納庫が登録されていません</p>
-                            <p class="text-white opacity-90 mb-8">CSV一括登録または個別追加で格納庫を登録しましょう</p>
+                            <p class="text-2xl text-white font-bold mb-4">まだホースホース格納庫が登録されていません</p>
+                            <p class="text-white opacity-90 mb-8">CSV一括登録または個別追加でホース格納庫を登録しましょう</p>
                             <button onclick="showUploadModal()" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-8 py-4 rounded-lg transition mr-2 border border-white border-opacity-50 shadow-lg">
                                 📥 CSV一括登録
                             </button>
                             <button onclick="showAddModal()" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-8 py-4 rounded-lg transition border border-white border-opacity-50 shadow-lg">
-                                ➕ 格納庫を追加
+                                ➕ ホース格納庫を追加
                             </button>
                         </div>
                     </div>
@@ -589,7 +580,7 @@ No.03,××消防団詰所前,根岸下,</pre>
                     });
 
                     const result = await response.json();
-                    alert(\`\${result.count}件の格納庫を登録しました！\`);
+                    alert(\`\${result.count}件のホース格納庫を登録しました！\`);
                     hideUploadModal();
                     loadStorages();
                 } catch (error) {
@@ -600,9 +591,9 @@ No.03,××消防団詰所前,根岸下,</pre>
             reader.readAsText(file);
         }
 
-        // 格納庫追加モーダル表示
+        // ホース格納庫追加モーダル表示
         function showAddModal() {
-            document.getElementById('modalTitle').textContent = '📦 格納庫を追加';
+            document.getElementById('modalTitle').textContent = '📦 ホース格納庫を追加';
             document.getElementById('storageForm').reset();
             document.getElementById('storageId').value = '';
             currentLat = null;
@@ -652,7 +643,7 @@ No.03,××消防団詰所前,根岸下,</pre>
             }
         }
 
-        // 格納庫編集
+        // ホース格納庫編集
         function editStorage(id) {
             const storage = storages.find(s => s.id === id);
             if (!storage) return;
@@ -685,7 +676,7 @@ No.03,××消防団詰所前,根岸下,</pre>
             }, 100);
         }
 
-        // 格納庫保存
+        // ホース格納庫保存
         async function saveStorage() {
             const id = document.getElementById('storageId').value;
             const storageNumber = document.getElementById('storageNumber').value;
@@ -693,7 +684,7 @@ No.03,××消防団詰所前,根岸下,</pre>
             
             // 必須項目チェック
             if (!storageNumber || !location) {
-                alert('格納庫番号と場所の目安は必須です');
+                alert('ホース格納庫番号と場所の目安は必須です');
                 return;
             }
             
@@ -769,7 +760,7 @@ No.03,××消防団詰所前,根岸下,</pre>
 })
 
 // ==========================================
-// API: 格納庫一覧取得
+// API: ホース格納庫一覧取得
 // ==========================================
 app.get('/api/hose/storages', async (c) => {
   try {
@@ -787,7 +778,7 @@ app.get('/api/hose/storages', async (c) => {
 })
 
 // ==========================================
-// API: 格納庫追加
+// API: ホース格納庫追加
 // ==========================================
 app.post('/api/hose/storages', async (c) => {
   try {
@@ -824,7 +815,7 @@ app.post('/api/hose/storages', async (c) => {
 })
 
 // ==========================================
-// API: 格納庫更新
+// API: ホース格納庫更新
 // ==========================================
 app.put('/api/hose/storages/:id', async (c) => {
   try {
@@ -904,7 +895,7 @@ app.post('/api/hose/storages/bulk', async (c) => {
 // CSVテンプレート配信
 // ==========================================
 app.get('/templates/hose_storages_template.csv', (c) => {
-  const csvContent = `格納庫番号,場所の目安,地区,備考
+  const csvContent = `ホース格納庫番号,場所の目安,地区,備考
 No.01,◯◯公民館前,市場,
 No.02,△△集会所裏,馬場,
 No.03,××消防団詰所前,根岸下,
@@ -974,11 +965,15 @@ app.get('/admin', (c) => {
     <div class="container mx-auto px-4 py-8">
         <!-- ヘッダー -->
         <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-8 mb-8">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="text-white mb-4 md:mb-0">
-                    <h1 class="text-4xl font-bold mb-2 drop-shadow-lg">⚙️ データ管理</h1>
-                    <p class="text-lg opacity-90">データベース内容の確認とバックアップ</p>
-                </div>
+            <div class="text-white mb-6">
+                <h1 class="text-4xl font-bold mb-2 drop-shadow-lg">⚙️ データ管理</h1>
+                <p class="text-lg opacity-90">データベース内容の確認とバックアップ</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <a href="/hose" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-8 py-4 rounded-lg transition border border-white border-opacity-50 shadow-lg text-lg font-bold text-center">
+                    🔧 ホース格納庫管理
+                </a>
                 <button onclick="downloadBackup()" class="bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm text-white px-8 py-4 rounded-lg transition border border-white border-opacity-50 shadow-lg text-lg font-bold">
                     💾 バックアップをダウンロード
                 </button>
@@ -1248,7 +1243,7 @@ app.get('/inspection-priority', (c) => {
         <div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-6 mb-6">
             <div class="text-white">
                 <h1 class="text-3xl font-bold mb-2 drop-shadow-lg">⚠️ 点検優先度</h1>
-                <p class="text-base opacity-90 mb-4">点検が必要な格納庫を確認しましょう</p>
+                <p class="text-base opacity-90 mb-4">点検が必要なホース格納庫を確認しましょう</p>
                 
                 <!-- 検索バー -->
                 <div class="mt-4">
@@ -1310,7 +1305,7 @@ app.get('/inspection-priority', (c) => {
             const list = document.getElementById('priorityList');
             
             if (storages.length === 0) {
-                list.innerHTML = '<div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-12 text-center"><p class="text-white text-xl">格納庫が登録されていません</p></div>';
+                list.innerHTML = '<div class="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30 rounded-2xl p-12 text-center"><p class="text-white text-xl">ホース格納庫が登録されていません</p></div>';
                 return;
             }
 
@@ -1422,7 +1417,7 @@ app.get('/api/inspection/priority', async (c) => {
 })
 
 // ==========================================
-// 格納庫詳細・点検ページ
+// ホース格納庫詳細・点検ページ
 // ==========================================
 app.get('/storage/:id', async (c) => {
   const id = c.req.param('id')
