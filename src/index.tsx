@@ -405,7 +405,7 @@ No.03,××消防団詰所前,</pre>
 
                 <!-- ボタン -->
                 <div class="flex space-x-2">
-                    <button type="submit" class="flex-1 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition">
+                    <button type="button" onclick="saveStorage()" class="flex-1 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition">
                         ✅ 保存する
                     </button>
                     <button type="button" onclick="hideAddModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-3 rounded-lg transition">
@@ -653,13 +653,20 @@ No.03,××消防団詰所前,</pre>
         }
 
         // 格納庫保存
-        document.getElementById('storageForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
+        async function saveStorage() {
             const id = document.getElementById('storageId').value;
+            const storageNumber = document.getElementById('storageNumber').value;
+            const location = document.getElementById('location').value;
+            
+            // 必須項目チェック
+            if (!storageNumber || !location) {
+                alert('格納庫番号と場所の目安は必須です');
+                return;
+            }
+            
             const data = {
-                storage_number: document.getElementById('storageNumber').value,
-                location: document.getElementById('location').value,
+                storage_number: storageNumber,
+                location: location,
                 address: document.getElementById('address').value,
                 google_maps_url: document.getElementById('googleMapsUrl').value,
                 latitude: currentLat,
@@ -688,7 +695,7 @@ No.03,××消防団詰所前,</pre>
                 alert('保存中にエラーが発生しました');
                 console.error(error);
             }
-        });
+        }
 
         // 地図で表示
         function viewOnMap(id) {
