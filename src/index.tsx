@@ -400,16 +400,6 @@ No.03,××消防団詰所前,根岸下,</pre>
                     </select>
                 </div>
 
-                <!-- 住所（任意） -->
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">
-                        🏠 住所（任意）
-                    </label>
-                    <input type="text" id="address"
-                        placeholder="大井町金子1234-5"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
-                </div>
-
                 <!-- Google My Maps URL（任意） -->
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-2">
@@ -530,7 +520,7 @@ No.03,××消防団詰所前,根岸下,</pre>
                             (storage.latitude ? '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">📍 地図設定済み</span>' : '<span class="bg-white bg-opacity-20 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">⚠️ 地図未設定</span>') +
                         '</div>' +
                         '<p class="text-lg mb-2 font-semibold">📍 ' + storage.location + '</p>' +
-                        (storage.address ? '<p class="opacity-90 mb-2">🏠 ' + storage.address + '</p>' : '') +
+                        (storage.district ? '<p class="opacity-90 mb-2">🏘️ ' + storage.district + '</p>' : '') +
                         (storage.remarks ? '<p class="opacity-80 text-sm mb-4">💬 ' + storage.remarks + '</p>' : '') +
                         '<div class="flex flex-col space-y-2 mt-6">' +
                             '<button onclick="event.stopPropagation(); location.href=\\'/storage/' + storage.id + '\\'" class="w-full bg-white bg-opacity-40 hover:bg-opacity-50 backdrop-blur-sm px-4 py-4 rounded-xl text-lg font-bold transition border border-white border-opacity-50">' +
@@ -672,7 +662,6 @@ No.03,××消防団詰所前,根岸下,</pre>
             document.getElementById('storageNumber').value = storage.storage_number;
             document.getElementById('location').value = storage.location;
             document.getElementById('district').value = storage.district || '';
-            document.getElementById('address').value = storage.address || '';
             document.getElementById('googleMapsUrl').value = storage.google_maps_url || '';
             document.getElementById('remarks').value = storage.remarks || '';
             
@@ -712,7 +701,6 @@ No.03,××消防団詰所前,根岸下,</pre>
                 storage_number: storageNumber,
                 location: location,
                 district: document.getElementById('district').value,
-                address: document.getElementById('address').value,
                 google_maps_url: document.getElementById('googleMapsUrl').value,
                 latitude: currentLat,
                 longitude: currentLng,
@@ -751,8 +739,8 @@ No.03,××消防団詰所前,根岸下,</pre>
             let html = '<div class="space-y-4">';
             html += '<div class="bg-gray-50 p-4 rounded">';
             html += '<p class="font-bold">📍 ' + storage.location + '</p>';
-            if (storage.address) {
-                html += '<p class="text-gray-600">🏠 ' + storage.address + '</p>';
+            if (storage.district) {
+                html += '<p class="text-gray-600">🏘️ ' + storage.district + '</p>';
             }
             html += '</div>';
             html += '<div id="detailMap" style="height: 400px; width: 100%;"></div>';
@@ -811,16 +799,15 @@ app.post('/api/hose/storages', async (c) => {
     
     await env.DB.prepare(`
       INSERT INTO hose_storages (
-        id, storage_number, location, district, address, 
+        id, storage_number, location, district,
         google_maps_url, latitude, longitude, remarks,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       data.storage_number,
       data.location,
       data.district || null,
-      data.address || null,
       data.google_maps_url || null,
       data.latitude || null,
       data.longitude || null,
@@ -852,7 +839,6 @@ app.put('/api/hose/storages/:id', async (c) => {
       SET storage_number = ?,
           location = ?,
           district = ?,
-          address = ?,
           google_maps_url = ?,
           latitude = ?,
           longitude = ?,
@@ -863,7 +849,6 @@ app.put('/api/hose/storages/:id', async (c) => {
       data.storage_number,
       data.location,
       data.district || null,
-      data.address || null,
       data.google_maps_url || null,
       data.latitude || null,
       data.longitude || null,
