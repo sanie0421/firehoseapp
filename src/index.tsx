@@ -3146,12 +3146,12 @@ app.post('/api/inspection/record', async (c) => {
       for (let i = 0; i < data.action_items.length; i++) {
         const item = data.action_items[i]
         if (item && item.trim() !== '') {
-          const itemId = 'action_item_' + Date.now() + '_' + i
+          // id は INTEGER AUTOINCREMENT なので指定しない
           await env.DB.prepare(`
             INSERT INTO action_items (
-              id, inspection_id, content, item_order, created_at
-            ) VALUES (?, ?, ?, ?, ?)
-          `).bind(itemId, id, item.trim(), i + 1, now).run()
+              inspection_id, content, item_order, created_at
+            ) VALUES (?, ?, ?, ?)
+          `).bind(id, item.trim(), i + 1, now).run()
         }
       }
     }
@@ -3723,6 +3723,81 @@ app.put('/api/action-items/:id/uncomplete', async (c) => {
   } catch (error) {
     console.error('Database error:', error)
     return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
+// API: データ移行 (一時的) - 既存のaction_requiredをaction_itemsに移行
+// ==========================================
+app.post('/api/migrate-action-items', async (c) => {
+  try {
+    const env = c.env as { DB: D1Database }
+    
+    // 1. action_requiredが存在する点検記録を取得
+    const inspections = await env.DB.prepare(`
+      SELECT id, action_required, inspection_date
+      FROM hose_inspections
+      WHERE action_required IS NOT NULL AND action_required != ''
+    `).all()
+    
+    let totalItems = 0;
+    let migratedInspections = 0;
+    
+    // 2. 各点検記録のaction_requiredを分割してaction_itemsに保存
+    for (const inspection of inspections.results as any[]) {
+      // 既にaction_itemsが存在するかチェック
+      const existing = await env.DB.prepare(`
+        SELECT COUNT(*) as count FROM action_items WHERE inspection_id = ?
+      `).bind(inspection.id).first()
+      
+      if ((existing as any).count > 0) {
+        continue; // 既に移行済み
+      }
+      
+      const actionRequired = inspection.action_required as string;
+      
+      // \\n\\n で分割
+      const items = actionRequired.split('\\n\\n').map(item => {
+        // [数字] プレフィックスを削除
+        const closeBracketIndex = item.indexOf(']');
+        if (item.startsWith('[') && closeBracketIndex > 0) {
+          return item.slice(closeBracketIndex + 1).trim();
+        }
+        return item.trim();
+      }).filter(item => item !== '');
+      
+      // 各アイテムをaction_itemsに保存
+      for (let i = 0; i < items.length; i++) {
+        try {
+          const now = new Date().toISOString();
+          const itemOrder = i + 1;
+          
+          // id は INTEGER AUTOINCREMENT なので指定しない
+          await env.DB.prepare(`
+            INSERT INTO action_items (
+              inspection_id, content, item_order, created_at
+            ) VALUES (?, ?, ?, ?)
+          `).bind(inspection.id, items[i], itemOrder, now).run();
+          
+          totalItems++;
+        } catch (err) {
+          console.error(`Failed to insert item ${i} for inspection ${inspection.id}:`, err);
+          throw err;
+        }
+      }
+      
+      migratedInspections++;
+    }
+    
+    return c.json({ 
+      success: true, 
+      migratedInspections,
+      totalItems,
+      message: `${migratedInspections}件の点検記録から${totalItems}件のアイテムを移行しました`
+    })
+  } catch (error) {
+    console.error('Migration error:', error)
+    return c.json({ success: false, error: String(error) }, 500)
   }
 })
 
