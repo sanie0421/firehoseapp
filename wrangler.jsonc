@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "webapp",
+  "name": "oifire1",
   "compatibility_date": "2025-11-05",
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
@@ -9,8 +9,14 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "shobodan-db",
-      "database_id": "local-dev-database-id"
+      "database_name": "webapp-production",
+      "database_id": "fcab2e99-79f4-43ec-af35-ffc45a4c0f2b"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "oifire1-images"
     }
   ]
 }

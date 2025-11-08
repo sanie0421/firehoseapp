@@ -26,15 +26,6 @@ app.get('/', (c) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>活動記録</title>
-    
-    <!-- PWA用メタタグ -->
-    <link rel="apple-touch-icon" href="/icon.png">
-    <link rel="icon" type="image/png" href="/icon.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="活動記録">
-    <meta name="theme-color" content="#ef5350">
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -80,11 +71,11 @@ app.get('/', (c) => {
     <div class="container mx-auto px-4 py-12">
         <!-- 機能カード -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            <!-- ホース点検 -->
+            <!-- 点検優先度（最優先） -->
             <a href="/inspection-priority" class="card-gradient-1 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
                     <div class="text-5xl mb-4 text-center">⚠️</div>
-                    <h2 class="text-xl font-bold mb-2 text-center">ホース点検</h2>
+                    <h2 class="text-xl font-bold mb-2 text-center">点検優先度</h2>
                     <p class="text-center opacity-90 text-sm">要点検のホース格納庫を確認</p>
                 </div>
             </a>
@@ -545,8 +536,6 @@ app.get('/hose', (c) => {
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- SheetJS for Excel file reading -->
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
@@ -618,10 +607,7 @@ app.get('/hose', (c) => {
                     ➕ ホース格納庫を追加
                 </button>
                 <button id="showUploadModalBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition shadow-lg font-bold text-lg">
-                    📥 Excel/CSV一括登録
-                </button>
-                <button id="showDistrictUploadModalBtn" class="w-full bg-purple-500 hover:bg-purple-600 text-white px-6 py-4 rounded-xl transition shadow-lg font-bold text-lg">
-                    🏘️ 地区一括登録
+                    📥 CSV一括登録
                 </button>
             </div>
         </div>
@@ -632,44 +618,38 @@ app.get('/hose', (c) => {
         </div>
     </div>
 
-    <!-- Excel/CSV一括登録モーダル -->
+    <!-- CSV一括登録モーダル -->
     <div id="uploadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
         <div class="min-h-full flex items-start justify-center p-4 py-8">
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">📥 Excel/CSV一括登録</h2>
+                <h2 class="text-2xl font-bold text-gray-800">📥 CSV一括登録</h2>
                 <button id="closeUploadModalBtn" class="text-gray-500 hover:text-gray-700">✕</button>
             </div>
 
             <div class="space-y-6">
                 <!-- テンプレートダウンロード -->
                 <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
-                    <p class="text-blue-800 mb-3"><strong>📋 Step 1:</strong> テンプレートをダウンロード</p>
-                    <div class="flex gap-3">
-                        <button onclick="downloadExcelTemplate()" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition font-bold">
-                            📊 Excelテンプレート
-                        </button>
-                        <button onclick="downloadCSVTemplate()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition font-bold">
-                            📄 CSVテンプレート
-                        </button>
-                    </div>
+                    <p class="text-blue-800 mb-2"><strong>📋 Step 1:</strong> CSVテンプレートをダウンロード</p>
+                    <a href="/templates/hose_storages_template.csv" download class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition">
+                        📥 テンプレートをダウンロード
+                    </a>
                 </div>
 
-                <!-- 形式説明 -->
+                <!-- CSV形式説明 -->
                 <div class="bg-gray-50 p-4 rounded">
-                    <p class="font-bold mb-2">📝 必要な列:</p>
-                    <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">ホース格納庫番号 | 場所の目安 | 地区 | 備考
-No.01 | ◯◯公民館前 | 市場 | 2020年設置
-No.02 | △△集会所裏 | 馬場 | 
-No.03 | ××消防団詰所前 | 根岸下 | </pre>
+                    <p class="font-bold mb-2">📝 CSV形式:</p>
+                    <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">ホース格納庫番号,場所の目安,地区,備考
+No.01,◯◯公民館前,市場,2020年設置
+No.02,△△集会所裏,馬場,
+No.03,××消防団詰所前,根岸下,</pre>
                     <p class="text-sm text-gray-600 mt-2">💡 地区: 市場、馬場、根岸下、根岸上、宮地、坊村 のいずれか</p>
-                    <p class="text-sm text-gray-600 mt-1">💡 Excel (.xlsx) または CSV (.csv) 形式に対応</p>
                 </div>
 
                 <!-- ファイル選択 -->
                 <div>
-                    <p class="font-bold mb-2"><strong>📂 Step 2:</strong> Excel/CSVファイルを選択</p>
-                    <input type="file" id="csvFile" accept=".csv,.xlsx,.xls" class="block w-full text-sm text-gray-500
+                    <p class="font-bold mb-2"><strong>📂 Step 2:</strong> CSVファイルを選択</p>
+                    <input type="file" id="csvFile" accept=".csv" class="block w-full text-sm text-gray-500
                         file:mr-4 file:py-2 file:px-4
                         file:rounded file:border-0
                         file:text-sm file:font-semibold
@@ -683,68 +663,6 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                         ✅ 一括登録する
                     </button>
                     <button id="cancelUploadModalBtn" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
-                        キャンセル
-                    </button>
-                </div>
-            </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 地区一括登録モーダル -->
-    <div id="districtUploadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
-        <div class="min-h-full flex items-start justify-center p-4 py-8">
-            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">🏘️ 地区一括登録</h2>
-                <button id="closeDistrictUploadModalBtn" class="text-gray-500 hover:text-gray-700">✕</button>
-            </div>
-
-            <div class="space-y-6">
-                <!-- テンプレートダウンロード -->
-                <div class="bg-purple-50 border-l-4 border-purple-400 p-4 rounded">
-                    <p class="text-purple-800 mb-3"><strong>📋 Step 1:</strong> テンプレートをダウンロード</p>
-                    <div class="flex gap-3">
-                        <button onclick="downloadDistrictExcelTemplate()" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition font-bold">
-                            📊 Excelテンプレート
-                        </button>
-                        <button onclick="downloadDistrictCSVTemplate()" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded transition font-bold">
-                            📄 CSVテンプレート
-                        </button>
-                    </div>
-                </div>
-
-                <!-- 形式説明 -->
-                <div class="bg-gray-50 p-4 rounded">
-                    <p class="font-bold mb-2">📝 必要な列:</p>
-                    <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">地区名
-市場
-馬場
-根岸下
-根岸上
-宮地
-坊村</pre>
-                    <p class="text-sm text-gray-600 mt-2">💡 地区名を1列に記入してください</p>
-                    <p class="text-sm text-gray-600 mt-1">💡 Excel (.xlsx) または CSV (.csv) 形式に対応</p>
-                </div>
-
-                <!-- ファイル選択 -->
-                <div>
-                    <p class="font-bold mb-2"><strong>📂 Step 2:</strong> Excel/CSVファイルを選択</p>
-                    <input type="file" id="districtFile" accept=".csv,.xlsx,.xls" class="block w-full text-sm text-gray-500
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-purple-50 file:text-purple-700
-                        hover:file:bg-purple-100">
-                </div>
-
-                <!-- アップロードボタン -->
-                <div class="flex flex-col space-y-3">
-                    <button id="uploadDistrictBtn" class="w-full bg-purple-500 hover:bg-purple-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
-                        ✅ 地区を一括登録する
-                    </button>
-                    <button id="cancelDistrictUploadModalBtn" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
                         キャンセル
                     </button>
                 </div>
@@ -898,33 +816,25 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             // イベントリスナーを設定
             const showAddBtn = document.getElementById('showAddModalBtn');
             const showUploadBtn = document.getElementById('showUploadModalBtn');
-            const showDistrictUploadBtn = document.getElementById('showDistrictUploadModalBtn');
             const closeAddBtn = document.getElementById('closeAddModalBtn');
             const closeUploadBtn = document.getElementById('closeUploadModalBtn');
-            const closeDistrictUploadBtn = document.getElementById('closeDistrictUploadModalBtn');
             const closeDetailBtn = document.getElementById('closeDetailModalBtn');
             const saveStorageBtn = document.getElementById('saveStorageBtn');
             const cancelAddBtn = document.getElementById('cancelAddModalBtn');
             const uploadCSVBtn = document.getElementById('uploadCSVBtn');
             const cancelUploadBtn = document.getElementById('cancelUploadModalBtn');
-            const uploadDistrictBtn = document.getElementById('uploadDistrictBtn');
-            const cancelDistrictUploadBtn = document.getElementById('cancelDistrictUploadModalBtn');
             const clearImageBtn = document.getElementById('clearImageBtn');
             const storageImageInput = document.getElementById('storageImage');
             
             if (showAddBtn) showAddBtn.addEventListener('click', showAddModal);
             if (showUploadBtn) showUploadBtn.addEventListener('click', showUploadModal);
-            if (showDistrictUploadBtn) showDistrictUploadBtn.addEventListener('click', showDistrictUploadModal);
             if (closeAddBtn) closeAddBtn.addEventListener('click', hideAddModal);
             if (closeUploadBtn) closeUploadBtn.addEventListener('click', hideUploadModal);
-            if (closeDistrictUploadBtn) closeDistrictUploadBtn.addEventListener('click', hideDistrictUploadModal);
             if (closeDetailBtn) closeDetailBtn.addEventListener('click', hideDetailModal);
             if (saveStorageBtn) saveStorageBtn.addEventListener('click', saveStorage);
             if (cancelAddBtn) cancelAddBtn.addEventListener('click', hideAddModal);
-            if (uploadCSVBtn) uploadCSVBtn.addEventListener('click', uploadFile);
+            if (uploadCSVBtn) uploadCSVBtn.addEventListener('click', uploadCSV);
             if (cancelUploadBtn) cancelUploadBtn.addEventListener('click', hideUploadModal);
-            if (uploadDistrictBtn) uploadDistrictBtn.addEventListener('click', uploadDistrictFile);
-            if (cancelDistrictUploadBtn) cancelDistrictUploadBtn.addEventListener('click', hideDistrictUploadModal);
             if (clearImageBtn) clearImageBtn.addEventListener('click', clearImage);
             if (storageImageInput) storageImageInput.addEventListener('change', previewImage);
         };
@@ -993,9 +903,6 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                             '<button onclick="event.stopPropagation(); editStorage(\\'' + storage.id + '\\')" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">' +
                                 '✏️ 編集' +
                             '</button>' +
-                            '<button onclick="event.stopPropagation(); deleteStorage(\\'' + storage.id + '\\', \\'' + storage.storage_number + '\\')" class="w-full bg-red-500 bg-opacity-80 hover:bg-opacity-90 backdrop-blur-sm px-4 py-3 rounded-lg text-base font-semibold transition border border-white border-opacity-50">' +
-                                '🗑️ 削除' +
-                            '</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -1011,244 +918,55 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             document.getElementById('uploadModal').classList.add('hidden');
         }
 
-        function showDistrictUploadModal() {
-            document.getElementById('districtUploadModal').classList.remove('hidden');
-        }
-
-        function hideDistrictUploadModal() {
-            document.getElementById('districtUploadModal').classList.add('hidden');
-        }
-
-        // Excel/CSVファイルアップロード（格納庫）
-        async function uploadFile() {
+        // CSVアップロード
+        async function uploadCSV() {
             const fileInput = document.getElementById('csvFile');
             const file = fileInput.files[0];
             
             if (!file) {
-                alert('Excel/CSVファイルを選択してください');
+                alert('CSVファイルを選択してください');
                 return;
             }
 
-            const fileName = file.name.toLowerCase();
-            const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
-            const isCSV = fileName.endsWith('.csv');
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const lines = text.split('\\n');
+                const storagesData = [];
 
-            if (!isExcel && !isCSV) {
-                alert('Excel (.xlsx) または CSV (.csv) ファイルを選択してください');
-                return;
-            }
+                // ヘッダー行をスキップして解析
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
 
-            try {
-                let storagesData = [];
-
-                if (isExcel) {
-                    // Excelファイルの場合
-                    const arrayBuffer = await file.arrayBuffer();
-                    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-
-                    // ヘッダー行をスキップして解析
-                    for (let i = 1; i < jsonData.length; i++) {
-                        const row = jsonData[i];
-                        if (row && row[0] && row[1]) {
-                            storagesData.push({
-                                storage_number: String(row[0]).trim(),
-                                location: String(row[1]).trim(),
-                                district: row[2] ? String(row[2]).trim() : '',
-                                remarks: row[3] ? String(row[3]).trim() : ''
-                            });
-                        }
-                    }
-                } else {
-                    // CSVファイルの場合
-                    const text = await file.text();
-                    const lines = text.split('\\n');
-
-                    for (let i = 1; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        if (!line) continue;
-
-                        const [storageNumber, location, district, remarks] = line.split(',');
-                        if (storageNumber && location) {
-                            storagesData.push({
-                                storage_number: storageNumber.trim(),
-                                location: location.trim(),
-                                district: district ? district.trim() : '',
-                                remarks: remarks ? remarks.trim() : ''
-                            });
-                        }
+                    const [storageNumber, location, district, remarks] = line.split(',');
+                    if (storageNumber && location) {
+                        storagesData.push({
+                            storage_number: storageNumber.trim(),
+                            location: location.trim(),
+                            district: district ? district.trim() : '',
+                            remarks: remarks ? remarks.trim() : ''
+                        });
                     }
                 }
 
-                if (storagesData.length === 0) {
-                    alert('有効なデータが見つかりませんでした');
-                    return;
+                try {
+                    const response = await fetch('/api/hose/storages/bulk', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ storages: storagesData })
+                    });
+
+                    const result = await response.json();
+                    alert(\`\${result.count}件のホース格納庫を登録しました！\`);
+                    hideUploadModal();
+                    loadStorages();
+                } catch (error) {
+                    alert('登録中にエラーが発生しました');
+                    console.error(error);
                 }
-
-                const response = await fetch('/api/hose/storages/bulk', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ storages: storagesData })
-                });
-
-                const result = await response.json();
-                alert(\`\${result.count}件のホース格納庫を登録しました！\`);
-                hideUploadModal();
-                loadStorages();
-            } catch (error) {
-                alert('登録中にエラーが発生しました: ' + error.message);
-                console.error(error);
-            }
-        }
-
-        // Excel/CSVファイルアップロード（地区）
-        async function uploadDistrictFile() {
-            const fileInput = document.getElementById('districtFile');
-            const file = fileInput.files[0];
-            
-            if (!file) {
-                alert('Excel/CSVファイルを選択してください');
-                return;
-            }
-
-            const fileName = file.name.toLowerCase();
-            const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
-            const isCSV = fileName.endsWith('.csv');
-
-            if (!isExcel && !isCSV) {
-                alert('Excel (.xlsx) または CSV (.csv) ファイルを選択してください');
-                return;
-            }
-
-            try {
-                let districts = [];
-
-                if (isExcel) {
-                    // Excelファイルの場合
-                    const arrayBuffer = await file.arrayBuffer();
-                    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-
-                    // ヘッダー行をスキップして解析
-                    for (let i = 1; i < jsonData.length; i++) {
-                        const row = jsonData[i];
-                        if (row && row[0]) {
-                            districts.push(String(row[0]).trim());
-                        }
-                    }
-                } else {
-                    // CSVファイルの場合
-                    const text = await file.text();
-                    const lines = text.split('\\n');
-
-                    for (let i = 1; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        if (line) {
-                            districts.push(line.split(',')[0].trim());
-                        }
-                    }
-                }
-
-                if (districts.length === 0) {
-                    alert('有効な地区データが見つかりませんでした');
-                    return;
-                }
-
-                // 地区selectに追加
-                const districtSelect = document.getElementById('district');
-                const existingOptions = Array.from(districtSelect.options).map(opt => opt.value);
-                
-                let addedCount = 0;
-                districts.forEach(district => {
-                    if (!existingOptions.includes(district)) {
-                        const option = document.createElement('option');
-                        option.value = district;
-                        option.textContent = district;
-                        districtSelect.appendChild(option);
-                        addedCount++;
-                    }
-                });
-
-                alert(\`\${addedCount}件の地区を追加しました！\\n（重複は除外されました）\`);
-                hideDistrictUploadModal();
-            } catch (error) {
-                alert('登録中にエラーが発生しました: ' + error.message);
-                console.error(error);
-            }
-        }
-
-        // Excelテンプレートダウンロード（格納庫）
-        function downloadExcelTemplate() {
-            const wb = XLSX.utils.book_new();
-            const data = [
-                ['ホース格納庫番号', '場所の目安', '地区', '備考'],
-                ['No.01', '◯◯公民館前', '市場', '2020年設置'],
-                ['No.02', '△△集会所裏', '馬場', ''],
-                ['No.03', '××消防団詰所前', '根岸下', ''],
-                ['No.04', '', '根岸上', ''],
-                ['No.05', '', '宮地', ''],
-                ['No.06', '', '坊村', ''],
-                ['No.07', '', '', ''],
-                ['No.08', '', '', ''],
-                ['No.09', '', '', ''],
-                ['No.10', '', '', ''],
-                ['No.11', '', '', ''],
-                ['No.12', '', '', '']
-            ];
-            const ws = XLSX.utils.aoa_to_sheet(data);
-            XLSX.utils.book_append_sheet(wb, ws, 'ホース格納庫');
-            XLSX.writeFile(wb, 'hose_storages_template.xlsx');
-        }
-
-        // CSVテンプレートダウンロード（格納庫）
-        function downloadCSVTemplate() {
-            const csv = 'ホース格納庫番号,場所の目安,地区,備考\\n' +
-                        'No.01,◯◯公民館前,市場,2020年設置\\n' +
-                        'No.02,△△集会所裏,馬場,\\n' +
-                        'No.03,××消防団詰所前,根岸下,\\n' +
-                        'No.04,,根岸上,\\n' +
-                        'No.05,,宮地,\\n' +
-                        'No.06,,坊村,\\n' +
-                        'No.07,,,\\n' +
-                        'No.08,,,\\n' +
-                        'No.09,,,\\n' +
-                        'No.10,,,\\n' +
-                        'No.11,,,\\n' +
-                        'No.12,,,';
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'hose_storages_template.csv';
-            link.click();
-        }
-
-        // Excelテンプレートダウンロード（地区）
-        function downloadDistrictExcelTemplate() {
-            const wb = XLSX.utils.book_new();
-            const data = [
-                ['地区名'],
-                ['市場'],
-                ['馬場'],
-                ['根岸下'],
-                ['根岸上'],
-                ['宮地'],
-                ['坊村']
-            ];
-            const ws = XLSX.utils.aoa_to_sheet(data);
-            XLSX.utils.book_append_sheet(wb, ws, '地区一覧');
-            XLSX.writeFile(wb, 'districts_template.xlsx');
-        }
-
-        // CSVテンプレートダウンロード（地区）
-        function downloadDistrictCSVTemplate() {
-            const csv = '地区名\\n市場\\n馬場\\n根岸下\\n根岸上\\n宮地\\n坊村';
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'districts_template.csv';
-            link.click();
+            };
+            reader.readAsText(file);
         }
 
         // ホース格納庫追加モーダル表示
@@ -1302,29 +1020,6 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             if (currentLat && currentLng) {
                 marker = L.marker([currentLat, currentLng]).addTo(map);
                 map.setView([currentLat, currentLng], 17);
-            }
-        }
-
-        // ホース格納庫削除
-        async function deleteStorage(id, storageNumber) {
-            if (!confirm('本当に「' + storageNumber + '」を削除しますか？\\n\\nこの操作は取り消せません。')) {
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/hose/storages/' + id, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    alert('削除しました');
-                    loadStorages();
-                } else {
-                    alert('削除に失敗しました');
-                }
-            } catch (error) {
-                console.error('Delete error:', error);
-                alert('削除中にエラーが発生しました');
             }
         }
 
@@ -1602,31 +1297,6 @@ app.put('/api/hose/storages/:id', async (c) => {
   } catch (error) {
     console.error('Database error:', error)
     return c.json({ success: false, error: 'Failed to update' }, 500)
-  }
-})
-
-// ==========================================
-// API: ホース格納庫削除
-// ==========================================
-app.delete('/api/hose/storages/:id', async (c) => {
-  try {
-    const id = c.req.param('id')
-    const env = c.env as { DB: D1Database }
-    
-    // まず関連する点検記録も削除
-    await env.DB.prepare(`
-      DELETE FROM hose_inspections WHERE storage_id = ?
-    `).bind(id).run()
-    
-    // 格納庫を削除
-    await env.DB.prepare(`
-      DELETE FROM hose_storages WHERE id = ?
-    `).bind(id).run()
-    
-    return c.json({ success: true })
-  } catch (error) {
-    console.error('Database error:', error)
-    return c.json({ success: false, error: 'Failed to delete' }, 500)
   }
 })
 
@@ -2094,28 +1764,14 @@ app.get('/inspection-priority', (c) => {
             </div>
         </div>
 
-        <!-- おすすめ4件 -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">⭐ おすすめ点検</h2>
-            <p class="text-sm text-gray-600 mb-4">点検が古い格納庫と、同地区で点検が必要な格納庫</p>
-            <div id="recommendedList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-gray-50 rounded-xl p-8 text-center"><p class="text-gray-800">読み込み中...</p></div>
-            </div>
-        </div>
-
-        <!-- 全格納庫一覧 -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 全格納庫一覧</h2>
-            <p class="text-sm text-gray-600 mb-4">点検が古い順に表示</p>
-            <div id="allStoragesList" class="space-y-4">
-                <div class="bg-gray-50 rounded-xl p-8 text-center"><p class="text-gray-800">読み込み中...</p></div>
-            </div>
+        <!-- 格納庫一覧（優先度順） -->
+        <div id="priorityList" class="space-y-4">
+            <div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800">読み込み中...</p></div>
         </div>
     </div>
 
     <script>
         let allStorages = [];
-        let recommendedStorages = [];
         
         window.onload = function() {
             loadPriorityList();
@@ -2123,23 +1779,13 @@ app.get('/inspection-priority', (c) => {
 
         async function loadPriorityList() {
             try {
-                // おすすめ4件を取得
-                const recommendedResponse = await fetch('/api/inspection/priority');
-                const recommendedData = await recommendedResponse.json();
-                recommendedStorages = recommendedData.storages || [];
-                
-                // 全件を取得
-                const allResponse = await fetch('/api/inspection/priority-all');
-                const allData = await allResponse.json();
-                allStorages = allData.storages || [];
-                
-                renderRecommendedList(recommendedStorages);
-                renderAllStoragesList(allStorages);
+                const response = await fetch('/api/inspection/priority');
+                const data = await response.json();
+                allStorages = data.storages || [];
+                renderPriorityList(allStorages);
             } catch (error) {
-                document.getElementById('recommendedList').innerHTML = 
-                    '<div class="bg-gray-50 rounded-xl p-8 text-center col-span-full"><p class="text-gray-800">データの読み込みに失敗しました</p></div>';
-                document.getElementById('allStoragesList').innerHTML = 
-                    '<div class="bg-gray-50 rounded-xl p-8 text-center"><p class="text-gray-800">データの読み込みに失敗しました</p></div>';
+                document.getElementById('priorityList').innerHTML = 
+                    '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800">データの読み込みに失敗しました</p></div>';
                 console.error(error);
             }
         }
@@ -2148,12 +1794,11 @@ app.get('/inspection-priority', (c) => {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             
             if (!searchTerm) {
-                renderRecommendedList(recommendedStorages);
-                renderAllStoragesList(allStorages);
+                renderPriorityList(allStorages);
                 return;
             }
             
-            const filteredRecommended = recommendedStorages.filter(storage => {
+            const filtered = allStorages.filter(storage => {
                 const storageNumber = (storage.storage_number || '').toLowerCase();
                 const location = (storage.location || '').toLowerCase();
                 const district = (storage.district || '').toLowerCase();
@@ -2163,82 +1808,11 @@ app.get('/inspection-priority', (c) => {
                        district.includes(searchTerm);
             });
             
-            const filteredAll = allStorages.filter(storage => {
-                const storageNumber = (storage.storage_number || '').toLowerCase();
-                const location = (storage.location || '').toLowerCase();
-                const district = (storage.district || '').toLowerCase();
-                
-                return storageNumber.includes(searchTerm) || 
-                       location.includes(searchTerm) || 
-                       district.includes(searchTerm);
-            });
-            
-            renderRecommendedList(filteredRecommended);
-            renderAllStoragesList(filteredAll);
+            renderPriorityList(filtered);
         }
 
-        function renderRecommendedList(storages) {
-            const list = document.getElementById('recommendedList');
-            
-            if (storages.length === 0) {
-                list.innerHTML = '<div class="bg-gray-50 rounded-xl p-8 text-center col-span-full"><p class="text-gray-800 text-xl">該当する格納庫がありません</p></div>';
-                return;
-            }
-
-            list.innerHTML = storages.map(storage => {
-                const daysAgo = storage.days_since_inspection;
-                const lastResult = storage.last_inspection_result;
-                let priorityClass = 'priority-low';
-                let priorityText = '正常';
-                let priorityIcon = '✅';
-                
-                // 最新の点検結果を最優先で判定
-                if (lastResult === 'abnormal') {
-                    priorityClass = 'priority-high';
-                    priorityText = '異常あり';
-                    priorityIcon = '🚨';
-                } else if (lastResult === 'caution') {
-                    priorityClass = 'priority-medium';
-                    priorityText = '要注意';
-                    priorityIcon = '⚠️';
-                } else if (daysAgo === null || daysAgo > 180) {
-                    priorityClass = 'priority-high';
-                    priorityText = '要点検';
-                    priorityIcon = '🚨';
-                } else if (daysAgo > 90) {
-                    priorityClass = 'priority-medium';
-                    priorityText = '注意';
-                    priorityIcon = '⚠️';
-                } else if (lastResult === 'normal') {
-                    priorityClass = 'priority-low';
-                    priorityText = '正常';
-                    priorityIcon = '✅';
-                }
-
-                const lastInspection = storage.last_inspection_date 
-                    ? new Date(storage.last_inspection_date).toLocaleDateString('ja-JP')
-                    : '未点検';
-                
-                return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
-                    '<div class="text-white">' +
-                        '<div class="flex justify-between items-start mb-4">' +
-                            '<div class="flex-1">' +
-                                (storage.district ? '<p class="text-lg opacity-90 mb-1">' + storage.district + '</p>' : '') +
-                                '<h3 class="text-2xl font-bold">' + storage.storage_number + ' | ' + storage.location + '</h3>' +
-                            '</div>' +
-                            '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full text-base font-bold border border-white border-opacity-50 ml-2">' + priorityIcon + ' ' + priorityText + '</span>' +
-                        '</div>' +
-                        '<p class="text-base opacity-90 mb-4">最終点検: ' + lastInspection + (daysAgo !== null ? ' (' + daysAgo + '日前)' : '') + '</p>' +
-                        '<button class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-xl text-base font-semibold transition border border-white border-opacity-50">' +
-                            '📝 点検する' +
-                        '</button>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
-        }
-
-        function renderAllStoragesList(storages) {
-            const list = document.getElementById('allStoragesList');
+        function renderPriorityList(storages) {
+            const list = document.getElementById('priorityList');
             
             if (storages.length === 0) {
                 list.innerHTML = '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800 text-xl">ホース格納庫が登録されていません</p></div>';
@@ -2247,57 +1821,33 @@ app.get('/inspection-priority', (c) => {
 
             list.innerHTML = storages.map(storage => {
                 const daysAgo = storage.days_since_inspection;
-                const lastResult = storage.last_inspection_result;
                 let priorityClass = 'priority-low';
                 let priorityText = '正常';
                 let priorityIcon = '✅';
                 
-                // 最新の点検結果を最優先で判定
-                if (lastResult === 'abnormal') {
-                    // 異常あり → 最優先で赤
-                    priorityClass = 'priority-high';
-                    priorityText = '異常あり';
-                    priorityIcon = '🚨';
-                } else if (lastResult === 'caution') {
-                    // 要注意 → 橙色
-                    priorityClass = 'priority-medium';
-                    priorityText = '要注意';
-                    priorityIcon = '⚠️';
-                } else if (lastResult === 'normal') {
-                    // 正常 → 緑色(日数に関わらず)
-                    priorityClass = 'priority-low';
-                    priorityText = '正常';
-                    priorityIcon = '✅';
-                } else if (daysAgo === null) {
-                    // 未点検 → 赤
-                    priorityClass = 'priority-high';
-                    priorityText = '未点検';
-                    priorityIcon = '🚨';
-                } else if (daysAgo > 180) {
-                    // 180日以上 → 赤
+                if (daysAgo === null || daysAgo > 180) {
                     priorityClass = 'priority-high';
                     priorityText = '要点検';
                     priorityIcon = '🚨';
                 } else if (daysAgo > 90) {
-                    // 90日以上 → 橙色
                     priorityClass = 'priority-medium';
-                    priorityText = '点検推奨';
+                    priorityText = '注意';
                     priorityIcon = '⚠️';
                 }
 
                 const lastInspection = storage.last_inspection_date 
                     ? new Date(storage.last_inspection_date).toLocaleDateString('ja-JP')
                     : '未点検';
+
+                const districtText = storage.district ? ' | 🏘️ ' + storage.district : '';
                 
                 return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
                     '<div class="text-white">' +
                         '<div class="flex justify-between items-start mb-4">' +
-                            '<div class="flex-1">' +
-                                (storage.district ? '<p class="text-lg opacity-90 mb-1">' + storage.district + '</p>' : '') +
-                                '<h3 class="text-2xl font-bold">' + storage.storage_number + ' | ' + storage.location + '</h3>' +
-                            '</div>' +
-                            '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full text-base font-bold border border-white border-opacity-50 ml-2">' + priorityIcon + ' ' + priorityText + '</span>' +
+                            '<h3 class="text-2xl font-bold">📦 ' + storage.storage_number + districtText + '</h3>' +
+                            '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full text-base font-bold border border-white border-opacity-50">' + priorityIcon + ' ' + priorityText + '</span>' +
                         '</div>' +
+                        '<p class="text-lg mb-2 font-semibold">📍 ' + storage.location + '</p>' +
                         '<p class="text-base opacity-90 mb-4">最終点検: ' + lastInspection + (daysAgo !== null ? ' (' + daysAgo + '日前)' : '') + '</p>' +
                         '<button class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-xl text-base font-semibold transition border border-white border-opacity-50">' +
                             '📝 点検する' +
@@ -2313,72 +1863,23 @@ app.get('/inspection-priority', (c) => {
 })
 
 // ==========================================
-// API: 全格納庫取得（点検が古い順）
-// ==========================================
-app.get('/api/inspection/priority-all', async (c) => {
-  try {
-    const env = c.env as { DB: D1Database }
-    
-    const result = await env.DB.prepare(`
-      SELECT 
-        s.*,
-        i.inspection_date as last_inspection_date,
-        i.result as last_inspection_result,
-        CAST((julianday('now') - julianday(i.inspection_date)) AS INTEGER) as days_since_inspection
-      FROM hose_storages s
-      LEFT JOIN (
-        SELECT 
-          hi1.storage_id, 
-          hi1.inspection_date,
-          hi1.result
-        FROM hose_inspections hi1
-        INNER JOIN (
-          SELECT storage_id, MAX(inspection_date) as max_date
-          FROM hose_inspections
-          GROUP BY storage_id
-        ) hi2 ON hi1.storage_id = hi2.storage_id AND hi1.inspection_date = hi2.max_date
-      ) i ON s.id = i.storage_id
-      ORDER BY 
-        CASE 
-          WHEN i.inspection_date IS NULL THEN 0
-          ELSE 1
-        END,
-        i.inspection_date ASC
-    `).all()
-    
-    return c.json({ storages: result.results || [] })
-  } catch (error) {
-    console.error('Database error:', error)
-    return c.json({ storages: [] })
-  }
-})
-
-// ==========================================
-// API: 点検優先度取得（おすすめ4件）
+// API: 点検優先度取得
 // ==========================================
 app.get('/api/inspection/priority', async (c) => {
   try {
     const env = c.env as { DB: D1Database }
     
-    // 1. 全格納庫の最終点検日と結果を取得して、最優先のものを1件取得
+    // 1. 全格納庫の最終点検日を取得して、最優先のものを1件取得
     const topPriorityResult = await env.DB.prepare(`
       SELECT 
         s.*,
         i.inspection_date as last_inspection_date,
-        i.result as last_inspection_result,
         CAST((julianday('now') - julianday(i.inspection_date)) AS INTEGER) as days_since_inspection
       FROM hose_storages s
       LEFT JOIN (
-        SELECT 
-          hi1.storage_id, 
-          hi1.inspection_date,
-          hi1.result
-        FROM hose_inspections hi1
-        INNER JOIN (
-          SELECT storage_id, MAX(inspection_date) as max_date
-          FROM hose_inspections
-          GROUP BY storage_id
-        ) hi2 ON hi1.storage_id = hi2.storage_id AND hi1.inspection_date = hi2.max_date
+        SELECT storage_id, MAX(inspection_date) as inspection_date
+        FROM hose_inspections
+        GROUP BY storage_id
       ) i ON s.id = i.storage_id
       ORDER BY 
         CASE 
@@ -2398,20 +1899,12 @@ app.get('/api/inspection/priority', async (c) => {
       SELECT 
         s.*,
         i.inspection_date as last_inspection_date,
-        i.result as last_inspection_result,
         CAST((julianday('now') - julianday(i.inspection_date)) AS INTEGER) as days_since_inspection
       FROM hose_storages s
       LEFT JOIN (
-        SELECT 
-          hi1.storage_id, 
-          hi1.inspection_date,
-          hi1.result
-        FROM hose_inspections hi1
-        INNER JOIN (
-          SELECT storage_id, MAX(inspection_date) as max_date
-          FROM hose_inspections
-          GROUP BY storage_id
-        ) hi2 ON hi1.storage_id = hi2.storage_id AND hi1.inspection_date = hi2.max_date
+        SELECT storage_id, MAX(inspection_date) as inspection_date
+        FROM hose_inspections
+        GROUP BY storage_id
       ) i ON s.id = i.storage_id
       WHERE s.district = ? AND s.id != ?
       ORDER BY 
@@ -2434,7 +1927,7 @@ app.get('/api/inspection/priority', async (c) => {
 })
 
 // ==========================================
-// ホース格納庫詳細・点検ページ（完全書き直し版）
+// ホース格納庫詳細・点検ページ
 // ==========================================
 app.get('/storage/:id', async (c) => {
   const id = c.req.param('id')
@@ -2464,12 +1957,6 @@ app.get('/storage/:id', async (c) => {
             -webkit-tap-highlight-color: transparent;
             min-height: 48px;
         }
-        .modal-open {
-            display: flex !important;
-        }
-        .modal-closed {
-            display: none !important;
-        }
     </style>
 </head>
 <body>
@@ -2495,49 +1982,34 @@ app.get('/storage/:id', async (c) => {
             <div class="bg-white rounded-2xl shadow-lg p-8 text-center"><p class="text-gray-800">読み込み中...</p></div>
         </div>
 
-        <!-- タブ切り替え -->
-        <div class="bg-white rounded-2xl shadow-lg mb-6">
-            <div class="flex border-b">
-                <button id="tabRecord" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-red-500 text-red-500">
-                    📝 点検記録
-                </button>
-                <button id="tabHistory" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
-                    📋 点検履歴
-                </button>
+        <!-- 点検記録ボタン -->
+        <button id="inspectionBtn" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg mb-6">
+            📝 点検を記録する
+        </button>
+
+        <!-- 点検履歴 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 点検履歴</h2>
+            <div id="inspectionHistory">
+                <p class="text-gray-600 text-center py-4">読み込み中...</p>
             </div>
+        </div>
 
-            <!-- 点検記録タブ -->
-            <div id="recordTab" class="p-6">
-                <button id="showModalBtn" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
-                    📝 点検を記録する
-                </button>
-            </div>
-
-            <!-- 点検履歴タブ -->
-            <div id="historyTab" class="p-6 hidden">
-                <div class="mb-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">📋 点検履歴</h3>
-                    <div id="inspectionHistory">
-                        <p class="text-gray-600 text-center py-4">読み込み中...</p>
-                    </div>
-                </div>
-
-                <div class="border-t pt-6">
-                    <h3 class="text-xl font-bold text-gray-800 mb-4">🚨 対応履歴</h3>
-                    <div id="actionHistory">
-                        <p class="text-gray-600 text-center py-4">読み込み中...</p>
-                    </div>
-                </div>
+        <!-- 対応履歴 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">🚨 対応履歴</h2>
+            <div id="actionHistory">
+                <p class="text-gray-600 text-center py-4">読み込み中...</p>
             </div>
         </div>
     </div>
 
     <!-- 点検記録モーダル -->
-    <div id="inspectionModal" class="modal-closed fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto">
-        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 my-4 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+    <div id="inspectionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 my-8">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">📝 点検を記録</h2>
-                <button id="closeModalBtn" class="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+                <button onclick="window.hideInspectionModal()" class="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
             </div>
 
             <div class="space-y-4">
@@ -2564,48 +2036,37 @@ app.get('/storage/:id', async (c) => {
                 </div>
 
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">📝 点検結果</label>
-                    <textarea id="remarks" rows="3" placeholder="例：2本問題なし、2本廃棄" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">🚨 要対応事項（あれば）</label>
+                    <textarea id="actionRequired" rows="4" placeholder="対応が必要な内容を記入してください" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
                 </div>
 
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-3">🚨 要対応事項（あれば）</label>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">要対応事項 1</label>
-                            <textarea id="actionRequired1" rows="3" placeholder="例：格納庫扉の破損" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">要対応事項 2</label>
-                            <textarea id="actionRequired2" rows="3" placeholder="例：ホース劣化" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
-                        </div>
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">要対応事項 3</label>
-                            <textarea id="actionRequired3" rows="3" placeholder="例：周辺草刈り必要" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
-                        </div>
-                    </div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">📝 備考</label>
+                    <textarea id="remarks" rows="3" placeholder="その他メモ" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
                 </div>
 
-                <!-- 要対応事項の写真 -->
+                <!-- 破損状況の写真 -->
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">📷 要対応事項の写真（任意）</label>
-                    <input type="file" id="inspectionImage" accept="image/*" multiple class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">📷 破損状況の写真（任意）</label>
+                    <input type="file" id="inspectionImage" accept="image/*" multiple
+                        onchange="previewInspectionImages(event)"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg">
                     <p class="text-sm text-gray-600 mt-1">
-                        💡 対応が必要な箇所や気になる点の写真を複数枚アップロードできます
+                        💡 破損箇所や気になる点の写真を複数枚アップロードできます
                     </p>
-                    <div id="inspectionImagePreview" style="display:none;" class="mt-4 space-y-2">
+                    <div id="inspectionImagePreview" class="hidden mt-4 space-y-2">
                         <div id="previewImages" class="grid grid-cols-2 gap-2"></div>
-                        <button type="button" id="clearImagesBtn" class="text-red-500 hover:text-red-700 text-sm">
+                        <button type="button" onclick="clearInspectionImages()" class="text-red-500 hover:text-red-700 text-sm">
                             🗑️ すべての画像を削除
                         </button>
                     </div>
                 </div>
 
                 <div class="flex flex-col space-y-3 pt-4">
-                    <button type="button" id="saveBtn" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
+                    <button type="button" onclick="saveInspection()" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
                         ✅ 保存する
                     </button>
-                    <button type="button" id="cancelBtn" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
+                    <button type="button" onclick="window.hideInspectionModal()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
                         キャンセル
                     </button>
                 </div>
@@ -2614,96 +2075,64 @@ app.get('/storage/:id', async (c) => {
     </div>
 
     <script>
-        // 定数
-        const STORAGE_ID = '${id}';
+        const storageId = '${id}';
         let storageData = null;
 
-        // DOM要素（グローバル変数）
-        let modal, showModalBtn, closeModalBtn, cancelBtn, saveBtn, imageInput, clearImagesBtn;
-
-        // モーダル表示
-        function showModal() {
-            modal.classList.remove('modal-closed');
-            modal.classList.add('modal-open');
-            // 背景のスクロールを無効化
-            document.body.style.overflow = 'hidden';
-            document.body.style.position = 'fixed';
-            document.body.style.width = '100%';
-        }
-
-        // モーダル非表示
-        function hideModal() {
-            modal.classList.remove('modal-open');
-            modal.classList.add('modal-closed');
-            // 背景のスクロールを復元
-            document.body.style.overflow = '';
-            document.body.style.position = '';
-            document.body.style.width = '';
-        }
-
-        // タブ切り替え
-        function switchTab(tabName) {
-            const tabRecord = document.getElementById('tabRecord');
-            const tabHistory = document.getElementById('tabHistory');
-            const recordTab = document.getElementById('recordTab');
-            const historyTab = document.getElementById('historyTab');
-
-            if (tabName === 'record') {
-                tabRecord.classList.add('border-red-500', 'text-red-500');
-                tabRecord.classList.remove('border-transparent', 'text-gray-500');
-                tabHistory.classList.remove('border-red-500', 'text-red-500');
-                tabHistory.classList.add('border-transparent', 'text-gray-500');
-                recordTab.classList.remove('hidden');
-                historyTab.classList.add('hidden');
-            } else {
-                tabHistory.classList.add('border-red-500', 'text-red-500');
-                tabHistory.classList.remove('border-transparent', 'text-gray-500');
-                tabRecord.classList.remove('border-red-500', 'text-red-500');
-                tabRecord.classList.add('border-transparent', 'text-gray-500');
-                historyTab.classList.remove('hidden');
-                recordTab.classList.add('hidden');
+        // グローバルスコープで関数を定義
+        window.showInspectionModal = function() {
+            try {
+                alert('関数が呼ばれました');
+                const modal = document.getElementById('inspectionModal');
+                alert('モーダル要素: ' + (modal ? 'あり' : 'なし'));
+                if (!modal) {
+                    alert('エラー: モーダル要素が見つかりません');
+                    return;
+                }
+                alert('hidden削除前のクラス: ' + modal.className);
+                modal.classList.remove('hidden');
+                modal.style.display = 'flex';
+                alert('hidden削除後のクラス: ' + modal.className);
+                alert('display スタイル: ' + modal.style.display);
+            } catch (error) {
+                alert('エラー: ' + error.message);
+                console.error(error);
             }
-        }
+        };
 
-        // ページ読み込み完了後に初期化
-        document.addEventListener('DOMContentLoaded', function() {
-            // DOM要素の取得（ここでDOM準備完了してるから確実に取れる）
-            modal = document.getElementById('inspectionModal');
-            showModalBtn = document.getElementById('showModalBtn');
-            closeModalBtn = document.getElementById('closeModalBtn');
-            cancelBtn = document.getElementById('cancelBtn');
-            saveBtn = document.getElementById('saveBtn');
-            imageInput = document.getElementById('inspectionImage');
-            clearImagesBtn = document.getElementById('clearImagesBtn');
+        window.hideInspectionModal = function() {
+            try {
+                const modal = document.getElementById('inspectionModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    modal.style.display = 'none';
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        };
 
-            // タブ切り替えイベント
-            document.getElementById('tabRecord').addEventListener('click', () => switchTab('record'));
-            document.getElementById('tabHistory').addEventListener('click', () => switchTab('history'));
-
-            // イベントリスナー設定（要素が確実に存在する状態で設定）
-            if (showModalBtn) showModalBtn.addEventListener('click', showModal);
-            if (closeModalBtn) closeModalBtn.addEventListener('click', hideModal);
-            if (cancelBtn) cancelBtn.addEventListener('click', hideModal);
-            if (modal) modal.addEventListener('click', hideModal);
-            if (saveBtn) saveBtn.addEventListener('click', saveInspection);
-            if (imageInput) imageInput.addEventListener('change', previewInspectionImages);
-            if (clearImagesBtn) clearImagesBtn.addEventListener('click', clearInspectionImages);
+        window.onload = function() {
+            alert('ページ読み込み完了');
             
-            // デバッグ用
-            console.log('showModalBtn:', showModalBtn);
-            console.log('modal:', modal);
-
-            // 初期値設定と読み込み
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('inspectionDate').value = today;
+            
+            // ボタンにイベントリスナーを設定
+            const btn = document.getElementById('inspectionBtn');
+            alert('ボタン要素: ' + (btn ? 'あり' : 'なし'));
+            if (btn) {
+                btn.addEventListener('click', function() {
+                    alert('ボタンクリック検知');
+                    window.showInspectionModal();
+                });
+            }
             
             loadMembers();
             loadStorageDetail();
             loadInspectionHistory();
             loadActionHistory();
-        });
+        };
 
-        // 団員一覧読み込み
         async function loadMembers() {
             try {
                 const response = await fetch('/api/members');
@@ -2721,12 +2150,11 @@ app.get('/storage/:id', async (c) => {
             }
         }
 
-        // 格納庫詳細読み込み
         async function loadStorageDetail() {
             try {
                 const response = await fetch('/api/hose/storages');
                 const data = await response.json();
-                storageData = data.storages.find(s => s.id === STORAGE_ID);
+                storageData = data.storages.find(s => s.id === storageId);
                 
                 if (storageData) {
                     document.getElementById('storageDetail').innerHTML = 
@@ -2748,10 +2176,9 @@ app.get('/storage/:id', async (c) => {
             }
         }
 
-        // 点検履歴読み込み
         async function loadInspectionHistory() {
             try {
-                const response = await fetch('/api/inspection/history/' + STORAGE_ID);
+                const response = await fetch('/api/inspection/history/' + storageId);
                 const data = await response.json();
                 renderHistory(data.inspections || []);
             } catch (error) {
@@ -2760,7 +2187,6 @@ app.get('/storage/:id', async (c) => {
             }
         }
 
-        // 点検履歴表示
         function renderHistory(inspections) {
             const container = document.getElementById('inspectionHistory');
             
@@ -2780,9 +2206,9 @@ app.get('/storage/:id', async (c) => {
                     try {
                         const photos = JSON.parse(insp.photos);
                         if (photos.length > 0) {
-                            photosHtml = '<div class="mt-3"><p class="text-gray-700 text-sm font-semibold mb-2">📷 要対応事項の写真:</p>' +
+                            photosHtml = '<div class="mt-3"><p class="text-gray-700 text-sm font-semibold mb-2">📷 破損状況の写真:</p>' +
                                 '<div class="grid grid-cols-2 gap-2">' +
-                                photos.map(url => '<img src="' + url + '" alt="点検写真" class="w-full h-32 object-cover rounded-lg cursor-pointer" onclick="window.open(&quot;' + url + '&quot;, &quot;_blank&quot;)">').join('') +
+                                photos.map(url => '<img src="' + url + '" alt="点検写真" class="w-full h-32 object-cover rounded-lg cursor-pointer" onclick="window.open(\'' + url + '\', \'_blank\')">').join('') +
                                 '</div></div>';
                         }
                     } catch (e) {
@@ -2799,22 +2225,13 @@ app.get('/storage/:id', async (c) => {
                     (insp.action_required ? '<p class="text-gray-700 mb-2">🚨 要対応: ' + insp.action_required + '</p>' : '') +
                     (insp.remarks ? '<p class="text-gray-600 text-sm mb-2">💬 ' + insp.remarks + '</p>' : '') +
                     photosHtml +
-                    '<div class="flex gap-2 mt-3">' +
-                        '<button onclick="editInspection(\\'' + insp.id + '\\')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition font-bold text-sm">' +
-                            '✏️ 編集' +
-                        '</button>' +
-                        '<button onclick="deleteInspection(\\'' + insp.id + '\\')" class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition font-bold text-sm">' +
-                            '🗑️ 削除' +
-                        '</button>' +
-                    '</div>' +
                 '</div>';
             }).join('');
         }
 
-        // 対応履歴読み込み
         async function loadActionHistory() {
             try {
-                const response = await fetch('/api/inspection/action-history/' + STORAGE_ID);
+                const response = await fetch('/api/inspection/action-history/' + storageId);
                 const data = await response.json();
                 renderActionHistory(data.actions || []);
             } catch (error) {
@@ -2823,7 +2240,6 @@ app.get('/storage/:id', async (c) => {
             }
         }
 
-        // 対応履歴表示
         function renderActionHistory(actions) {
             const container = document.getElementById('actionHistory');
             
@@ -2842,9 +2258,9 @@ app.get('/storage/:id', async (c) => {
                     try {
                         const photos = JSON.parse(action.photos);
                         if (photos.length > 0) {
-                            photosHtml = '<div class="mt-3"><p class="text-gray-700 text-sm font-semibold mb-2">📷 要対応事項の写真:</p>' +
+                            photosHtml = '<div class="mt-3"><p class="text-gray-700 text-sm font-semibold mb-2">📷 破損状況の写真:</p>' +
                                 '<div class="grid grid-cols-2 gap-2">' +
-                                photos.map(url => '<img src="' + url + '" alt="点検写真" class="w-full h-32 object-cover rounded-lg cursor-pointer" onclick="window.open(&quot;' + url + '&quot;, &quot;_blank&quot;)">').join('') +
+                                photos.map(url => '<img src="' + url + '" alt="点検写真" class="w-full h-32 object-cover rounded-lg cursor-pointer" onclick="window.open(\'' + url + '\', \'_blank\')">').join('') +
                                 '</div></div>';
                         }
                     } catch (e) {
@@ -2871,7 +2287,7 @@ app.get('/storage/:id', async (c) => {
             }).join('');
         }
 
-        // 画像プレビュー
+        // 点検画像プレビュー
         function previewInspectionImages(event) {
             const files = event.target.files;
             if (files.length > 0) {
@@ -2888,18 +2304,18 @@ app.get('/storage/:id', async (c) => {
                     reader.readAsDataURL(file);
                 });
                 
-                document.getElementById('inspectionImagePreview').style.display = 'block';
+                document.getElementById('inspectionImagePreview').classList.remove('hidden');
             }
         }
 
-        // 画像クリア
+        // 点検画像クリア
         function clearInspectionImages() {
             document.getElementById('inspectionImage').value = '';
-            document.getElementById('inspectionImagePreview').style.display = 'none';
+            document.getElementById('inspectionImagePreview').classList.add('hidden');
             document.getElementById('previewImages').innerHTML = '';
         }
 
-        // 画像アップロード
+        // 複数画像アップロード
         async function uploadInspectionImages() {
             const fileInput = document.getElementById('inspectionImage');
             if (!fileInput.files || fileInput.files.length === 0) {
@@ -2929,19 +2345,12 @@ app.get('/storage/:id', async (c) => {
             return imageUrls;
         }
 
-        // 点検記録保存（新規作成と編集の両方に対応）
         async function saveInspection() {
             const inspectorName = document.getElementById('inspectorName').value;
             const date = document.getElementById('inspectionDate').value;
             const result = document.getElementById('inspectionResult').value;
-            const actionRequired1 = document.getElementById('actionRequired1').value;
-            const actionRequired2 = document.getElementById('actionRequired2').value;
-            const actionRequired3 = document.getElementById('actionRequired3').value;
+            const actionRequired = document.getElementById('actionRequired').value;
             const remarks = document.getElementById('remarks').value;
-            
-            // 3つの要対応事項を結合（空でないものだけ）
-            const actionRequiredList = [actionRequired1, actionRequired2, actionRequired3].filter(item => item.trim() !== '');
-            const actionRequired = actionRequiredList.length > 0 ? actionRequiredList.map((item, index) => '[' + (index + 1) + '] ' + item).join('\\n\\n') : null;
 
             if (!inspectorName || !date || !result) {
                 alert('入力者、点検日、結果は必須です');
@@ -2952,119 +2361,34 @@ app.get('/storage/:id', async (c) => {
             const imageUrls = await uploadInspectionImages();
 
             const data = {
-                storage_id: STORAGE_ID,
+                storage_id: storageId,
                 storage_number: storageData.storage_number,
                 inspection_date: date,
                 result: result,
-                action_required: actionRequired || null,
-                remarks: remarks || null,
+                action_required: actionRequired,
+                remarks: remarks,
                 inspector_name: inspectorName,
                 photos: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null
             };
 
             try {
-                let response;
-                if (currentEditingInspectionId) {
-                    // 編集の場合
-                    response = await fetch('/api/inspection/' + currentEditingInspectionId, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
-                } else {
-                    // 新規作成の場合
-                    response = await fetch('/api/inspection/record', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
-                }
+                const response = await fetch('/api/inspection/record', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
 
                 if (response.ok) {
-                    alert(currentEditingInspectionId ? '点検記録を更新しました！' : '点検記録を保存しました！');
-                    hideModal();
+                    alert('点検記録を保存しました！');
+                    hideInspectionModal();
                     loadInspectionHistory();
-                    loadActionHistory();
-                    
-                    // リセット
-                    currentEditingInspectionId = null;
-                    document.querySelector('#inspectionModal h2').textContent = '📝 点検を記録';
                     document.getElementById('inspectorName').value = '';
                     document.getElementById('inspectionResult').value = '';
-                    document.getElementById('actionRequired1').value = '';
-                    document.getElementById('actionRequired2').value = '';
-                    document.getElementById('actionRequired3').value = '';
+                    document.getElementById('actionRequired').value = '';
                     document.getElementById('remarks').value = '';
                     clearInspectionImages();
                 } else {
                     alert('保存に失敗しました');
-                }
-            } catch (error) {
-                alert('エラーが発生しました');
-                console.error(error);
-            }
-        }
-
-        // 点検記録編集
-        let currentEditingInspectionId = null;
-        async function editInspection(id) {
-            currentEditingInspectionId = id;
-            
-            // 点検記録の詳細を取得
-            try {
-                const response = await fetch('/api/inspection/detail/' + id);
-                const data = await response.json();
-                const insp = data.inspection;
-                
-                if (!insp) {
-                    alert('点検記録が見つかりません');
-                    return;
-                }
-                
-                // モーダルのタイトルを変更
-                document.querySelector('#inspectionModal h2').textContent = '✏️ 点検記録を編集';
-                
-                // フォームに値をセット
-                document.getElementById('inspectorName').value = insp.inspector_name || '';
-                document.getElementById('inspectionDate').value = insp.inspection_date ? insp.inspection_date.split('T')[0] : '';
-                document.getElementById('inspectionResult').value = insp.result || '';
-                
-                // 要対応事項を3つのフィールドに分割（[1], [2], [3]形式で保存されている場合）
-                const actionRequired = insp.action_required || '';
-                const actionItems = actionRequired.split('\\n\\n').map(item => {
-                    return item.replace(new RegExp('^\\\\\\\\[\\\\\\\\d+\\\\\\\\]\\\\\\\\s*'), '');
-                });
-                document.getElementById('actionRequired1').value = actionItems[0] || '';
-                document.getElementById('actionRequired2').value = actionItems[1] || '';
-                document.getElementById('actionRequired3').value = actionItems[2] || '';
-                
-                document.getElementById('remarks').value = insp.remarks || '';
-                
-                // モーダル表示
-                showModal();
-            } catch (error) {
-                alert('点検記録の読み込みに失敗しました');
-                console.error(error);
-            }
-        }
-
-        // 点検記録削除
-        async function deleteInspection(id) {
-            if (!confirm('この点検記録を削除しますか？\\n\\nこの操作は取り消せません。')) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/inspection/' + id, {
-                    method: 'DELETE'
-                });
-                
-                if (response.ok) {
-                    alert('削除しました');
-                    loadInspectionHistory();
-                    loadActionHistory();
-                } else {
-                    alert('削除に失敗しました');
                 }
             } catch (error) {
                 alert('エラーが発生しました');
@@ -3076,7 +2400,6 @@ app.get('/storage/:id', async (c) => {
 </html>
   `)
 })
-
 
 // ==========================================
 // API: 点検履歴取得
@@ -3134,64 +2457,6 @@ app.post('/api/inspection/record', async (c) => {
     ).run()
     
     return c.json({ success: true, id })
-  } catch (error) {
-    console.error('Database error:', error)
-    return c.json({ success: false }, 500)
-  }
-})
-
-// ==========================================
-// API: 点検記録詳細取得
-// ==========================================
-app.get('/api/inspection/detail/:id', async (c) => {
-  try {
-    const id = c.req.param('id')
-    const env = c.env as { DB: D1Database }
-    
-    const result = await env.DB.prepare(`
-      SELECT * FROM hose_inspections WHERE id = ?
-    `).bind(id).first()
-    
-    return c.json({ inspection: result })
-  } catch (error) {
-    console.error('Database error:', error)
-    return c.json({ inspection: null }, 500)
-  }
-})
-
-// ==========================================
-// API: 点検記録更新
-// ==========================================
-app.put('/api/inspection/:id', async (c) => {
-  try {
-    const id = c.req.param('id')
-    const data = await c.req.json()
-    const env = c.env as { DB: D1Database }
-    
-    const now = new Date().toISOString()
-    
-    await env.DB.prepare(`
-      UPDATE hose_inspections 
-      SET inspection_date = ?,
-          result = ?,
-          action_required = ?,
-          remarks = ?,
-          photos = ?,
-          inspector_name = ?,
-          updated_at = ?
-      WHERE id = ?
-    `).bind(
-      data.inspection_date,
-      data.result,
-      data.action_required || null,
-      data.remarks || null,
-      data.photos || null,
-      data.inspector_name,
-      now,
-      id
-    ).run()
-    
-    return c.json({ success: true })
   } catch (error) {
     console.error('Database error:', error)
     return c.json({ success: false }, 500)
@@ -3282,33 +2547,6 @@ app.get('/action-required', (c) => {
         </div>
     </div>
 
-    <!-- 編集モーダル -->
-    <div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
-        <div class="min-h-full flex items-center justify-center p-4">
-            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6">✏️ 対応内容を編集</h2>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">
-                        📝 対応内容 <span class="text-red-500">*</span>
-                    </label>
-                    <textarea id="editActionContent" rows="4" required
-                        placeholder="対応内容を入力してください"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
-                </div>
-                
-                <div class="flex flex-col space-y-3">
-                    <button onclick="submitEdit()" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
-                        ✅ 保存する
-                    </button>
-                    <button onclick="hideEditModal()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
-                        キャンセル
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script>
         window.onload = function() {
             loadActionRequired();
@@ -3360,19 +2598,11 @@ app.get('/action-required', (c) => {
                         '</div>' : ''
                     ) +
                     (!isCompleted ? 
-                        '<button onclick="markCompleted(\\'' + item.id + '\\')" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl transition font-bold text-base mb-2">' +
+                        '<button onclick="markCompleted(\\'' + item.id + '\\')" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
                             '✅ 対応完了にする' +
                         '</button>' :
-                        '<p class="text-gray-600 text-center mb-4">対応完了日: ' + new Date(item.action_completed_at).toLocaleDateString('ja-JP') + '</p>'
+                        '<p class="text-gray-600 text-center">対応完了日: ' + new Date(item.action_completed_at).toLocaleDateString('ja-JP') + '</p>'
                     ) +
-                    '<div class="grid grid-cols-2 gap-2">' +
-                        '<button onclick="editAction(\\'' + item.id + '\\', \\'' + encodeURIComponent(item.action_content || '') + '\\')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg transition font-bold">' +
-                            '✏️ 編集' +
-                        '</button>' +
-                        '<button onclick="deleteAction(\\'' + item.id + '\\', \\'' + item.storage_number + '\\')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-lg transition font-bold">' +
-                            '🗑️ 削除' +
-                        '</button>' +
-                    '</div>' +
                 '</div>';
             }).join('');
         }
@@ -3411,70 +2641,6 @@ app.get('/action-required', (c) => {
                     loadActionRequired();
                 } else {
                     alert('更新に失敗しました');
-                }
-            } catch (error) {
-                alert('エラーが発生しました');
-                console.error(error);
-            }
-        }
-
-        let currentEditInspectionId = null;
-
-        function editAction(inspectionId, encodedContent) {
-            const content = decodeURIComponent(encodedContent);
-            currentEditInspectionId = inspectionId;
-            document.getElementById('editActionContent').value = content;
-            document.getElementById('editModal').classList.remove('hidden');
-        }
-
-        function hideEditModal() {
-            document.getElementById('editModal').classList.add('hidden');
-            currentEditInspectionId = null;
-        }
-
-        async function submitEdit() {
-            const actionContent = document.getElementById('editActionContent').value.trim();
-            
-            if (!actionContent) {
-                alert('対応内容を入力してください');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/inspection/mark-completed/' + currentEditInspectionId, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action_content: actionContent })
-                });
-
-                if (response.ok) {
-                    alert('更新しました！');
-                    hideEditModal();
-                    loadActionRequired();
-                } else {
-                    alert('更新に失敗しました');
-                }
-            } catch (error) {
-                alert('エラーが発生しました');
-                console.error(error);
-            }
-        }
-
-        async function deleteAction(inspectionId, storageNumber) {
-            if (!confirm(storageNumber + 'の対応記録を削除しますか？')) {
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/inspection/' + inspectionId, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    alert('削除しました！');
-                    loadActionRequired();
-                } else {
-                    alert('削除に失敗しました');
                 }
             } catch (error) {
                 alert('エラーが発生しました');
@@ -3558,25 +2724,6 @@ app.put('/api/inspection/mark-completed/:id', async (c) => {
           updated_at = ?
       WHERE id = ?
     `).bind(now, data.action_content || null, now, id).run()
-    
-    return c.json({ success: true })
-  } catch (error) {
-    console.error('Database error:', error)
-    return c.json({ success: false }, 500)
-  }
-})
-
-// ==========================================
-// API: 点検記録削除
-// ==========================================
-app.delete('/api/inspection/:id', async (c) => {
-  try {
-    const id = c.req.param('id')
-    const env = c.env as { DB: D1Database }
-    
-    await env.DB.prepare(`
-      DELETE FROM hose_inspections WHERE id = ?
-    `).bind(id).run()
     
     return c.json({ success: true })
   } catch (error) {
@@ -4540,12 +3687,11 @@ app.get('/members', (c) => {
                 const age = member.birth_date ? calculateAge(member.birth_date) : '不明';
                 const years = member.join_date ? calculateYearsOfService(member.join_date) : '不明';
                 const joinDateDisplay = member.join_date ? new Date(member.join_date).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'}) : '不明';
-                const birthDateDisplay = member.birth_date ? new Date(member.birth_date).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'}) : '不明';
                 
                 return '<div class="bg-white rounded-2xl p-6 shadow-lg border-2 border-gray-200 hover:border-blue-400 transition">' +
                     '<h3 class="text-2xl font-bold text-gray-800 mb-4">👤 ' + member.name + '</h3>' +
                     '<div class="space-y-2 mb-4">' +
-                        '<p class="text-gray-700 text-base">🎂 生年月日: ' + birthDateDisplay + ' (' + age + '歳)</p>' +
+                        '<p class="text-gray-700 text-base">🎂 年齢: ' + age + '歳</p>' +
                         '<p class="text-gray-700 text-base">📅 入団: ' + joinDateDisplay + ' (' + years + '年目)</p>' +
                     '</div>' +
                     '<div class="grid grid-cols-2 gap-2">' +
