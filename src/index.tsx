@@ -2939,9 +2939,11 @@ app.get('/storage/:id', async (c) => {
             const actionRequired3 = document.getElementById('actionRequired3').value;
             const remarks = document.getElementById('remarks').value;
             
-            // 3つの要対応事項を結合（空でないものだけ）
-            const actionRequiredList = [actionRequired1, actionRequired2, actionRequired3].filter(item => item.trim() !== '');
-            const actionRequired = actionRequiredList.length > 0 ? actionRequiredList.map((item, index) => '[' + (index + 1) + '] ' + item).join('\\n\\n') : null;
+            // 3つの要対応事項を配列として送信（空でないものだけ）
+            const actionItemsList = [actionRequired1, actionRequired2, actionRequired3].filter(item => item.trim() !== '');
+            
+            // 後方互換性のため、action_requiredも保存（旧形式）
+            const actionRequired = actionItemsList.length > 0 ? actionItemsList.map((item, index) => '[' + (index + 1) + '] ' + item).join('\\n\\n') : null;
 
             if (!inspectorName || !date || !result) {
                 alert('入力者、点検日、結果は必須です');
@@ -2957,6 +2959,7 @@ app.get('/storage/:id', async (c) => {
                 inspection_date: date,
                 result: result,
                 action_required: actionRequired || null,
+                action_items: actionItemsList,  // 新形式: 配列
                 remarks: remarks || null,
                 inspector_name: inspectorName,
                 photos: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null
@@ -3138,6 +3141,21 @@ app.post('/api/inspection/record', async (c) => {
       now
     ).run()
     
+    // 要対応事項を個別に保存（action_itemsテーブル）
+    if (data.action_items && Array.isArray(data.action_items)) {
+      for (let i = 0; i < data.action_items.length; i++) {
+        const item = data.action_items[i]
+        if (item && item.trim() !== '') {
+          const itemId = 'action_item_' + Date.now() + '_' + i
+          await env.DB.prepare(`
+            INSERT INTO action_items (
+              id, inspection_id, content, item_order, created_at
+            ) VALUES (?, ?, ?, ?, ?)
+          `).bind(itemId, id, item.trim(), i + 1, now).run()
+        }
+      }
+    }
+    
     return c.json({ success: true, id })
   } catch (error) {
     console.error('Database error:', error)
@@ -3255,6 +3273,18 @@ app.get('/action-required', (c) => {
             <p class="text-base text-gray-600">対応が必要な項目を確認しましょう</p>
         </div>
 
+        <!-- タブ切り替え -->
+        <div class="bg-white rounded-2xl shadow-lg mb-6">
+            <div class="flex border-b">
+                <button id="tabPending" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-red-500 text-red-500">
+                    ⚠️ 未対応
+                </button>
+                <button id="tabCompleted" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                    ✅ 対応済
+                </button>
+            </div>
+        </div>
+
         <div id="actionList" class="space-y-4">
             <div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800">読み込み中...</p></div>
         </div>
@@ -3315,15 +3345,43 @@ app.get('/action-required', (c) => {
     </div>
 
     <script>
+        let allItems = [];
+        let currentTab = 'pending'; // 'pending' or 'completed'
+
         window.onload = function() {
             loadActionRequired();
+            
+            // タブ切り替えイベント
+            document.getElementById('tabPending').addEventListener('click', () => switchTab('pending'));
+            document.getElementById('tabCompleted').addEventListener('click', () => switchTab('completed'));
         };
+
+        function switchTab(tab) {
+            currentTab = tab;
+            const tabPending = document.getElementById('tabPending');
+            const tabCompleted = document.getElementById('tabCompleted');
+            
+            if (tab === 'pending') {
+                tabPending.classList.add('border-red-500', 'text-red-500');
+                tabPending.classList.remove('border-transparent', 'text-gray-500');
+                tabCompleted.classList.remove('border-green-500', 'text-green-500');
+                tabCompleted.classList.add('border-transparent', 'text-gray-500');
+            } else {
+                tabCompleted.classList.add('border-green-500', 'text-green-500');
+                tabCompleted.classList.remove('border-transparent', 'text-gray-500');
+                tabPending.classList.remove('border-red-500', 'text-red-500');
+                tabPending.classList.add('border-transparent', 'text-gray-500');
+            }
+            
+            renderActionList(allItems);
+        }
 
         async function loadActionRequired() {
             try {
                 const response = await fetch('/api/inspection/action-required');
                 const data = await response.json();
-                renderActionList(data.items || []);
+                allItems = data.items || [];
+                renderActionList(allItems);
             } catch (error) {
                 document.getElementById('actionList').innerHTML = 
                     '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800">データの読み込みに失敗しました</p></div>';
@@ -3334,19 +3392,32 @@ app.get('/action-required', (c) => {
         function renderActionList(items) {
             const list = document.getElementById('actionList');
             
-            if (items.length === 0) {
-                list.innerHTML = '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800 text-xl">対応が必要な項目はありません</p></div>';
+            // タブに応じてフィルタリング
+            const filteredItems = items.filter(item => {
+                if (currentTab === 'pending') {
+                    return item.is_completed === 0;
+                } else {
+                    return item.is_completed === 1;
+                }
+            });
+            
+            if (filteredItems.length === 0) {
+                const message = currentTab === 'pending' ? '未対応の項目はありません' : '対応済みの項目はありません';
+                list.innerHTML = '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800 text-xl">' + message + '</p></div>';
                 return;
             }
 
-            list.innerHTML = items.map(item => {
+            // 各action_itemごとに個別のカードを表示
+            list.innerHTML = filteredItems.map(item => {
                 const date = new Date(item.inspection_date).toLocaleDateString('ja-JP');
-                const isCompleted = item.action_completed === 1;
+                const isCompleted = item.is_completed === 1;
+                const district = item.district || '';
                 
                 return '<div class="bg-white rounded-2xl shadow-lg p-6">' +
                     '<div class="flex justify-between items-start mb-4">' +
                         '<div class="flex-1">' +
-                            '<h3 class="text-xl font-bold text-gray-800 mb-2">📦 ' + item.storage_number + ' - ' + item.location + '</h3>' +
+                            '<div class="text-sm text-gray-600 mb-1">' + district + '</div>' +
+                            '<h3 class="text-xl font-bold text-gray-800 mb-2">' + item.storage_number + ' - ' + item.location + '</h3>' +
                             '<p class="text-sm text-gray-600 mb-2">📅 点検日: ' + date + '</p>' +
                         '</div>' +
                         (isCompleted ? 
@@ -3356,43 +3427,37 @@ app.get('/action-required', (c) => {
                     '</div>' +
                     '<div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-4">' +
                         '<p class="text-red-800 font-semibold mb-2">🚨 要対応内容:</p>' +
-                        '<p class="text-gray-800">' + item.action_required + '</p>' +
+                        '<p class="text-gray-800">' + item.content + '</p>' +
                     '</div>' +
-                    (isCompleted && item.action_content ? 
-                        '<div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-4 mb-4">' +
-                            '<p class="text-green-800 font-semibold mb-2">✅ 対応内容:</p>' +
-                            '<p class="text-gray-800">' + item.action_content + '</p>' +
-                        '</div>' : ''
-                    ) +
-                    (!isCompleted ? 
-                        '<button onclick="markCompleted(\\'' + item.id + '\\')" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl transition font-bold text-base mb-2">' +
+                    (isCompleted ? 
+                        '<div>' +
+                            (item.action_content ? 
+                                '<div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-4 mb-4">' +
+                                    '<p class="text-green-800 font-semibold mb-2">✅ 対応内容:</p>' +
+                                    '<p class="text-gray-800">' + item.action_content + '</p>' +
+                                '</div>' : ''
+                            ) +
+                            '<p class="text-gray-600 text-center mb-4">対応完了日: ' + new Date(item.completed_at).toLocaleDateString('ja-JP') + '</p>' +
+                        '</div>' :
+                        '<button onclick="markCompleted(\\'' + item.id + '\\')" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
                             '✅ 対応完了にする' +
-                        '</button>' :
-                        '<p class="text-gray-600 text-center mb-4">対応完了日: ' + new Date(item.action_completed_at).toLocaleDateString('ja-JP') + '</p>'
+                        '</button>'
                     ) +
-                    '<div class="grid grid-cols-2 gap-2">' +
-                        '<button onclick="editAction(\\'' + item.id + '\\', \\'' + encodeURIComponent(item.action_content || '') + '\\')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg transition font-bold">' +
-                            '✏️ 編集' +
-                        '</button>' +
-                        '<button onclick="deleteAction(\\'' + item.id + '\\', \\'' + item.storage_number + '\\')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-lg transition font-bold">' +
-                            '🗑️ 削除' +
-                        '</button>' +
-                    '</div>' +
                 '</div>';
             }).join('');
         }
 
-        let currentInspectionId = null;
+        let currentActionItemId = null;
 
-        function markCompleted(inspectionId) {
-            currentInspectionId = inspectionId;
+        function markCompleted(actionItemId) {
+            currentActionItemId = actionItemId;
             document.getElementById('actionContent').value = '';
             document.getElementById('completeModal').classList.remove('hidden');
         }
 
         function hideCompleteModal() {
             document.getElementById('completeModal').classList.add('hidden');
-            currentInspectionId = null;
+            currentActionItemId = null;
         }
 
         async function submitComplete() {
@@ -3404,7 +3469,8 @@ app.get('/action-required', (c) => {
             }
 
             try {
-                const response = await fetch('/api/inspection/mark-completed/' + currentInspectionId, {
+                // 新しいaction_items APIを使用
+                const response = await fetch('/api/action-items/' + currentActionItemId + '/complete', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action_content: actionContent })
@@ -3493,23 +3559,28 @@ app.get('/action-required', (c) => {
 })
 
 // ==========================================
-// API: 要対応事項一覧取得
+// API: 要対応事項一覧取得（新形式: action_itemsベース）
 // ==========================================
 app.get('/api/inspection/action-required', async (c) => {
   try {
     const env = c.env as { DB: D1Database }
     
+    // action_itemsテーブルから取得
     const result = await env.DB.prepare(`
       SELECT 
-        i.*,
-        s.location
-      FROM hose_inspections i
+        a.*,
+        i.storage_id,
+        i.storage_number,
+        i.inspection_date,
+        s.location,
+        s.district
+      FROM action_items a
+      JOIN hose_inspections i ON a.inspection_id = i.id
       JOIN hose_storages s ON i.storage_id = s.id
-      WHERE i.action_required IS NOT NULL 
-        AND i.action_required != ''
       ORDER BY 
-        i.action_completed ASC,
-        i.inspection_date DESC
+        a.is_completed ASC,
+        i.inspection_date DESC,
+        a.item_order ASC
     `).all()
     
     return c.json({ items: result.results })
@@ -3581,6 +3652,71 @@ app.delete('/api/inspection/:id', async (c) => {
     
     await env.DB.prepare(`
       DELETE FROM hose_inspections WHERE id = ?
+    `).bind(id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
+// API: 要対応事項一覧取得 (by inspection_id)
+// ==========================================
+app.get('/api/action-items/:inspectionId', async (c) => {
+  try {
+    const inspectionId = c.req.param('inspectionId')
+    const env = c.env as { DB: D1Database }
+    
+    const result = await env.DB.prepare(`
+      SELECT * FROM action_items
+      WHERE inspection_id = ?
+      ORDER BY item_order ASC
+    `).bind(inspectionId).all()
+    
+    return c.json(result.results || [])
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
+// API: 要対応事項を対応完了にする
+// ==========================================
+app.put('/api/action-items/:id/complete', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    const now = new Date().toISOString()
+    
+    await env.DB.prepare(`
+      UPDATE action_items
+      SET is_completed = 1, completed_at = ?, action_content = ?
+      WHERE id = ?
+    `).bind(now, data.action_content || null, id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
+// API: 要対応事項を未完了に戻す
+// ==========================================
+app.put('/api/action-items/:id/uncomplete', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const env = c.env as { DB: D1Database }
+    
+    await env.DB.prepare(`
+      UPDATE action_items
+      SET is_completed = 0, completed_at = NULL
+      WHERE id = ?
     `).bind(id).run()
     
     return c.json({ success: true })
