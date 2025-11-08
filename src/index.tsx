@@ -2751,8 +2751,8 @@ app.get('/storage/:id', async (c) => {
                             '</div>' +
                         '</div>';
                         
-                        // 地図を初期化（住所から座標を取得して表示）
-                        initStorageMap(storageData.location);
+                        // 地図を初期化（Google Maps URLまたは住所から座標を取得して表示）
+                        initStorageMap(storageData.location, storageData.google_maps_url);
                 }
             } catch (error) {
                 console.error(error);
@@ -2760,17 +2760,32 @@ app.get('/storage/:id', async (c) => {
         }
 
         // 地図を初期化
-        async function initStorageMap(location) {
+        async function initStorageMap(location, mapUrl) {
             try {
-                // Nominatim APIで住所から座標を取得
-                const query = encodeURIComponent(location + ' 大井町 神奈川県');
-                const response = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + query + '&limit=1');
-                const data = await response.json();
+                let lat, lon;
                 
-                if (data.length > 0) {
-                    const lat = parseFloat(data[0].lat);
-                    const lon = parseFloat(data[0].lon);
+                // Google Maps URLから座標を抽出
+                if (mapUrl) {
+                    const coords = extractCoordsFromGoogleMapsUrl(mapUrl);
+                    if (coords) {
+                        lat = coords.lat;
+                        lon = coords.lon;
+                    }
+                }
+                
+                // 座標が取得できない場合はNominatim APIで住所から取得
+                if (!lat || !lon) {
+                    const query = encodeURIComponent(location + ' 大井町 神奈川県');
+                    const response = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + query + '&limit=1');
+                    const data = await response.json();
                     
+                    if (data.length > 0) {
+                        lat = parseFloat(data[0].lat);
+                        lon = parseFloat(data[0].lon);
+                    }
+                }
+                
+                if (lat && lon) {
                     // Leaflet地図を初期化
                     const map = L.map('storageMap').setView([lat, lon], 17);
                     
@@ -2793,6 +2808,31 @@ app.get('/storage/:id', async (c) => {
             } catch (error) {
                 console.error('Map initialization error:', error);
             }
+        }
+        
+        // Google Maps URLから座標を抽出
+        function extractCoordsFromGoogleMapsUrl(url) {
+            if (!url) return null;
+            
+            // パターン1: @35.123,139.456,17z 形式
+            let match = url.match(/@(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);
+            if (match) {
+                return { lat: parseFloat(match[1]), lon: parseFloat(match[2]) };
+            }
+            
+            // パターン2: ?q=35.123,139.456 形式
+            match = url.match(/[?&]q=(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);
+            if (match) {
+                return { lat: parseFloat(match[1]), lon: parseFloat(match[2]) };
+            }
+            
+            // パターン3: /place/.../@35.123,139.456 形式
+            match = url.match(/\\/place\\/[^@]*@(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);
+            if (match) {
+                return { lat: parseFloat(match[1]), lon: parseFloat(match[2]) };
+            }
+            
+            return null;
         }
 
         // 点検履歴読み込み

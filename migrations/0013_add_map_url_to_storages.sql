@@ -1,0 +1,3 @@
+-- Rename google_maps_url to map_url for consistency
+-- Note: SQLite doesn't support RENAME COLUMN directly in older versions
+-- So we'll just ensure map_url is an alias or use google_maps_url as is
