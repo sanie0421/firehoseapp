@@ -2733,7 +2733,7 @@ app.get('/storage/:id', async (c) => {
                         '<div class="bg-white rounded-2xl shadow-lg p-6">' +
                             '<div class="flex justify-between items-start mb-4">' +
                                 '<h1 class="text-3xl font-bold text-gray-800">📦 ' + storageData.storage_number + '</h1>' +
-                                '<a href="/storage-edit/' + storageData.id + '" ' +
+                                '<a href="/hose?edit=' + storageData.id + '" ' +
                                 'class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition font-bold">' +
                                     '✏️ 編集' +
                                 '</a>' +
@@ -2749,7 +2749,7 @@ app.get('/storage/:id', async (c) => {
                             (storageData.address ? '<p class="text-base text-gray-600 mb-4">🏠 ' + storageData.address + '</p>' : '') +
                             '<div class="mt-4">' +
                                 '<div id="storageMap" class="w-full h-64 rounded-lg border-2 border-gray-200"></div>' +
-                                '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(storageData.location + ' 大井町') + '" ' +
+                                '<a href="' + (storageData.google_maps_url || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(storageData.location + ' 大井町')) + '" ' +
                                 'target="_blank" rel="noopener noreferrer" ' +
                                 'class="block w-full bg-blue-500 hover:bg-blue-600 text-white text-center px-4 py-3 rounded-lg transition font-bold text-base mt-2">' +
                                     '🗺️ Google Mapsで開く' +
@@ -2772,19 +2772,14 @@ app.get('/storage/:id', async (c) => {
                 
                 // Google Maps URLから座標を抽出
                 if (mapUrl) {
-                    // 短縮URL (maps.app.goo.gl) の場合、iframe埋め込みで表示
+                    // 短縮URL (maps.app.goo.gl) の場合、地図表示不可のメッセージを表示
                     if (mapUrl.includes('maps.app.goo.gl') || mapUrl.includes('goo.gl')) {
-                        try {
-                            // 短縮URLをそのままiframeのsrcとして使用
-                            const mapElement = document.getElementById('storageMap');
-                            mapElement.innerHTML = '<iframe width="100%" height="100%" style="border:0; border-radius:8px;" ' +
-                                'src="' + mapUrl + '" ' +
-                                'loading="lazy" allowfullscreen></iframe>';
-                            console.log('Loaded map with shortened URL:', mapUrl);
-                            return;
-                        } catch (err) {
-                            console.error('Failed to load shortened URL:', err);
-                        }
+                        console.log('Shortened URL detected, showing placeholder:', mapUrl);
+                        const mapElement = document.getElementById('storageMap');
+                        mapElement.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">' +
+                            '<p class="text-gray-600 text-center px-4">📍 地図プレビュー利用不可<br>下のボタンからGoogle Mapsで開いてください</p>' +
+                        '</div>';
+                        return;
                     } else {
                         // 通常のURLから座標を抽出
                         const coords = extractCoordsFromGoogleMapsUrl(mapUrl);
