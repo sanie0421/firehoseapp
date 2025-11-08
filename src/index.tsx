@@ -2766,18 +2766,21 @@ app.get('/storage/:id', async (c) => {
                 
                 // Google Maps URLから座標を抽出
                 if (mapUrl) {
-                    // 短縮URL (maps.app.goo.gl) の場合、リダイレクト先を取得
+                    // 短縮URL (maps.app.goo.gl) の場合、fetchでリダイレクト先を取得
                     if (mapUrl.includes('maps.app.goo.gl') || mapUrl.includes('goo.gl')) {
                         try {
-                            // CORSプロキシを使わずに、短縮URLを展開
-                            // Google Maps の短縮URLは、iframe srcに直接指定すると自動展開される
-                            const mapElement = document.getElementById('storageMap');
-                            mapElement.innerHTML = '<iframe width="100%" height="100%" style="border:0; border-radius:8px;" ' +
-                                'src="https://www.google.com/maps?q=' + encodeURIComponent(mapUrl) + '&output=embed" ' +
-                                'loading="lazy" allowfullscreen></iframe>';
-                            return;
+                            // 短縮URLをフェッチしてリダイレクト先のURLを取得
+                            const response = await fetch(mapUrl, { redirect: 'follow' });
+                            const fullUrl = response.url;
+                            
+                            // リダイレクト先から座標を抽出
+                            const coords = extractCoordsFromGoogleMapsUrl(fullUrl);
+                            if (coords) {
+                                lat = coords.lat;
+                                lon = coords.lon;
+                            }
                         } catch (err) {
-                            console.error('Failed to load shortened URL:', err);
+                            console.error('Failed to expand shortened URL:', err);
                         }
                     } else {
                         // 通常のURLから座標を抽出
