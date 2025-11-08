@@ -2740,11 +2740,58 @@ app.get('/storage/:id', async (c) => {
                             '<p class="text-xl text-gray-700 mb-2">📍 ' + storageData.location + '</p>' +
                             (storageData.district ? '<p class="text-base text-gray-600 mb-2">🏘️ ' + storageData.district + '</p>' : '') +
                             (storageData.remarks ? '<p class="text-base text-gray-600 mb-2">💬 ' + storageData.remarks + '</p>' : '') +
-                            (storageData.address ? '<p class="text-base text-gray-600">🏠 ' + storageData.address + '</p>' : '') +
+                            (storageData.address ? '<p class="text-base text-gray-600 mb-4">🏠 ' + storageData.address + '</p>' : '') +
+                            '<div class="mt-4">' +
+                                '<div id="storageMap" class="w-full h-64 rounded-lg border-2 border-gray-200"></div>' +
+                                '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(storageData.location + ' 大井町') + '" ' +
+                                'target="_blank" rel="noopener noreferrer" ' +
+                                'class="block w-full bg-blue-500 hover:bg-blue-600 text-white text-center px-4 py-3 rounded-lg transition font-bold text-base mt-2">' +
+                                    '🗺️ Google Mapsで開く' +
+                                '</a>' +
+                            '</div>' +
                         '</div>';
+                        
+                        // 地図を初期化（住所から座標を取得して表示）
+                        initStorageMap(storageData.location);
                 }
             } catch (error) {
                 console.error(error);
+            }
+        }
+
+        // 地図を初期化
+        async function initStorageMap(location) {
+            try {
+                // Nominatim APIで住所から座標を取得
+                const query = encodeURIComponent(location + ' 大井町 神奈川県');
+                const response = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + query + '&limit=1');
+                const data = await response.json();
+                
+                if (data.length > 0) {
+                    const lat = parseFloat(data[0].lat);
+                    const lon = parseFloat(data[0].lon);
+                    
+                    // Leaflet地図を初期化
+                    const map = L.map('storageMap').setView([lat, lon], 17);
+                    
+                    // OpenStreetMapタイル追加
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    }).addTo(map);
+                    
+                    // マーカー追加
+                    L.marker([lat, lon]).addTo(map)
+                        .bindPopup('<b>' + location + '</b>')
+                        .openPopup();
+                } else {
+                    // 座標が取得できない場合はデフォルト位置（大井町役場）
+                    const map = L.map('storageMap').setView([35.3580, 139.1047], 15);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    }).addTo(map);
+                }
+            } catch (error) {
+                console.error('Map initialization error:', error);
             }
         }
 
