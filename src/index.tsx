@@ -3032,7 +3032,12 @@ app.get('/storage/:id', async (c) => {
                 // 要対応事項を3つのフィールドに分割（[1], [2], [3]形式で保存されている場合）
                 const actionRequired = insp.action_required || '';
                 const actionItems = actionRequired.split('\\n\\n').map(item => {
-                    return item.replace(new RegExp('^\\\\\\\\[\\\\\\\\d+\\\\\\\\]\\\\\\\\s*'), '');
+                    // [1], [2], [3] などのプレフィックスを削除
+                    const closeBracketIndex = item.indexOf(']');
+                    if (item.startsWith('[') && closeBracketIndex > 0) {
+                        return item.slice(closeBracketIndex + 1).trim();
+                    }
+                    return item;
                 });
                 document.getElementById('actionRequired1').value = actionItems[0] || '';
                 document.getElementById('actionRequired2').value = actionItems[1] || '';
