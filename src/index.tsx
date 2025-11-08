@@ -2731,7 +2731,13 @@ app.get('/storage/:id', async (c) => {
                 if (storageData) {
                     document.getElementById('storageDetail').innerHTML = 
                         '<div class="bg-white rounded-2xl shadow-lg p-6">' +
-                            '<h1 class="text-3xl font-bold text-gray-800 mb-4">📦 ' + storageData.storage_number + '</h1>' +
+                            '<div class="flex justify-between items-start mb-4">' +
+                                '<h1 class="text-3xl font-bold text-gray-800">📦 ' + storageData.storage_number + '</h1>' +
+                                '<a href="/storage-edit/' + storageData.id + '" ' +
+                                'class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition font-bold">' +
+                                    '✏️ 編集' +
+                                '</a>' +
+                            '</div>' +
                             (storageData.image_url ? 
                                 '<div class="mb-4">' +
                                     '<img src="' + storageData.image_url + '" alt="格納庫写真" class="w-full h-64 object-cover rounded-lg">' +
