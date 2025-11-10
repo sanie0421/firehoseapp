@@ -610,7 +610,7 @@ app.get('/hose', (c) => {
         <!-- ヘッダー -->
         <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
             <div class="mb-4">
-                <h1 class="text-3xl font-bold mb-2 text-gray-800">🔧 ホース格納庫管理</h1>
+                <h1 class="text-3xl font-bold mb-2 text-gray-800">🔧 ホース格納庫管理 <span id="hoseStorageCount" class="text-xl text-gray-500">(読み込み中...)</span></h1>
                 <p class="text-base text-gray-600">ホース格納庫の登録・地図設定・点検記録</p>
             </div>
             <div class="flex flex-col space-y-3">
@@ -1016,6 +1016,12 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             const list = document.getElementById('storageList');
             const searchBox = document.getElementById('searchBox');
             const searchTerm = searchBox ? searchBox.value.toLowerCase().trim() : '';
+            const countElement = document.getElementById('hoseStorageCount');
+            
+            // 総数を更新
+            if (countElement) {
+                countElement.textContent = '(' + storages.length + '件)';
+            }
             
             // フィルター適用
             let filteredStorages = storages;
@@ -2406,7 +2412,7 @@ app.get('/inspection-priority', (c) => {
 
         <!-- 全格納庫一覧 -->
         <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 全格納庫一覧 <span id="storageCount" class="text-lg text-gray-500">(読み込み中...)</span></h2>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 全格納庫一覧</h2>
             <p class="text-sm text-gray-600 mb-4">点検が古い順に表示</p>
             <div id="allStoragesList" class="space-y-4">
                 <div class="bg-gray-50 rounded-xl p-8 text-center"><p class="text-gray-800">読み込み中...</p></div>
@@ -2623,12 +2629,6 @@ app.get('/inspection-priority', (c) => {
 
         function renderAllStoragesList(storages) {
             const list = document.getElementById('allStoragesList');
-            const countElement = document.getElementById('storageCount');
-            
-            // 件数表示を更新
-            if (countElement) {
-                countElement.textContent = '(' + storages.length + '件)';
-            }
             
             if (storages.length === 0) {
                 list.innerHTML = '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800 text-xl">ホース格納庫が登録されていません</p></div>';
@@ -4353,9 +4353,25 @@ app.get('/api/hose-stats', async (c) => {
       ORDER BY damaged DESC, replaced DESC
     `).bind(startDate, endDate).all()
     
+    // 総格納庫数
+    const totalStoragesResult = await env.DB.prepare(`
+      SELECT COUNT(*) as total FROM hose_storages
+    `).first()
+    
+    // 年度内に点検実施した格納庫数
+    const inspectedStoragesResult = await env.DB.prepare(`
+      SELECT COUNT(DISTINCT storage_id) as inspected
+      FROM hose_inspections
+      WHERE inspection_date >= ? AND inspection_date <= ?
+    `).bind(startDate, endDate).first()
+    
     return c.json({
       fiscal_year: fiscalYear,
-      summary: summaryResult,
+      summary: {
+        ...summaryResult,
+        total_storages: totalStoragesResult?.total || 0,
+        inspected_storages: inspectedStoragesResult?.inspected || 0
+      },
       monthly: monthlyData,
       by_storage: storageResult.results || []
     })
@@ -5850,7 +5866,7 @@ app.get('/stats', (c) => {
             </div>
 
             <!-- 集計サマリー -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                 <div class="bg-blue-50 rounded-2xl p-6 shadow-lg">
                     <div class="text-blue-600 text-4xl mb-2">🔄</div>
                     <div class="text-3xl font-bold text-blue-600 mb-1" id="totalReplaced">-</div>
@@ -5865,6 +5881,11 @@ app.get('/stats', (c) => {
                     <div class="text-green-600 text-4xl mb-2">📊</div>
                     <div class="text-3xl font-bold text-green-600 mb-1" id="replacementRate">-</div>
                     <div class="text-gray-700 font-bold">交換率</div>
+                </div>
+                <div class="bg-purple-50 rounded-2xl p-6 shadow-lg">
+                    <div class="text-purple-600 text-4xl mb-2">📦</div>
+                    <div class="text-3xl font-bold text-purple-600 mb-1" id="inspectionCoverage">-</div>
+                    <div class="text-gray-700 font-bold">点検実施率</div>
                 </div>
             </div>
 
@@ -6220,6 +6241,14 @@ app.get('/stats', (c) => {
                     ? Math.round((data.summary.total_replaced / data.summary.total_damaged) * 100) 
                     : 0;
                 document.getElementById('replacementRate').textContent = rate + '%';
+                
+                // 点検実施率
+                const totalStorages = data.summary.total_storages || 0;
+                const inspectedStorages = data.summary.inspected_storages || 0;
+                const inspectionRate = totalStorages > 0 
+                    ? Math.round((inspectedStorages / totalStorages) * 100) 
+                    : 0;
+                document.getElementById('inspectionCoverage').textContent = inspectedStorages + '/' + totalStorages + ' (' + inspectionRate + '%)';
                 
                 // グラフ更新
                 updateHoseChart(data.monthly);
