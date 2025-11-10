@@ -626,6 +626,32 @@ app.get('/hose', (c) => {
             </div>
         </div>
 
+        <!-- 検索ボックス -->
+        <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
+            <label for="searchBox" class="block text-lg font-bold text-gray-800 mb-3">🔍 検索・フィルター</label>
+            <input 
+                type="text" 
+                id="searchBox" 
+                placeholder="番号、場所、地区で検索..." 
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
+            >
+            
+            <!-- フィルターボタン -->
+            <div class="grid grid-cols-3 gap-2">
+                <button id="filterAll" onclick="setFilter('all')" class="px-4 py-2 rounded-lg font-bold transition bg-blue-500 text-white">
+                    📦 すべて
+                </button>
+                <button id="filterNoMap" onclick="setFilter('nomap')" class="px-4 py-2 rounded-lg font-bold transition bg-gray-200 text-gray-700 hover:bg-gray-300">
+                    ⚠️ 地図未設定
+                </button>
+                <button id="filterNoImage" onclick="setFilter('noimage')" class="px-4 py-2 rounded-lg font-bold transition bg-gray-200 text-gray-700 hover:bg-gray-300">
+                    📷 画像未追加
+                </button>
+            </div>
+            
+            <p class="text-sm text-gray-600 mt-2">💡 格納庫番号、場所、地区名で絞り込みできます</p>
+        </div>
+
         <!-- ホース格納庫一覧 -->
         <div id="storageList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- JavaScriptで動的に生成 -->
@@ -824,6 +850,9 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                     <p class="text-sm text-gray-600 mt-2">
                         💡 地図をタップすると赤いピンが立ちます。位置設定は後からでも可能です。
                     </p>
+                    <p class="text-sm text-orange-600 font-bold mt-1">
+                        ⚠️ Google Maps URLがある場合はそちらが優先されます。新規登録時は地図クリックが便利です。
+                    </p>
                     <div id="coordsDisplay" class="hidden mt-2 p-3 bg-green-50 rounded">
                         <p class="text-sm text-green-800">
                             📍 位置設定完了: <span id="latDisplay"></span>, <span id="lngDisplay"></span>
@@ -890,10 +919,51 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
         let storages = [];
         let map, marker;
         let currentLat = null, currentLng = null;
+        let currentFilter = 'all'; // 'all', 'nomap', 'noimage'
+
+        // フィルター切り替え
+        function setFilter(filter) {
+            currentFilter = filter;
+            
+            // ボタンのスタイルを切り替え
+            const filterAll = document.getElementById('filterAll');
+            const filterNoMap = document.getElementById('filterNoMap');
+            const filterNoImage = document.getElementById('filterNoImage');
+            
+            // 全てのボタンをリセット
+            filterAll.classList.remove('bg-blue-500', 'text-white');
+            filterAll.classList.add('bg-gray-200', 'text-gray-700');
+            filterNoMap.classList.remove('bg-orange-500', 'text-white');
+            filterNoMap.classList.add('bg-gray-200', 'text-gray-700');
+            filterNoImage.classList.remove('bg-purple-500', 'text-white');
+            filterNoImage.classList.add('bg-gray-200', 'text-gray-700');
+            
+            // 選択されたボタンをハイライト
+            if (filter === 'all') {
+                filterAll.classList.add('bg-blue-500', 'text-white');
+                filterAll.classList.remove('bg-gray-200', 'text-gray-700');
+            } else if (filter === 'nomap') {
+                filterNoMap.classList.add('bg-orange-500', 'text-white');
+                filterNoMap.classList.remove('bg-gray-200', 'text-gray-700');
+            } else if (filter === 'noimage') {
+                filterNoImage.classList.add('bg-purple-500', 'text-white');
+                filterNoImage.classList.remove('bg-gray-200', 'text-gray-700');
+            }
+            
+            renderStorages();
+        }
 
         // ページ読み込み時
         window.onload = function() {
             loadStorages();
+            
+            // 検索ボックスのイベントリスナー
+            const searchBox = document.getElementById('searchBox');
+            if (searchBox) {
+                searchBox.addEventListener('input', function() {
+                    renderStorages();
+                });
+            }
             
             // イベントリスナーを設定
             const showAddBtn = document.getElementById('showAddModalBtn');
@@ -941,9 +1011,53 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             }
         }
 
-        // ホース格納庫一覧を表示
+        // ホース格納庫一覧を表示（検索対応 + フィルター対応）
         function renderStorages() {
             const list = document.getElementById('storageList');
+            const searchBox = document.getElementById('searchBox');
+            const searchTerm = searchBox ? searchBox.value.toLowerCase().trim() : '';
+            
+            // フィルター適用
+            let filteredStorages = storages;
+            
+            // 地図未設定フィルター
+            if (currentFilter === 'nomap') {
+                filteredStorages = filteredStorages.filter(storage => {
+                    return !storage.latitude && !storage.longitude && !storage.google_maps_url;
+                });
+            }
+            
+            // 画像未追加フィルター
+            if (currentFilter === 'noimage') {
+                filteredStorages = filteredStorages.filter(storage => {
+                    return !storage.image_url;
+                });
+            }
+            
+            // 検索フィルター
+            if (searchTerm) {
+                filteredStorages = filteredStorages.filter(storage => {
+                    return (
+                        storage.storage_number.toLowerCase().includes(searchTerm) ||
+                        storage.location.toLowerCase().includes(searchTerm) ||
+                        (storage.district && storage.district.toLowerCase().includes(searchTerm)) ||
+                        (storage.remarks && storage.remarks.toLowerCase().includes(searchTerm))
+                    );
+                });
+            }
+            
+            if (filteredStorages.length === 0 && searchTerm) {
+                list.innerHTML = \`
+                    <div class="col-span-full text-center py-16">
+                        <div class="bg-white rounded-2xl shadow-lg p-12">
+                            <div class="text-8xl mb-6">🔍</div>
+                            <p class="text-2xl text-gray-800 font-bold mb-4">「\${searchTerm}」に一致する格納庫が見つかりません</p>
+                            <p class="text-gray-600">別のキーワードで検索してみてください</p>
+                        </div>
+                    </div>
+                \`;
+                return;
+            }
             
             if (storages.length === 0) {
                 list.innerHTML = \`
@@ -965,13 +1079,13 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             }
 
             const gradients = ['storage-gradient-1', 'storage-gradient-2', 'storage-gradient-3', 'storage-gradient-4', 'storage-gradient-5'];
-            list.innerHTML = storages.map((storage, index) => {
+            list.innerHTML = filteredStorages.map((storage, index) => {
                 const gradient = gradients[index % 5];
                 return '<div class="' + gradient + ' rounded-2xl shadow-2xl p-6 storage-card" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
                     '<div class="text-white">' +
                         '<div class="flex justify-between items-start mb-4">' +
                             '<h3 class="text-2xl font-bold">📦 ' + storage.storage_number + '</h3>' +
-                            (storage.latitude ? '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">📍 地図設定済み</span>' : '<span class="bg-white bg-opacity-20 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">⚠️ 地図未設定</span>') +
+                            (storage.latitude || storage.google_maps_url ? '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">📍 地図設定済み</span>' : '<span class="bg-white bg-opacity-20 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-white border-opacity-50">⚠️ 地図未設定</span>') +
                         '</div>' +
                         (storage.image_url ? 
                             '<div class="mb-4">' +
@@ -1262,7 +1376,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             document.getElementById('addModal').classList.remove('hidden');
             
             setTimeout(() => {
-                initMap();
+                initMapWithCurrentLocation();
             }, 100);
         }
 
@@ -1273,6 +1387,36 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             if (map) {
                 map.remove();
                 map = null;
+            }
+        }
+
+        // 現在地を取得して地図を初期化
+        function initMapWithCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    // 成功時: 現在地を取得
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        console.log('Current location:', lat, lng);
+                        initMap(lat, lng);
+                    },
+                    // エラー時: デフォルト位置（大井町役場）
+                    (error) => {
+                        console.log('Geolocation error, using default location:', error);
+                        initMap();
+                    },
+                    // オプション
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                // 位置情報APIが使えない場合はデフォルト位置
+                console.log('Geolocation not supported, using default location');
+                initMap();
             }
         }
 
@@ -1363,9 +1507,11 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             
             setTimeout(() => {
                 if (currentLat && currentLng) {
+                    // 既に座標がある場合はそれを使用
                     initMap(currentLat, currentLng);
                 } else {
-                    initMap();
+                    // 座標がない場合は現在地を取得
+                    initMapWithCurrentLocation();
                 }
             }, 100);
         }
@@ -2447,6 +2593,17 @@ app.get('/storage/:id', async (c) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>格納庫詳細 - 活動記録</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""/>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+    
     <style>
         body {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
@@ -2483,9 +2640,14 @@ app.get('/storage/:id', async (c) => {
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/inspection-priority" class="text-blue-600 hover:text-blue-800 hover:underline text-sm bg-blue-50 px-4 py-2 rounded-lg font-bold">
-                    ← 優先度一覧
-                </a>
+                <div class="flex gap-2">
+                    <a href="/hose" class="text-green-600 hover:text-green-800 hover:underline text-sm bg-green-50 px-4 py-2 rounded-lg font-bold">
+                        🔧 格納庫管理
+                    </a>
+                    <a href="/inspection-priority" class="text-blue-600 hover:text-blue-800 hover:underline text-sm bg-blue-50 px-4 py-2 rounded-lg font-bold">
+                        ← 優先度一覧
+                    </a>
+                </div>
             </div>
         </div>
     </nav>
@@ -2563,9 +2725,33 @@ app.get('/storage/:id', async (c) => {
                     </select>
                 </div>
 
+                <!-- ホース交換数・破損数 -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">🔄 ホース交換数</label>
+                        <select id="hoseReplacedCount" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                            <option value="0">0本</option>
+                            <option value="1">1本</option>
+                            <option value="2">2本</option>
+                            <option value="3">3本</option>
+                            <option value="4">4本</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">⚠️ ホース破損数</label>
+                        <select id="hoseDamagedCount" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                            <option value="0">0本</option>
+                            <option value="1">1本</option>
+                            <option value="2">2本</option>
+                            <option value="3">3本</option>
+                            <option value="4">4本</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">📝 点検結果</label>
-                    <textarea id="remarks" rows="3" placeholder="例：2本問題なし、2本廃棄" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">📝 備考</label>
+                    <textarea id="remarks" rows="3" placeholder="例：ホース状態良好、格納庫周辺の清掃実施" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
                 </div>
 
                 <div>
@@ -2577,7 +2763,7 @@ app.get('/storage/:id', async (c) => {
                         </div>
                         <div>
                             <label class="block text-xs text-gray-600 mb-1">要対応事項 2</label>
-                            <textarea id="actionRequired2" rows="3" placeholder="例：ホース劣化" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                            <textarea id="actionRequired2" rows="3" placeholder="例：開栓棒紛失" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
                         </div>
                         <div>
                             <label class="block text-xs text-gray-600 mb-1">要対応事項 3</label>
@@ -2757,8 +2943,8 @@ app.get('/storage/:id', async (c) => {
                             '</div>' +
                         '</div>';
                         
-                        // 地図を初期化（Google Maps URLまたは住所から座標を取得して表示）
-                        initStorageMap(storageData.location, storageData.google_maps_url);
+                        // 地図を初期化（Google Maps URLまたは保存された座標から表示）
+                        initStorageMap(storageData.location, storageData.google_maps_url, storageData.latitude, storageData.longitude);
                 }
             } catch (error) {
                 console.error(error);
@@ -2766,20 +2952,47 @@ app.get('/storage/:id', async (c) => {
         }
 
         // 地図を初期化
-        async function initStorageMap(location, mapUrl) {
+        async function initStorageMap(location, mapUrl, savedLat, savedLon) {
             try {
                 let lat, lon;
                 
-                // Google Maps URLから座標を抽出
+                // 優先順位1: Google Maps URLから座標を抽出
                 if (mapUrl) {
-                    // 短縮URL (maps.app.goo.gl) の場合、地図表示不可のメッセージを表示
+                    // 短縮URL (maps.app.goo.gl) の場合、サーバー側で展開
                     if (mapUrl.includes('maps.app.goo.gl') || mapUrl.includes('goo.gl')) {
-                        console.log('Shortened URL detected, showing placeholder:', mapUrl);
-                        const mapElement = document.getElementById('storageMap');
-                        mapElement.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">' +
-                            '<p class="text-gray-600 text-center px-4">📍 地図プレビュー利用不可<br>下のボタンからGoogle Mapsで開いてください</p>' +
-                        '</div>';
-                        return;
+                        console.log('Shortened URL detected, expanding via API:', mapUrl);
+                        
+                        try {
+                            const response = await fetch('/api/expand-maps-url', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ url: mapUrl })
+                            });
+                            
+                            const data = await response.json();
+                            
+                            if (data.success && data.lat && data.lon) {
+                                console.log('Successfully expanded URL to coordinates:', data.lat, data.lon);
+                                lat = data.lat;
+                                lon = data.lon;
+                            } else {
+                                console.error('Failed to expand URL:', data.error);
+                                // フォールバック: エラーメッセージを表示
+                                const mapElement = document.getElementById('storageMap');
+                                mapElement.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">' +
+                                    '<p class="text-gray-600 text-center px-4">📍 地図の読み込みに失敗しました<br>下のボタンからGoogle Mapsで開いてください</p>' +
+                                '</div>';
+                                return;
+                            }
+                        } catch (error) {
+                            console.error('API call error:', error);
+                            // フォールバック: エラーメッセージを表示
+                            const mapElement = document.getElementById('storageMap');
+                            mapElement.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">' +
+                                '<p class="text-gray-600 text-center px-4">📍 地図の読み込みに失敗しました<br>下のボタンからGoogle Mapsで開いてください</p>' +
+                            '</div>';
+                            return;
+                        }
                     } else {
                         // 通常のURLから座標を抽出
                         const coords = extractCoordsFromGoogleMapsUrl(mapUrl);
@@ -2790,7 +3003,14 @@ app.get('/storage/:id', async (c) => {
                     }
                 }
                 
-                // 座標が取得できない場合はNominatim APIで住所から取得
+                // 優先順位2: URLがない場合は保存された座標を使用
+                if (!lat && !lon && savedLat && savedLon) {
+                    console.log('Using saved coordinates:', savedLat, savedLon);
+                    lat = savedLat;
+                    lon = savedLon;
+                }
+                
+                // 優先順位3: どちらもない場合はNominatim APIで住所から取得
                 if (!lat || !lon) {
                     const query = encodeURIComponent(location + ' 大井町 神奈川県');
                     const response = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + query + '&limit=1');
@@ -3037,7 +3257,8 @@ app.get('/storage/:id', async (c) => {
         async function saveInspection() {
             const inspectorName = document.getElementById('inspectorName').value;
             const date = document.getElementById('inspectionDate').value;
-            const result = document.getElementById('inspectionResult').value;
+            const hoseReplacedCount = parseInt(document.getElementById('hoseReplacedCount').value);
+            const hoseDamagedCount = parseInt(document.getElementById('hoseDamagedCount').value);
             const actionRequired1 = document.getElementById('actionRequired1').value;
             const actionRequired2 = document.getElementById('actionRequired2').value;
             const actionRequired3 = document.getElementById('actionRequired3').value;
@@ -3049,8 +3270,8 @@ app.get('/storage/:id', async (c) => {
             // 後方互換性のため、action_requiredも保存（旧形式）
             const actionRequired = actionItemsList.length > 0 ? actionItemsList.map((item, index) => '[' + (index + 1) + '] ' + item).join('\\n\\n') : null;
 
-            if (!inspectorName || !date || !result) {
-                alert('入力者、点検日、結果は必須です');
+            if (!inspectorName || !date) {
+                alert('入力者と点検日は必須です');
                 return;
             }
 
@@ -3061,7 +3282,8 @@ app.get('/storage/:id', async (c) => {
                 storage_id: STORAGE_ID,
                 storage_number: storageData.storage_number,
                 inspection_date: date,
-                result: result,
+                hose_replaced_count: hoseReplacedCount,
+                hose_damaged_count: hoseDamagedCount,
                 action_required: actionRequired || null,
                 action_items: actionItemsList,  // 新形式: 配列
                 remarks: remarks || null,
@@ -3097,7 +3319,8 @@ app.get('/storage/:id', async (c) => {
                     currentEditingInspectionId = null;
                     document.querySelector('#inspectionModal h2').textContent = '📝 点検を記録';
                     document.getElementById('inspectorName').value = '';
-                    document.getElementById('inspectionResult').value = '';
+                    document.getElementById('hoseReplacedCount').value = '0';
+                    document.getElementById('hoseDamagedCount').value = '0';
                     document.getElementById('actionRequired1').value = '';
                     document.getElementById('actionRequired2').value = '';
                     document.getElementById('actionRequired3').value = '';
@@ -3134,7 +3357,8 @@ app.get('/storage/:id', async (c) => {
                 // フォームに値をセット
                 document.getElementById('inspectorName').value = insp.inspector_name || '';
                 document.getElementById('inspectionDate').value = insp.inspection_date ? insp.inspection_date.split('T')[0] : '';
-                document.getElementById('inspectionResult').value = insp.result || '';
+                document.getElementById('hoseReplacedCount').value = insp.hose_replaced_count || '0';
+                document.getElementById('hoseDamagedCount').value = insp.hose_damaged_count || '0';
                 
                 // 要対応事項を3つのフィールドに分割（[1], [2], [3]形式で保存されている場合）
                 const actionRequired = insp.action_required || '';
@@ -3226,16 +3450,18 @@ app.post('/api/inspection/record', async (c) => {
     await env.DB.prepare(`
       INSERT INTO hose_inspections (
         id, storage_id, storage_number, inspection_date,
-        result, action_required, remarks, photos,
+        hose_replaced_count, hose_damaged_count,
+        action_required, remarks, photos,
         inspector_id, inspector_name,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       data.storage_id,
       data.storage_number,
       data.inspection_date,
-      data.result,
+      data.hose_replaced_count || 0,
+      data.hose_damaged_count || 0,
       data.action_required || null,
       data.remarks || null,
       data.photos || null,
@@ -3300,7 +3526,8 @@ app.put('/api/inspection/:id', async (c) => {
     await env.DB.prepare(`
       UPDATE hose_inspections 
       SET inspection_date = ?,
-          result = ?,
+          hose_replaced_count = ?,
+          hose_damaged_count = ?,
           action_required = ?,
           remarks = ?,
           photos = ?,
@@ -3309,7 +3536,8 @@ app.put('/api/inspection/:id', async (c) => {
       WHERE id = ?
     `).bind(
       data.inspection_date,
-      data.result,
+      data.hose_replaced_count || 0,
+      data.hose_damaged_count || 0,
       data.action_required || null,
       data.remarks || null,
       data.photos || null,
@@ -3766,6 +3994,82 @@ app.delete('/api/inspection/:id', async (c) => {
 })
 
 // ==========================================
+// API: ホース集計データ取得
+// ==========================================
+app.get('/api/hose-stats', async (c) => {
+  try {
+    const fiscalYear = parseInt(c.req.query('fiscal_year') || new Date().getFullYear().toString())
+    const env = c.env as { DB: D1Database }
+    
+    // 年度の開始日と終了日を計算 (4月1日〜翌年3月31日)
+    const startDate = `${fiscalYear}-04-01`
+    const endDate = `${fiscalYear + 1}-03-31`
+    
+    // サマリー: 年度合計
+    const summaryResult = await env.DB.prepare(`
+      SELECT 
+        COALESCE(SUM(hose_replaced_count), 0) as total_replaced,
+        COALESCE(SUM(hose_damaged_count), 0) as total_damaged
+      FROM hose_inspections
+      WHERE inspection_date >= ? AND inspection_date <= ?
+    `).bind(startDate, endDate).first()
+    
+    // 月別集計
+    const monthlyResult = await env.DB.prepare(`
+      SELECT 
+        CAST(strftime('%m', inspection_date) AS INTEGER) as month,
+        COALESCE(SUM(hose_replaced_count), 0) as replaced,
+        COALESCE(SUM(hose_damaged_count), 0) as damaged
+      FROM hose_inspections
+      WHERE inspection_date >= ? AND inspection_date <= ?
+      GROUP BY strftime('%m', inspection_date)
+      ORDER BY month ASC
+    `).bind(startDate, endDate).all()
+    
+    // 全12ヶ月分のデータを準備 (データがない月は0で埋める)
+    const monthlyData = []
+    for (let m = 1; m <= 12; m++) {
+      const found = monthlyResult.results?.find((r: any) => r.month === m)
+      monthlyData.push({
+        month: m,
+        replaced: found ? found.replaced : 0,
+        damaged: found ? found.damaged : 0
+      })
+    }
+    
+    // 格納庫別集計 (破損数の多い順)
+    const storageResult = await env.DB.prepare(`
+      SELECT 
+        s.district,
+        s.storage_number,
+        s.location,
+        COALESCE(SUM(i.hose_replaced_count), 0) as replaced,
+        COALESCE(SUM(i.hose_damaged_count), 0) as damaged
+      FROM hose_storages s
+      LEFT JOIN hose_inspections i ON s.id = i.storage_id 
+        AND i.inspection_date >= ? AND i.inspection_date <= ?
+      GROUP BY s.id, s.district, s.storage_number, s.location
+      HAVING damaged > 0 OR replaced > 0
+      ORDER BY damaged DESC, replaced DESC
+    `).bind(startDate, endDate).all()
+    
+    return c.json({
+      fiscal_year: fiscalYear,
+      summary: summaryResult,
+      monthly: monthlyData,
+      by_storage: storageResult.results || []
+    })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ 
+      summary: { total_replaced: 0, total_damaged: 0 },
+      monthly: [],
+      by_storage: []
+    }, 500)
+  }
+})
+
+// ==========================================
 // API: 要対応事項一覧取得 (by inspection_id)
 // ==========================================
 app.get('/api/action-items/:inspectionId', async (c) => {
@@ -3904,6 +4208,121 @@ app.post('/api/migrate-action-items', async (c) => {
     return c.json({ success: false, error: String(error) }, 500)
   }
 })
+
+// ==========================================
+// API: Google Maps短縮URLを展開して座標を取得
+// ==========================================
+app.post('/api/expand-maps-url', async (c) => {
+  try {
+    const { url } = await c.req.json()
+    
+    if (!url) {
+      return c.json({ success: false, error: 'URL is required' }, 400)
+    }
+    
+    // 既に座標が含まれている通常のURLの場合
+    const coords = extractCoordsFromUrl(url)
+    if (coords) {
+      return c.json({ success: true, lat: coords.lat, lon: coords.lon })
+    }
+    
+    // 短縮URLの場合、サーバー側でfetchして展開
+    if (url.includes('maps.app.goo.gl') || url.includes('goo.gl')) {
+      try {
+        // Step 1: リダイレクトを追跡してfinal URLを取得
+        const response = await fetch(url, {
+          method: 'GET',
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        })
+        
+        let finalUrl = response.url
+        
+        // Step 2: もし最終URLがまだ短縮URLなら、HTMLをパースしてリダイレクト先を探す
+        if (finalUrl.includes('maps.app.goo.gl') || finalUrl.includes('goo.gl')) {
+          const html = await response.text()
+          
+          // パターン1: meta refreshタグを探す
+          const metaRefreshMatch = html.match(/<meta[^>]*http-equiv=["']refresh["'][^>]*content=["'][^"']*url=([^"']+)["'][^>]*>/i)
+          if (metaRefreshMatch && metaRefreshMatch[1]) {
+            finalUrl = metaRefreshMatch[1]
+          } else {
+            // パターン2: window.location = "..." を探す
+            const jsRedirectMatch = html.match(/window\.location(?:\.href)?\s*=\s*["']([^"']+)["']/i)
+            if (jsRedirectMatch && jsRedirectMatch[1]) {
+              finalUrl = jsRedirectMatch[1]
+            } else {
+              // パターン3: href="..." (リンク内の完全なURL)を探す
+              const hrefMatch = html.match(/href=["'](https:\/\/www\.google\.com\/maps[^"']+)["']/i)
+              if (hrefMatch && hrefMatch[1]) {
+                finalUrl = hrefMatch[1]
+              }
+            }
+          }
+        }
+        
+        // final URLから座標を抽出
+        const finalCoords = extractCoordsFromUrl(finalUrl)
+        if (finalCoords) {
+          return c.json({ 
+            success: true, 
+            lat: finalCoords.lat, 
+            lon: finalCoords.lon,
+            expandedUrl: finalUrl
+          })
+        }
+        
+        return c.json({ 
+          success: false, 
+          error: 'Could not extract coordinates from expanded URL',
+          expandedUrl: finalUrl
+        }, 400)
+      } catch (fetchError) {
+        console.error('URL expansion error:', fetchError)
+        return c.json({ 
+          success: false, 
+          error: 'Failed to expand shortened URL: ' + String(fetchError)
+        }, 500)
+      }
+    }
+    
+    return c.json({ 
+      success: false, 
+      error: 'Could not extract coordinates from URL'
+    }, 400)
+    
+  } catch (error) {
+    console.error('Expand URL error:', error)
+    return c.json({ success: false, error: String(error) }, 500)
+  }
+})
+
+// 座標抽出用のヘルパー関数
+function extractCoordsFromUrl(url: string): { lat: number; lon: number } | null {
+  if (!url) return null
+  
+  // パターン1: @35.123,139.456 形式
+  let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+  if (match) {
+    return { lat: parseFloat(match[1]), lon: parseFloat(match[2]) }
+  }
+  
+  // パターン2: ?q=35.123,139.456 形式
+  match = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/)
+  if (match) {
+    return { lat: parseFloat(match[1]), lon: parseFloat(match[2]) }
+  }
+  
+  // パターン3: /place/.../@35.123,139.456 形式
+  match = url.match(/\/place\/[^@]*@(-?\d+\.\d+),(-?\d+\.\d+)/)
+  if (match) {
+    return { lat: parseFloat(match[1]), lon: parseFloat(match[2]) }
+  }
+  
+  return null
+}
 
 // ==========================================
 // 未実装ページ（Coming Soon）
@@ -5013,6 +5432,7 @@ app.get('/stats', (c) => {
     <title>活動集計 - 活動記録</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
@@ -5023,6 +5443,10 @@ app.get('/stats', (c) => {
             50% { transform: translateY(-20px); }
         }
         .float-animation { animation: float 3s ease-in-out infinite; }
+        .tab-btn.active {
+            border-bottom: 4px solid #ef5350;
+            color: #ef5350;
+        }
     </style>
 </head>
 <body>
@@ -5047,7 +5471,20 @@ app.get('/stats', (c) => {
         <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
             <h1 class="text-3xl font-bold text-gray-800 mb-2">📊 活動集計</h1>
             <p class="text-base text-gray-600 mb-4">活動実績データ・統計表示</p>
+            
+            <!-- タブナビゲーション -->
+            <div class="flex border-b mt-4">
+                <button id="tabActivity" class="tab-btn flex-1 py-3 px-6 font-bold text-lg transition active">
+                    📝 活動集計
+                </button>
+                <button id="tabHose" class="tab-btn flex-1 py-3 px-6 font-bold text-lg transition text-gray-500 hover:text-gray-700">
+                    📈 ホース集計
+                </button>
+            </div>
         </div>
+        
+        <!-- 活動集計タブ -->
+        <div id="activityTab">
 
         <!-- 統計カード -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -5092,6 +5529,58 @@ app.get('/stats', (c) => {
                 <!-- JavaScriptで動的生成 -->
             </div>
         </div>
+        </div>
+        
+        <!-- ホース集計タブ -->
+        <div id="hoseTab" class="hidden">
+            <!-- 年度選択 -->
+            <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
+                <label class="block text-lg font-bold text-gray-700 mb-3">📅 年度選択</label>
+                <select id="fiscalYear" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg">
+                    <!-- JavaScriptで動的に生成 -->
+                </select>
+            </div>
+
+            <!-- 集計サマリー -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-blue-50 rounded-2xl p-6 shadow-lg">
+                    <div class="text-blue-600 text-4xl mb-2">🔄</div>
+                    <div class="text-3xl font-bold text-blue-600 mb-1" id="totalReplaced">-</div>
+                    <div class="text-gray-700 font-bold">年度交換数</div>
+                </div>
+                <div class="bg-red-50 rounded-2xl p-6 shadow-lg">
+                    <div class="text-red-600 text-4xl mb-2">⚠️</div>
+                    <div class="text-3xl font-bold text-red-600 mb-1" id="totalDamaged">-</div>
+                    <div class="text-gray-700 font-bold">年度破損数</div>
+                </div>
+                <div class="bg-green-50 rounded-2xl p-6 shadow-lg">
+                    <div class="text-green-600 text-4xl mb-2">📊</div>
+                    <div class="text-3xl font-bold text-green-600 mb-1" id="replacementRate">-</div>
+                    <div class="text-gray-700 font-bold">交換率</div>
+                </div>
+            </div>
+
+            <!-- グラフ -->
+            <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">📈 月別推移</h2>
+                <canvas id="hoseMonthlyChart"></canvas>
+            </div>
+
+            <!-- 格納庫別ランキング -->
+            <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">🏆 格納庫別ランキング</h2>
+                <div id="storageRanking" class="space-y-3">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+            </div>
+
+            <!-- Excel出力 -->
+            <div class="bg-white rounded-2xl p-6 shadow-lg">
+                <button id="exportExcelBtn" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
+                    📥 Excelでダウンロード
+                </button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -5099,7 +5588,44 @@ app.get('/stats', (c) => {
 
         window.onload = function() {
             loadStats();
+            initTabs();
+            initHoseTab();
         };
+
+        // タブ切り替え機能
+        function initTabs() {
+            const tabActivity = document.getElementById('tabActivity');
+            const tabHose = document.getElementById('tabHose');
+            const activityTab = document.getElementById('activityTab');
+            const hoseTab = document.getElementById('hoseTab');
+
+            tabActivity.addEventListener('click', () => {
+                tabActivity.classList.add('active');
+                tabActivity.classList.remove('text-gray-500');
+                tabHose.classList.remove('active');
+                tabHose.classList.add('text-gray-500');
+                activityTab.classList.remove('hidden');
+                hoseTab.classList.add('hidden');
+            });
+
+            tabHose.addEventListener('click', () => {
+                tabHose.classList.add('active');
+                tabHose.classList.remove('text-gray-500');
+                tabActivity.classList.remove('active');
+                tabActivity.classList.add('text-gray-500');
+                hoseTab.classList.remove('hidden');
+                activityTab.classList.add('hidden');
+            });
+        }
+
+        // ホース集計タブ初期化
+        function initHoseTab() {
+            initFiscalYearSelect();
+            loadHoseStats();
+
+            document.getElementById('fiscalYear').addEventListener('change', loadHoseStats);
+            document.getElementById('exportExcelBtn').addEventListener('click', exportToExcel);
+        }
 
         async function loadStats() {
             try {
@@ -5259,6 +5785,227 @@ app.get('/stats', (c) => {
                     '</div>' +
                 '</div>';
             }).join('');
+        }
+
+        // ==========================================
+        // タブ切り替え機能
+        // ==========================================
+        const tabActivity = document.getElementById('tabActivity');
+        const tabHose = document.getElementById('tabHose');
+        const activityTab = document.getElementById('activityTab');
+        const hoseTab = document.getElementById('hoseTab');
+        
+        tabActivity.addEventListener('click', () => {
+            tabActivity.classList.add('active');
+            tabActivity.classList.remove('text-gray-500');
+            tabHose.classList.remove('active');
+            tabHose.classList.add('text-gray-500');
+            activityTab.classList.remove('hidden');
+            hoseTab.classList.add('hidden');
+        });
+        
+        tabHose.addEventListener('click', () => {
+            tabHose.classList.add('active');
+            tabHose.classList.remove('text-gray-500');
+            tabActivity.classList.remove('active');
+            tabActivity.classList.add('text-gray-500');
+            hoseTab.classList.remove('hidden');
+            activityTab.classList.add('hidden');
+            
+            // ホース集計タブに切り替えた時に初期化
+            if (!hoseChart) {
+                initHoseStats();
+            }
+        });
+
+        // ==========================================
+        // ホース集計機能
+        // ==========================================
+        let hoseChart = null;
+
+        function initHoseStats() {
+            initFiscalYearSelect();
+            loadHoseStats();
+
+            document.getElementById('fiscalYear').addEventListener('change', loadHoseStats);
+            document.getElementById('exportExcelBtn').addEventListener('click', exportToExcel);
+        }
+
+        // 年度セレクトボックスを初期化
+        function initFiscalYearSelect() {
+            const select = document.getElementById('fiscalYear');
+            const currentYear = new Date().getFullYear();
+            const currentMonth = new Date().getMonth() + 1; // 1-12
+            
+            // 現在の年度を計算 (4月始まり)
+            const currentFiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+            
+            // 過去5年分の年度を生成
+            for (let i = 0; i < 5; i++) {
+                const year = currentFiscalYear - i;
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year + '年度 (' + year + '/4/1〜' + (year + 1) + '/3/31)';
+                select.appendChild(option);
+            }
+        }
+
+        // 統計データを読み込む
+        async function loadHoseStats() {
+            const fiscalYear = parseInt(document.getElementById('fiscalYear').value);
+            
+            try {
+                const response = await fetch('/api/hose-stats?fiscal_year=' + fiscalYear);
+                const data = await response.json();
+                
+                // サマリー更新
+                document.getElementById('totalReplaced').textContent = data.summary.total_replaced + '本';
+                document.getElementById('totalDamaged').textContent = data.summary.total_damaged + '本';
+                
+                const rate = data.summary.total_damaged > 0 
+                    ? Math.round((data.summary.total_replaced / data.summary.total_damaged) * 100) 
+                    : 0;
+                document.getElementById('replacementRate').textContent = rate + '%';
+                
+                // グラフ更新
+                updateHoseChart(data.monthly);
+                
+                // ランキング更新
+                updateStorageRanking(data.by_storage);
+                
+            } catch (error) {
+                console.error('データ読み込みエラー:', error);
+            }
+        }
+
+        // グラフを更新
+        function updateHoseChart(monthlyData) {
+            const ctx = document.getElementById('hoseMonthlyChart').getContext('2d');
+            
+            if (hoseChart) {
+                hoseChart.destroy();
+            }
+            
+            const labels = monthlyData.map(d => d.month + '月');
+            const replacedData = monthlyData.map(d => d.replaced || 0);
+            const damagedData = monthlyData.map(d => d.damaged || 0);
+            
+            hoseChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '交換数',
+                            data: replacedData,
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            borderColor: 'rgb(59, 130, 246)',
+                            borderWidth: 2
+                        },
+                        {
+                            label: '破損数',
+                            data: damagedData,
+                            backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                            borderColor: 'rgb(239, 68, 68)',
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ランキングを更新
+        function updateStorageRanking(storageData) {
+            const container = document.getElementById('storageRanking');
+            container.innerHTML = '';
+            
+            if (storageData.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-4">データがありません</div>';
+                return;
+            }
+            
+            storageData.forEach((storage, index) => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between p-4 bg-gray-50 rounded-lg';
+                div.innerHTML = \`
+                    <div class="flex items-center space-x-4">
+                        <div class="text-2xl font-bold text-gray-400">\${index + 1}</div>
+                        <div>
+                            <div class="font-bold text-gray-800">\${storage.district} \${storage.storage_number}</div>
+                            <div class="text-sm text-gray-600">\${storage.location || ''}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-blue-600 font-bold">交換: \${storage.replaced}本</div>
+                        <div class="text-red-600 font-bold">破損: \${storage.damaged}本</div>
+                    </div>
+                \`;
+                container.appendChild(div);
+            });
+        }
+
+        // Excelエクスポート
+        async function exportToExcel() {
+            const fiscalYear = parseInt(document.getElementById('fiscalYear').value);
+            
+            try {
+                const response = await fetch('/api/hose-stats?fiscal_year=' + fiscalYear);
+                const data = await response.json();
+                
+                // ワークブック作成
+                const wb = XLSX.utils.book_new();
+                
+                // サマリーシート
+                const summaryData = [
+                    ['年度', fiscalYear + '年度'],
+                    ['期間', fiscalYear + '/4/1〜' + (fiscalYear + 1) + '/3/31'],
+                    [''],
+                    ['総交換数', data.summary.total_replaced + '本'],
+                    ['総破損数', data.summary.total_damaged + '本'],
+                    ['交換率', (data.summary.total_damaged > 0 ? Math.round((data.summary.total_replaced / data.summary.total_damaged) * 100) : 0) + '%']
+                ];
+                const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+                XLSX.utils.book_append_sheet(wb, ws1, 'サマリー');
+                
+                // 月別シート
+                const monthlyData = [
+                    ['月', '交換数', '破損数']
+                ];
+                data.monthly.forEach(m => {
+                    monthlyData.push([m.month + '月', m.replaced || 0, m.damaged || 0]);
+                });
+                const ws2 = XLSX.utils.aoa_to_sheet(monthlyData);
+                XLSX.utils.book_append_sheet(wb, ws2, '月別推移');
+                
+                // 格納庫別シート
+                const storageData = [
+                    ['地区', '格納庫番号', '住所', '交換数', '破損数']
+                ];
+                data.by_storage.forEach(s => {
+                    storageData.push([s.district, s.storage_number, s.location || '', s.replaced, s.damaged]);
+                });
+                const ws3 = XLSX.utils.aoa_to_sheet(storageData);
+                XLSX.utils.book_append_sheet(wb, ws3, '格納庫別');
+                
+                // ダウンロード
+                XLSX.writeFile(wb, 'ホース集計_' + fiscalYear + '年度.xlsx');
+                
+            } catch (error) {
+                alert('エクスポートに失敗しました');
+                console.error(error);
+            }
         }
     </script>
 </body>
