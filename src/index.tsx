@@ -2406,7 +2406,7 @@ app.get('/inspection-priority', (c) => {
 
         <!-- 全格納庫一覧 -->
         <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 全格納庫一覧</h2>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 全格納庫一覧 <span id="storageCount" class="text-lg text-gray-500">(読み込み中...)</span></h2>
             <p class="text-sm text-gray-600 mb-4">点検が古い順に表示</p>
             <div id="allStoragesList" class="space-y-4">
                 <div class="bg-gray-50 rounded-xl p-8 text-center"><p class="text-gray-800">読み込み中...</p></div>
@@ -2623,6 +2623,12 @@ app.get('/inspection-priority', (c) => {
 
         function renderAllStoragesList(storages) {
             const list = document.getElementById('allStoragesList');
+            const countElement = document.getElementById('storageCount');
+            
+            // 件数表示を更新
+            if (countElement) {
+                countElement.textContent = '(' + storages.length + '件)';
+            }
             
             if (storages.length === 0) {
                 list.innerHTML = '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800 text-xl">ホース格納庫が登録されていません</p></div>';
