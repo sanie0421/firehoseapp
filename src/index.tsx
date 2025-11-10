@@ -5486,6 +5486,14 @@ app.get('/stats', (c) => {
         <!-- 活動集計タブ -->
         <div id="activityTab">
 
+        <!-- 年度選択 -->
+        <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
+            <label class="block text-lg font-bold text-gray-700 mb-3">📅 年度選択</label>
+            <select id="activityFiscalYear" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg">
+                <!-- JavaScriptで動的に生成 -->
+            </select>
+        </div>
+
         <!-- 統計カード -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             <div class="bg-white rounded-2xl p-6 shadow-lg">
@@ -5627,12 +5635,52 @@ app.get('/stats', (c) => {
             document.getElementById('exportExcelBtn').addEventListener('click', exportToExcel);
         }
 
+        // 活動集計タブ初期化
+        function initActivityTab() {
+            initActivityFiscalYearSelect();
+            document.getElementById('activityFiscalYear').addEventListener('change', () => {
+                calculateStats();
+                renderCharts();
+                renderParticipationRanking();
+            });
+        }
+
+        // 活動集計の年度選択を初期化
+        function initActivityFiscalYearSelect() {
+            const select = document.getElementById('activityFiscalYear');
+            const currentYear = new Date().getFullYear();
+            const currentMonth = new Date().getMonth() + 1;
+            const currentFiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+            
+            // 過去5年分の年度を生成
+            for (let i = 0; i < 5; i++) {
+                const year = currentFiscalYear - i;
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year + '年度 (' + year + '/4/1〜' + (year + 1) + '/3/31)';
+                select.appendChild(option);
+            }
+        }
+
+        // 選択された年度で活動日誌をフィルタ
+        function getFilteredLogs() {
+            const fiscalYear = parseInt(document.getElementById('activityFiscalYear').value);
+            const startDate = new Date(fiscalYear, 3, 1); // 4月1日
+            const endDate = new Date(fiscalYear + 1, 2, 31, 23, 59, 59); // 翌年3月31日
+            
+            return logs.filter(log => {
+                const logDate = new Date(log.activity_date);
+                return logDate >= startDate && logDate <= endDate;
+            });
+        }
+
         async function loadStats() {
             try {
                 const response = await fetch('/api/activity-logs');
                 const data = await response.json();
                 logs = data.logs || [];
                 
+                initActivityTab();
                 calculateStats();
                 renderCharts();
                 renderParticipationRanking();
@@ -5642,26 +5690,30 @@ app.get('/stats', (c) => {
         }
 
         function calculateStats() {
+            const filteredLogs = getFilteredLogs();
+            
             // 総活動回数
-            document.getElementById('totalActivities').textContent = logs.length;
+            document.getElementById('totalActivities').textContent = filteredLogs.length;
 
             // 総活動時間
-            const totalHours = logs.reduce((sum, log) => sum + (parseFloat(log.duration_hours) || 0), 0);
+            const totalHours = filteredLogs.reduce((sum, log) => sum + (parseFloat(log.duration_hours) || 0), 0);
             document.getElementById('totalHours').textContent = totalHours.toFixed(1);
 
             // 災害出動回数
-            const disasterCount = logs.filter(log => log.activity_type === '災害出動').length;
+            const disasterCount = filteredLogs.filter(log => log.activity_type === '災害出動').length;
             document.getElementById('disasterCount').textContent = disasterCount;
 
             // 訓練回数
-            const trainingCount = logs.filter(log => log.activity_type === '訓練').length;
+            const trainingCount = filteredLogs.filter(log => log.activity_type === '訓練').length;
             document.getElementById('trainingCount').textContent = trainingCount;
         }
 
         function renderCharts() {
+            const filteredLogs = getFilteredLogs();
+            
             // 活動種別の割合（円グラフ）
             const typeCounts = {};
-            logs.forEach(log => {
+            filteredLogs.forEach(log => {
                 const type = log.activity_type;
                 typeCounts[type] = (typeCounts[type] || 0) + 1;
             });
@@ -5696,7 +5748,7 @@ app.get('/stats', (c) => {
 
             // 月別活動回数（棒グラフ）
             const monthlyCounts = {};
-            logs.forEach(log => {
+            filteredLogs.forEach(log => {
                 const date = new Date(log.activity_date);
                 const monthKey = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
                 monthlyCounts[monthKey] = (monthlyCounts[monthKey] || 0) + 1;
@@ -5741,9 +5793,11 @@ app.get('/stats', (c) => {
         }
 
         function renderParticipationRanking() {
+            const filteredLogs = getFilteredLogs();
+            
             // 出動回数をカウント
             const participationCounts = {};
-            logs.forEach(log => {
+            filteredLogs.forEach(log => {
                 try {
                     const participants = JSON.parse(log.participants || '[]');
                     participants.forEach(name => {
