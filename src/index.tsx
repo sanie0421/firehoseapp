@@ -2184,6 +2184,8 @@ app.get('/inspection-priority', (c) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>点検優先度 - 活動記録</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
@@ -2200,6 +2202,11 @@ app.get('/inspection-priority', (c) => {
         button {
             -webkit-tap-highlight-color: transparent;
             min-height: 48px;
+        }
+        .storage-map {
+            height: 128px;
+            border-radius: 0.75rem;
+            z-index: 1;
         }
     </style>
 </head>
@@ -2365,9 +2372,13 @@ app.get('/inspection-priority', (c) => {
                     ? new Date(storage.last_inspection_date).toLocaleDateString('ja-JP')
                     : '未点検';
                 
+                const mapId = 'map-rec-' + storage.id;
+                const hasLocation = storage.latitude && storage.longitude;
+                
                 return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
                     '<div class="text-white">' +
                         (storage.image_url ? '<div class="mb-4"><img src="' + storage.image_url + '" alt="' + storage.location + '" class="w-full h-48 object-cover rounded-xl"></div>' : '') +
+                        (hasLocation ? '<div id="' + mapId + '" class="storage-map mb-4"></div>' : '') +
                         '<div class="flex justify-between items-start mb-4">' +
                             '<div class="flex-1">' +
                                 (storage.district ? '<p class="text-lg opacity-90 mb-1">' + storage.district + '</p>' : '') +
@@ -2382,6 +2393,30 @@ app.get('/inspection-priority', (c) => {
                     '</div>' +
                 '</div>';
             }).join('');
+            
+            // 地図を初期化
+            setTimeout(() => {
+                storages.forEach(storage => {
+                    if (storage.latitude && storage.longitude) {
+                        const mapId = 'map-rec-' + storage.id;
+                        const mapElement = document.getElementById(mapId);
+                        if (mapElement) {
+                            const map = L.map(mapId, {
+                                dragging: false,
+                                touchZoom: false,
+                                scrollWheelZoom: false,
+                                doubleClickZoom: false,
+                                boxZoom: false,
+                                keyboard: false,
+                                zoomControl: false
+                            }).setView([storage.latitude, storage.longitude], 15);
+                            
+                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                            L.marker([storage.latitude, storage.longitude]).addTo(map);
+                        }
+                    }
+                });
+            }, 100);
         }
 
         function renderAllStoragesList(storages) {
@@ -2436,9 +2471,13 @@ app.get('/inspection-priority', (c) => {
                     ? new Date(storage.last_inspection_date).toLocaleDateString('ja-JP')
                     : '未点検';
                 
+                const mapId = 'map-all-' + storage.id;
+                const hasLocation = storage.latitude && storage.longitude;
+                
                 return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
                     '<div class="text-white">' +
                         (storage.image_url ? '<div class="mb-4"><img src="' + storage.image_url + '" alt="' + storage.location + '" class="w-full h-48 object-cover rounded-xl"></div>' : '') +
+                        (hasLocation ? '<div id="' + mapId + '" class="storage-map mb-4"></div>' : '') +
                         '<div class="flex justify-between items-start mb-4">' +
                             '<div class="flex-1">' +
                                 (storage.district ? '<p class="text-lg opacity-90 mb-1">' + storage.district + '</p>' : '') +
@@ -2453,6 +2492,30 @@ app.get('/inspection-priority', (c) => {
                     '</div>' +
                 '</div>';
             }).join('');
+            
+            // 地図を初期化
+            setTimeout(() => {
+                storages.forEach(storage => {
+                    if (storage.latitude && storage.longitude) {
+                        const mapId = 'map-all-' + storage.id;
+                        const mapElement = document.getElementById(mapId);
+                        if (mapElement) {
+                            const map = L.map(mapId, {
+                                dragging: false,
+                                touchZoom: false,
+                                scrollWheelZoom: false,
+                                doubleClickZoom: false,
+                                boxZoom: false,
+                                keyboard: false,
+                                zoomControl: false
+                            }).setView([storage.latitude, storage.longitude], 15);
+                            
+                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                            L.marker([storage.latitude, storage.longitude]).addTo(map);
+                        }
+                    }
+                });
+            }, 100);
         }
     </script>
 </body>
