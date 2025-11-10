@@ -1681,6 +1681,44 @@ app.post('/api/hose/storages', async (c) => {
     const id = 'storage_' + Date.now()
     const now = new Date().toISOString()
     
+    // Google Maps URLから座標を自動抽出（latitude/longitudeがない場合）
+    let latitude = data.latitude || null
+    let longitude = data.longitude || null
+    
+    if (!latitude && !longitude && data.google_maps_url) {
+      try {
+        // 短縮URLの場合は展開
+        if (data.google_maps_url.includes('maps.app.goo.gl') || data.google_maps_url.includes('goo.gl')) {
+          const expandResponse = await fetch(data.google_maps_url, { 
+            method: 'HEAD',
+            redirect: 'follow'
+          })
+          const expandedUrl = expandResponse.url
+          
+          // 展開後のURLから座標を抽出（複数パターンに対応）
+          const atMatch = expandedUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+          const qMatch = expandedUrl.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/)
+          
+          if (atMatch) {
+            latitude = parseFloat(atMatch[1])
+            longitude = parseFloat(atMatch[2])
+          } else if (qMatch) {
+            latitude = parseFloat(qMatch[1])
+            longitude = parseFloat(qMatch[2])
+          }
+        } else {
+          // 通常のURLから座標を抽出
+          const atMatch = data.google_maps_url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+          if (atMatch) {
+            latitude = parseFloat(atMatch[1])
+            longitude = parseFloat(atMatch[2])
+          }
+        }
+      } catch (e) {
+        console.error('座標抽出エラー:', e)
+      }
+    }
+    
     await env.DB.prepare(`
       INSERT INTO hose_storages (
         id, storage_number, location, district,
@@ -1693,8 +1731,8 @@ app.post('/api/hose/storages', async (c) => {
       data.location,
       data.district || null,
       data.google_maps_url || null,
-      data.latitude || null,
-      data.longitude || null,
+      latitude,
+      longitude,
       data.remarks || null,
       data.image_url || null,
       now,
@@ -1719,6 +1757,44 @@ app.put('/api/hose/storages/:id', async (c) => {
     
     const now = new Date().toISOString()
     
+    // Google Maps URLから座標を自動抽出（latitude/longitudeがない場合）
+    let latitude = data.latitude || null
+    let longitude = data.longitude || null
+    
+    if (!latitude && !longitude && data.google_maps_url) {
+      try {
+        // 短縮URLの場合は展開
+        if (data.google_maps_url.includes('maps.app.goo.gl') || data.google_maps_url.includes('goo.gl')) {
+          const expandResponse = await fetch(data.google_maps_url, { 
+            method: 'HEAD',
+            redirect: 'follow'
+          })
+          const expandedUrl = expandResponse.url
+          
+          // 展開後のURLから座標を抽出（複数パターンに対応）
+          const atMatch = expandedUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+          const qMatch = expandedUrl.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/)
+          
+          if (atMatch) {
+            latitude = parseFloat(atMatch[1])
+            longitude = parseFloat(atMatch[2])
+          } else if (qMatch) {
+            latitude = parseFloat(qMatch[1])
+            longitude = parseFloat(qMatch[2])
+          }
+        } else {
+          // 通常のURLから座標を抽出
+          const atMatch = data.google_maps_url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+          if (atMatch) {
+            latitude = parseFloat(atMatch[1])
+            longitude = parseFloat(atMatch[2])
+          }
+        }
+      } catch (e) {
+        console.error('座標抽出エラー:', e)
+      }
+    }
+    
     await env.DB.prepare(`
       UPDATE hose_storages 
       SET storage_number = ?,
@@ -1736,8 +1812,8 @@ app.put('/api/hose/storages/:id', async (c) => {
       data.location,
       data.district || null,
       data.google_maps_url || null,
-      data.latitude || null,
-      data.longitude || null,
+      latitude,
+      longitude,
       data.remarks || null,
       data.image_url || null,
       now,
@@ -1748,6 +1824,78 @@ app.put('/api/hose/storages/:id', async (c) => {
   } catch (error) {
     console.error('Database error:', error)
     return c.json({ success: false, error: 'Failed to update' }, 500)
+  }
+})
+
+// ==========================================
+// API: 既存格納庫の座標を一括更新
+// ==========================================
+app.post('/api/hose/storages/update-coordinates', async (c) => {
+  try {
+    const env = c.env as { DB: D1Database }
+    
+    // latitude/longitudeがnullでgoogle_maps_urlがある格納庫を取得
+    const result = await env.DB.prepare(`
+      SELECT id, google_maps_url
+      FROM hose_storages
+      WHERE (latitude IS NULL OR longitude IS NULL)
+        AND google_maps_url IS NOT NULL
+    `).all()
+    
+    const storages = result.results || []
+    let updatedCount = 0
+    
+    for (const storage of storages) {
+      try {
+        let latitude = null
+        let longitude = null
+        
+        // 短縮URLの場合は展開
+        if (storage.google_maps_url.includes('maps.app.goo.gl') || storage.google_maps_url.includes('goo.gl')) {
+          const expandResponse = await fetch(storage.google_maps_url, { 
+            method: 'HEAD',
+            redirect: 'follow'
+          })
+          const expandedUrl = expandResponse.url
+          
+          // 展開後のURLから座標を抽出（複数パターンに対応）
+          const atMatch = expandedUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+          const qMatch = expandedUrl.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/)
+          
+          if (atMatch) {
+            latitude = parseFloat(atMatch[1])
+            longitude = parseFloat(atMatch[2])
+          } else if (qMatch) {
+            latitude = parseFloat(qMatch[1])
+            longitude = parseFloat(qMatch[2])
+          }
+        } else {
+          // 通常のURLから座標を抽出
+          const atMatch = storage.google_maps_url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+          if (atMatch) {
+            latitude = parseFloat(atMatch[1])
+            longitude = parseFloat(atMatch[2])
+          }
+        }
+        
+        if (latitude && longitude) {
+          await env.DB.prepare(`
+            UPDATE hose_storages
+            SET latitude = ?, longitude = ?, updated_at = ?
+            WHERE id = ?
+          `).bind(latitude, longitude, new Date().toISOString(), storage.id).run()
+          
+          updatedCount++
+        }
+      } catch (e) {
+        console.error('座標抽出エラー for', storage.id, ':', e)
+      }
+    }
+    
+    return c.json({ success: true, total: storages.length, updated: updatedCount })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false, error: 'Failed to update coordinates' }, 500)
   }
 })
 
