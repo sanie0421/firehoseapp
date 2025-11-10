@@ -2367,6 +2367,7 @@ app.get('/inspection-priority', (c) => {
                 
                 return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
                     '<div class="text-white">' +
+                        (storage.image_url ? '<div class="mb-4"><img src="' + storage.image_url + '" alt="' + storage.location + '" class="w-full h-48 object-cover rounded-xl"></div>' : '') +
                         '<div class="flex justify-between items-start mb-4">' +
                             '<div class="flex-1">' +
                                 (storage.district ? '<p class="text-lg opacity-90 mb-1">' + storage.district + '</p>' : '') +
@@ -2437,6 +2438,7 @@ app.get('/inspection-priority', (c) => {
                 
                 return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
                     '<div class="text-white">' +
+                        (storage.image_url ? '<div class="mb-4"><img src="' + storage.image_url + '" alt="' + storage.location + '" class="w-full h-48 object-cover rounded-xl"></div>' : '') +
                         '<div class="flex justify-between items-start mb-4">' +
                             '<div class="flex-1">' +
                                 (storage.district ? '<p class="text-lg opacity-90 mb-1">' + storage.district + '</p>' : '') +
@@ -2469,14 +2471,12 @@ app.get('/api/inspection/priority-all', async (c) => {
       SELECT 
         s.*,
         i.inspection_date as last_inspection_date,
-        i.result as last_inspection_result,
         CAST((julianday('now') - julianday(i.inspection_date)) AS INTEGER) as days_since_inspection
       FROM hose_storages s
       LEFT JOIN (
         SELECT 
           hi1.storage_id, 
-          hi1.inspection_date,
-          hi1.result
+          hi1.inspection_date
         FROM hose_inspections hi1
         INNER JOIN (
           SELECT storage_id, MAX(inspection_date) as max_date
@@ -2511,14 +2511,12 @@ app.get('/api/inspection/priority', async (c) => {
       SELECT 
         s.*,
         i.inspection_date as last_inspection_date,
-        i.result as last_inspection_result,
         CAST((julianday('now') - julianday(i.inspection_date)) AS INTEGER) as days_since_inspection
       FROM hose_storages s
       LEFT JOIN (
         SELECT 
           hi1.storage_id, 
-          hi1.inspection_date,
-          hi1.result
+          hi1.inspection_date
         FROM hose_inspections hi1
         INNER JOIN (
           SELECT storage_id, MAX(inspection_date) as max_date
@@ -2544,14 +2542,12 @@ app.get('/api/inspection/priority', async (c) => {
       SELECT 
         s.*,
         i.inspection_date as last_inspection_date,
-        i.result as last_inspection_result,
         CAST((julianday('now') - julianday(i.inspection_date)) AS INTEGER) as days_since_inspection
       FROM hose_storages s
       LEFT JOIN (
         SELECT 
           hi1.storage_id, 
-          hi1.inspection_date,
-          hi1.result
+          hi1.inspection_date
         FROM hose_inspections hi1
         INNER JOIN (
           SELECT storage_id, MAX(inspection_date) as max_date
