@@ -2394,29 +2394,33 @@ app.get('/inspection-priority', (c) => {
                 '</div>';
             }).join('');
             
-            // 地図を初期化
+            // 地図を初期化（DOMレンダリング完了後）
             setTimeout(() => {
                 storages.forEach(storage => {
                     if (storage.latitude && storage.longitude) {
                         const mapId = 'map-rec-' + storage.id;
                         const mapElement = document.getElementById(mapId);
-                        if (mapElement) {
-                            const map = L.map(mapId, {
-                                dragging: false,
-                                touchZoom: false,
-                                scrollWheelZoom: false,
-                                doubleClickZoom: false,
-                                boxZoom: false,
-                                keyboard: false,
-                                zoomControl: false
-                            }).setView([storage.latitude, storage.longitude], 15);
-                            
-                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                            L.marker([storage.latitude, storage.longitude]).addTo(map);
+                        if (mapElement && !mapElement.classList.contains('leaflet-container')) {
+                            try {
+                                const map = L.map(mapId, {
+                                    dragging: false,
+                                    touchZoom: false,
+                                    scrollWheelZoom: false,
+                                    doubleClickZoom: false,
+                                    boxZoom: false,
+                                    keyboard: false,
+                                    zoomControl: false
+                                }).setView([storage.latitude, storage.longitude], 15);
+                                
+                                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                                L.marker([storage.latitude, storage.longitude]).addTo(map);
+                            } catch (e) {
+                                console.error('Map init error:', e);
+                            }
                         }
                     }
                 });
-            }, 100);
+            }, 500);
         }
 
         function renderAllStoragesList(storages) {
@@ -2493,29 +2497,33 @@ app.get('/inspection-priority', (c) => {
                 '</div>';
             }).join('');
             
-            // 地図を初期化
+            // 地図を初期化（DOMレンダリング完了後）
             setTimeout(() => {
                 storages.forEach(storage => {
                     if (storage.latitude && storage.longitude) {
                         const mapId = 'map-all-' + storage.id;
                         const mapElement = document.getElementById(mapId);
-                        if (mapElement) {
-                            const map = L.map(mapId, {
-                                dragging: false,
-                                touchZoom: false,
-                                scrollWheelZoom: false,
-                                doubleClickZoom: false,
-                                boxZoom: false,
-                                keyboard: false,
-                                zoomControl: false
-                            }).setView([storage.latitude, storage.longitude], 15);
-                            
-                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                            L.marker([storage.latitude, storage.longitude]).addTo(map);
+                        if (mapElement && !mapElement.classList.contains('leaflet-container')) {
+                            try {
+                                const map = L.map(mapId, {
+                                    dragging: false,
+                                    touchZoom: false,
+                                    scrollWheelZoom: false,
+                                    doubleClickZoom: false,
+                                    boxZoom: false,
+                                    keyboard: false,
+                                    zoomControl: false
+                                }).setView([storage.latitude, storage.longitude], 15);
+                                
+                                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                                L.marker([storage.latitude, storage.longitude]).addTo(map);
+                            } catch (e) {
+                                console.error('Map init error:', e);
+                            }
                         }
                     }
                 });
-            }, 100);
+            }, 500);
         }
     </script>
 </body>
