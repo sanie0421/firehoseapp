@@ -2273,6 +2273,27 @@ app.get('/inspection-priority', (c) => {
         window.onload = function() {
             loadPriorityList();
         };
+        
+        // Google Maps URLから座標を抽出する関数
+        function extractCoordsFromGoogleMapsUrl(url) {
+            try {
+                const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+                if (atMatch) {
+                    return { lat: parseFloat(atMatch[1]), lon: parseFloat(atMatch[2]) };
+                }
+                const qMatch = url.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+                if (qMatch) {
+                    return { lat: parseFloat(qMatch[1]), lon: parseFloat(qMatch[2]) };
+                }
+                const llMatch = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+                if (llMatch) {
+                    return { lat: parseFloat(llMatch[1]), lon: parseFloat(llMatch[2]) };
+                }
+            } catch (e) {
+                console.error('座標抽出エラー:', e);
+            }
+            return null;
+        }
 
         async function loadPriorityList() {
             try {
@@ -2373,7 +2394,7 @@ app.get('/inspection-priority', (c) => {
                     : '未点検';
                 
                 const mapId = 'map-rec-' + storage.id;
-                const hasLocation = storage.latitude && storage.longitude;
+                const hasLocation = (storage.latitude && storage.longitude) || storage.google_maps_url;
                 
                 return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
                     '<div class="text-white">' +
@@ -2395,9 +2416,38 @@ app.get('/inspection-priority', (c) => {
             }).join('');
             
             // 地図を初期化（DOMレンダリング完了後）
-            setTimeout(() => {
-                storages.forEach(storage => {
-                    if (storage.latitude && storage.longitude) {
+            setTimeout(async () => {
+                for (const storage of storages) {
+                    let lat = storage.latitude;
+                    let lon = storage.longitude;
+                    
+                    // Google Maps URLから座標を抽出
+                    if (!lat && !lon && storage.google_maps_url) {
+                        if (storage.google_maps_url.includes('maps.app.goo.gl') || storage.google_maps_url.includes('goo.gl')) {
+                            try {
+                                const response = await fetch('/api/expand-maps-url', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ url: storage.google_maps_url })
+                                });
+                                const data = await response.json();
+                                if (data.success && data.lat && data.lon) {
+                                    lat = data.lat;
+                                    lon = data.lon;
+                                }
+                            } catch (e) {
+                                console.error('URL展開エラー:', e);
+                            }
+                        } else {
+                            const coords = extractCoordsFromGoogleMapsUrl(storage.google_maps_url);
+                            if (coords) {
+                                lat = coords.lat;
+                                lon = coords.lon;
+                            }
+                        }
+                    }
+                    
+                    if (lat && lon) {
                         const mapId = 'map-rec-' + storage.id;
                         const mapElement = document.getElementById(mapId);
                         if (mapElement && !mapElement.classList.contains('leaflet-container')) {
@@ -2410,16 +2460,16 @@ app.get('/inspection-priority', (c) => {
                                     boxZoom: false,
                                     keyboard: false,
                                     zoomControl: false
-                                }).setView([storage.latitude, storage.longitude], 15);
+                                }).setView([lat, lon], 15);
                                 
                                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                                L.marker([storage.latitude, storage.longitude]).addTo(map);
+                                L.marker([lat, lon]).addTo(map);
                             } catch (e) {
                                 console.error('Map init error:', e);
                             }
                         }
                     }
-                });
+                }
             }, 500);
         }
 
@@ -2476,7 +2526,7 @@ app.get('/inspection-priority', (c) => {
                     : '未点検';
                 
                 const mapId = 'map-all-' + storage.id;
-                const hasLocation = storage.latitude && storage.longitude;
+                const hasLocation = (storage.latitude && storage.longitude) || storage.google_maps_url;
                 
                 return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
                     '<div class="text-white">' +
@@ -2498,9 +2548,38 @@ app.get('/inspection-priority', (c) => {
             }).join('');
             
             // 地図を初期化（DOMレンダリング完了後）
-            setTimeout(() => {
-                storages.forEach(storage => {
-                    if (storage.latitude && storage.longitude) {
+            setTimeout(async () => {
+                for (const storage of storages) {
+                    let lat = storage.latitude;
+                    let lon = storage.longitude;
+                    
+                    // Google Maps URLから座標を抽出
+                    if (!lat && !lon && storage.google_maps_url) {
+                        if (storage.google_maps_url.includes('maps.app.goo.gl') || storage.google_maps_url.includes('goo.gl')) {
+                            try {
+                                const response = await fetch('/api/expand-maps-url', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ url: storage.google_maps_url })
+                                });
+                                const data = await response.json();
+                                if (data.success && data.lat && data.lon) {
+                                    lat = data.lat;
+                                    lon = data.lon;
+                                }
+                            } catch (e) {
+                                console.error('URL展開エラー:', e);
+                            }
+                        } else {
+                            const coords = extractCoordsFromGoogleMapsUrl(storage.google_maps_url);
+                            if (coords) {
+                                lat = coords.lat;
+                                lon = coords.lon;
+                            }
+                        }
+                    }
+                    
+                    if (lat && lon) {
                         const mapId = 'map-all-' + storage.id;
                         const mapElement = document.getElementById(mapId);
                         if (mapElement && !mapElement.classList.contains('leaflet-container')) {
@@ -2513,16 +2592,16 @@ app.get('/inspection-priority', (c) => {
                                     boxZoom: false,
                                     keyboard: false,
                                     zoomControl: false
-                                }).setView([storage.latitude, storage.longitude], 15);
+                                }).setView([lat, lon], 15);
                                 
                                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                                L.marker([storage.latitude, storage.longitude]).addTo(map);
+                                L.marker([lat, lon]).addTo(map);
                             } catch (e) {
                                 console.error('Map init error:', e);
                             }
                         }
                     }
-                });
+                }
             }, 500);
         }
     </script>
