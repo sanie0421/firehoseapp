@@ -2814,6 +2814,7 @@ app.get('/inspection-priority', (c) => {
         .priority-high { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
         .priority-medium { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
         .priority-low { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .pinned-today { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: 3px solid #fbbf24; }
         button {
             -webkit-tap-highlight-color: transparent;
             min-height: 48px;
@@ -2822,6 +2823,18 @@ app.get('/inspection-priority', (c) => {
             height: 128px;
             border-radius: 0.75rem;
             z-index: 1;
+        }
+        #allMap {
+            height: 600px;
+            border-radius: 1rem;
+        }
+        .filter-btn {
+            transition: all 0.2s;
+        }
+        .filter-btn.active {
+            background-color: #3b82f6;
+            color: white;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -2857,367 +2870,383 @@ app.get('/inspection-priority', (c) => {
                     <input type="text" id="searchInput" placeholder="🔍 格納庫番号、場所、地区で検索..." 
                         class="w-full px-4 py-3 rounded-xl border-2 border-gray-300 bg-gray-50 text-gray-800 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" 
                         style="font-size: 16px;"
-                        oninput="searchStorages()">
+                        oninput="applyFilters()">
                 </div>
             </div>
         </div>
 
-        <!-- おすすめ4件 -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">⭐ おすすめ点検</h2>
-            <p class="text-sm text-gray-600 mb-4">点検が古い格納庫と、同地区で点検が必要な格納庫</p>
-            <div id="recommendedList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-gray-50 rounded-xl p-8 text-center"><p class="text-gray-800">読み込み中...</p></div>
+        <!-- タブUI -->
+        <div class="bg-white rounded-2xl shadow-lg mb-6">
+            <div class="flex border-b">
+                <button id="tabPriority" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-red-500 text-red-500">
+                    ⚠️ 優先度
+                </button>
+                <button id="tabMap" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                    🗺️ 地図
+                </button>
+                <button id="tabHistory" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                    📋 全履歴
+                </button>
             </div>
-        </div>
 
-        <!-- 全格納庫一覧 -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 全格納庫一覧</h2>
-            <p class="text-sm text-gray-600 mb-4">点検が古い順に表示</p>
-            <div id="allStoragesList" class="space-y-4">
-                <div class="bg-gray-50 rounded-xl p-8 text-center"><p class="text-gray-800">読み込み中...</p></div>
+            <!-- 優先度タブ -->
+            <div id="priorityTab" class="p-6">
+                <!-- フィルタボタン群 -->
+                <div class="mb-6">
+                    <!-- 時間フィルタ -->
+                    <div class="mb-4">
+                        <p class="text-sm font-bold text-gray-700 mb-2">📅 点検時期</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="setTimeFilter('all')" class="filter-btn time-filter active px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">すべて</button>
+                            <button onclick="setTimeFilter('under1')" class="filter-btn time-filter px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">1年未満</button>
+                            <button onclick="setTimeFilter('1to2')" class="filter-btn time-filter px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">1年以上2年未満</button>
+                            <button onclick="setTimeFilter('over2')" class="filter-btn time-filter px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">2年以上</button>
+                            <button onclick="setTimeFilter('never')" class="filter-btn time-filter px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">未点検</button>
+                        </div>
+                    </div>
+
+                    <!-- 地区フィルタ -->
+                    <div class="mb-4">
+                        <p class="text-sm font-bold text-gray-700 mb-2">📍 地区</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="setDistrictFilter('all')" class="filter-btn district-filter active px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">すべて</button>
+                            <button onclick="setDistrictFilter('市場')" class="filter-btn district-filter px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">市場</button>
+                            <button onclick="setDistrictFilter('根岸上')" class="filter-btn district-filter px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">根岸上</button>
+                            <button onclick="setDistrictFilter('根岸下')" class="filter-btn district-filter px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">根岸下</button>
+                            <button onclick="setDistrictFilter('坊村')" class="filter-btn district-filter px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">坊村</button>
+                            <button onclick="setDistrictFilter('馬場')" class="filter-btn district-filter px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">馬場</button>
+                            <button onclick="setDistrictFilter('宮地')" class="filter-btn district-filter px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">宮地</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 今日点検する格納庫（固定表示） -->
+                <div id="todayPinnedList" class="mb-6"></div>
+
+                <!-- 格納庫一覧 -->
+                <div id="allStoragesList" class="space-y-4">
+                    <div class="bg-gray-50 rounded-xl p-8 text-center"><p class="text-gray-800">読み込み中...</p></div>
+                </div>
+            </div>
+
+            <!-- 地図タブ -->
+            <div id="mapTab" class="p-6 hidden">
+                <div id="allMap"></div>
+            </div>
+
+            <!-- 全履歴タブ -->
+            <div id="historyTab" class="p-6 hidden">
+                <div id="allHistoryList" class="space-y-4">
+                    <p class="text-gray-600 text-center py-8">読み込み中...</p>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
         let allStorages = [];
-        let recommendedStorages = [];
+        let allInspections = [];
+        let pinnedToday = JSON.parse(localStorage.getItem('pinnedTodayStorages') || '[]');
+        let currentTimeFilter = 'all';
+        let currentDistrictFilter = 'all';
+        let leafletMap = null;
         
         window.onload = function() {
-            loadPriorityList();
+            loadAllData();
+            setupTabs();
         };
+
+        function setupTabs() {
+            document.getElementById('tabPriority').addEventListener('click', () => switchTab('priority'));
+            document.getElementById('tabMap').addEventListener('click', () => switchTab('map'));
+            document.getElementById('tabHistory').addEventListener('click', () => switchTab('history'));
+        }
+
+        function switchTab(tabName) {
+            const tabs = ['tabPriority', 'tabMap', 'tabHistory'];
+            const contents = ['priorityTab', 'mapTab', 'historyTab'];
+
+            tabs.forEach((tab, i) => {
+                const btn = document.getElementById(tab);
+                const content = document.getElementById(contents[i]);
+                
+                if (contents[i] === tabName + 'Tab') {
+                    btn.classList.add('border-red-500', 'text-red-500');
+                    btn.classList.remove('border-transparent', 'text-gray-500');
+                    content.classList.remove('hidden');
+                    
+                    if (tabName === 'map' && !leafletMap) {
+                        loadMap();
+                    } else if (tabName === 'history' && allInspections.length === 0) {
+                        loadHistory();
+                    }
+                } else {
+                    btn.classList.remove('border-red-500', 'text-red-500');
+                    btn.classList.add('border-transparent', 'text-gray-500');
+                    content.classList.add('hidden');
+                }
+            });
+        }
         
-        // Google Maps URLから座標を抽出する関数
         function extractCoordsFromGoogleMapsUrl(url) {
             try {
                 const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-                if (atMatch) {
-                    return { lat: parseFloat(atMatch[1]), lon: parseFloat(atMatch[2]) };
-                }
+                if (atMatch) return { lat: parseFloat(atMatch[1]), lon: parseFloat(atMatch[2]) };
                 const qMatch = url.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
-                if (qMatch) {
-                    return { lat: parseFloat(qMatch[1]), lon: parseFloat(qMatch[2]) };
-                }
+                if (qMatch) return { lat: parseFloat(qMatch[1]), lon: parseFloat(qMatch[2]) };
                 const llMatch = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
-                if (llMatch) {
-                    return { lat: parseFloat(llMatch[1]), lon: parseFloat(llMatch[2]) };
-                }
+                if (llMatch) return { lat: parseFloat(llMatch[1]), lon: parseFloat(llMatch[2]) };
             } catch (e) {
                 console.error('座標抽出エラー:', e);
             }
             return null;
         }
 
-        async function loadPriorityList() {
+        async function loadAllData() {
             try {
-                // おすすめ4件を取得
-                const recommendedResponse = await fetch('/api/inspection/priority');
-                const recommendedData = await recommendedResponse.json();
-                recommendedStorages = recommendedData.storages || [];
-                
-                // 全件を取得
-                const allResponse = await fetch('/api/inspection/priority-all');
-                const allData = await allResponse.json();
-                allStorages = allData.storages || [];
-                
-                renderRecommendedList(recommendedStorages);
-                renderAllStoragesList(allStorages);
+                const response = await fetch('/api/inspection/priority-all');
+                const data = await response.json();
+                allStorages = data.storages || [];
+                applyFilters();
             } catch (error) {
-                document.getElementById('recommendedList').innerHTML = 
-                    '<div class="bg-gray-50 rounded-xl p-8 text-center col-span-full"><p class="text-gray-800">データの読み込みに失敗しました</p></div>';
                 document.getElementById('allStoragesList').innerHTML = 
                     '<div class="bg-gray-50 rounded-xl p-8 text-center"><p class="text-gray-800">データの読み込みに失敗しました</p></div>';
                 console.error(error);
             }
         }
-        
-        function searchStorages() {
+
+        function setTimeFilter(filter) {
+            currentTimeFilter = filter;
+            document.querySelectorAll('.time-filter').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            applyFilters();
+        }
+
+        function setDistrictFilter(filter) {
+            currentDistrictFilter = filter;
+            document.querySelectorAll('.district-filter').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            applyFilters();
+        }
+
+        function applyFilters() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             
-            if (!searchTerm) {
-                renderRecommendedList(recommendedStorages);
-                renderAllStoragesList(allStorages);
-                return;
-            }
-            
-            const filteredRecommended = recommendedStorages.filter(storage => {
-                const storageNumber = (storage.storage_number || '').toLowerCase();
-                const location = (storage.location || '').toLowerCase();
-                const district = (storage.district || '').toLowerCase();
+            let filtered = allStorages.filter(storage => {
+                // 検索フィルタ
+                if (searchTerm) {
+                    const storageNumber = (storage.storage_number || '').toLowerCase();
+                    const location = (storage.location || '').toLowerCase();
+                    const district = (storage.district || '').toLowerCase();
+                    
+                    if (!storageNumber.includes(searchTerm) && 
+                        !location.includes(searchTerm) && 
+                        !district.includes(searchTerm)) {
+                        return false;
+                    }
+                }
                 
-                return storageNumber.includes(searchTerm) || 
-                       location.includes(searchTerm) || 
-                       district.includes(searchTerm);
-            });
-            
-            const filteredAll = allStorages.filter(storage => {
-                const storageNumber = (storage.storage_number || '').toLowerCase();
-                const location = (storage.location || '').toLowerCase();
-                const district = (storage.district || '').toLowerCase();
-                
-                return storageNumber.includes(searchTerm) || 
-                       location.includes(searchTerm) || 
-                       district.includes(searchTerm);
-            });
-            
-            renderRecommendedList(filteredRecommended);
-            renderAllStoragesList(filteredAll);
-        }
-
-        function renderRecommendedList(storages) {
-            const list = document.getElementById('recommendedList');
-            
-            if (storages.length === 0) {
-                list.innerHTML = '<div class="bg-gray-50 rounded-xl p-8 text-center col-span-full"><p class="text-gray-800 text-xl">該当する格納庫がありません</p></div>';
-                return;
-            }
-
-            list.innerHTML = storages.map(storage => {
+                // 時間フィルタ（AND条件）
                 const daysAgo = storage.days_since_inspection;
-                const lastResult = storage.last_inspection_result;
-                let priorityClass = 'priority-low';
-                let priorityText = '正常';
-                let priorityIcon = '✅';
+                if (currentTimeFilter === 'under1' && (daysAgo === null || daysAgo >= 365)) return false;
+                if (currentTimeFilter === '1to2' && (daysAgo === null || daysAgo < 365 || daysAgo >= 730)) return false;
+                if (currentTimeFilter === 'over2' && (daysAgo === null || daysAgo < 730)) return false;
+                if (currentTimeFilter === 'never' && daysAgo !== null) return false;
                 
-                // 最新の点検結果を最優先で判定
-                if (lastResult === 'abnormal') {
-                    priorityClass = 'priority-high';
-                    priorityText = '異常あり';
-                    priorityIcon = '🚨';
-                } else if (lastResult === 'caution') {
-                    priorityClass = 'priority-medium';
-                    priorityText = '要注意';
-                    priorityIcon = '⚠️';
-                } else if (daysAgo === null || daysAgo > 180) {
-                    priorityClass = 'priority-high';
-                    priorityText = '要点検';
-                    priorityIcon = '🚨';
-                } else if (daysAgo > 90) {
-                    priorityClass = 'priority-medium';
-                    priorityText = '注意';
-                    priorityIcon = '⚠️';
-                } else if (lastResult === 'normal') {
-                    priorityClass = 'priority-low';
-                    priorityText = '正常';
-                    priorityIcon = '✅';
-                }
-
-                const lastInspection = storage.last_inspection_date 
-                    ? new Date(storage.last_inspection_date).toLocaleDateString('ja-JP')
-                    : '未点検';
+                // 地区フィルタ（AND条件）
+                if (currentDistrictFilter !== 'all' && storage.district !== currentDistrictFilter) return false;
                 
-                const mapId = 'map-rec-' + storage.id;
-                const hasLocation = (storage.latitude && storage.longitude) || storage.google_maps_url;
-                
-                return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
-                    '<div class="text-white">' +
-                        (storage.image_url ? '<div class="mb-4"><img src="' + storage.image_url + '" alt="' + storage.location + '" class="w-full h-48 object-cover rounded-xl"></div>' : '') +
-                        (hasLocation ? '<div id="' + mapId + '" class="storage-map mb-4"></div>' : '') +
-                        '<div class="flex justify-between items-start mb-4">' +
-                            '<div class="flex-1">' +
-                                (storage.district ? '<p class="text-lg opacity-90 mb-1">' + storage.district + '</p>' : '') +
-                                '<h3 class="text-2xl font-bold">' + storage.storage_number + ' | ' + storage.location + '</h3>' +
-                            '</div>' +
-                            '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full text-base font-bold border border-white border-opacity-50 ml-2">' + priorityIcon + ' ' + priorityText + '</span>' +
-                        '</div>' +
-                        '<p class="text-base opacity-90 mb-4">最終点検: ' + lastInspection + (daysAgo !== null ? ' (' + daysAgo + '日前)' : '') + '</p>' +
-                        '<button class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-xl text-base font-semibold transition border border-white border-opacity-50">' +
-                            '📝 点検する' +
-                        '</button>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
+                return true;
+            });
             
-            // 地図を初期化（DOMレンダリング完了後）
-            setTimeout(async () => {
-                for (const storage of storages) {
-                    let lat = storage.latitude;
-                    let lon = storage.longitude;
-                    
-                    // Google Maps URLから座標を抽出
-                    if (!lat && !lon && storage.google_maps_url) {
-                        if (storage.google_maps_url.includes('maps.app.goo.gl') || storage.google_maps_url.includes('goo.gl')) {
-                            try {
-                                const response = await fetch('/api/expand-maps-url', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ url: storage.google_maps_url })
-                                });
-                                const data = await response.json();
-                                if (data.success && data.lat && data.lon) {
-                                    lat = data.lat;
-                                    lon = data.lon;
-                                }
-                            } catch (e) {
-                                console.error('URL展開エラー:', e);
-                            }
-                        } else {
-                            const coords = extractCoordsFromGoogleMapsUrl(storage.google_maps_url);
-                            if (coords) {
-                                lat = coords.lat;
-                                lon = coords.lon;
-                            }
-                        }
-                    }
-                    
-                    if (lat && lon) {
-                        const mapId = 'map-rec-' + storage.id;
-                        const mapElement = document.getElementById(mapId);
-                        if (mapElement && !mapElement.classList.contains('leaflet-container')) {
-                            try {
-                                const map = L.map(mapId, {
-                                    dragging: false,
-                                    touchZoom: false,
-                                    scrollWheelZoom: false,
-                                    doubleClickZoom: false,
-                                    boxZoom: false,
-                                    keyboard: false,
-                                    zoomControl: false
-                                }).setView([lat, lon], 15);
-                                
-                                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                                L.marker([lat, lon]).addTo(map);
-                            } catch (e) {
-                                console.error('Map init error:', e);
-                            }
-                        }
-                    }
-                }
-            }, 500);
+            renderStoragesList(filtered);
         }
 
-        function renderAllStoragesList(storages) {
+        function pinTodayInspection(storageId, event) {
+            event.stopPropagation();
+            if (!pinnedToday.includes(storageId)) {
+                pinnedToday.push(storageId);
+                localStorage.setItem('pinnedTodayStorages', JSON.stringify(pinnedToday));
+                applyFilters();
+            }
+        }
+
+        function unpinStorage(storageId, event) {
+            event.stopPropagation();
+            pinnedToday = pinnedToday.filter(id => id !== storageId);
+            localStorage.setItem('pinnedTodayStorages', JSON.stringify(pinnedToday));
+            applyFilters();
+        }
+
+        function renderStoragesList(storages) {
+            // 固定表示（今日点検する）
+            const pinnedStorages = allStorages.filter(s => pinnedToday.includes(s.id));
+            const pinnedContainer = document.getElementById('todayPinnedList');
+            
+            if (pinnedStorages.length > 0) {
+                pinnedContainer.innerHTML = '<h3 class="text-xl font-bold text-gray-800 mb-4">📌 今日点検する</h3>' +
+                    '<div class="space-y-4 mb-6">' + 
+                    pinnedStorages.map(storage => renderStorageCard(storage, true)).join('') +
+                    '</div>';
+            } else {
+                pinnedContainer.innerHTML = '';
+            }
+            
+            // 通常リスト（固定表示以外）
+            const unpinnedStorages = storages.filter(s => !pinnedToday.includes(s.id));
             const list = document.getElementById('allStoragesList');
             
-            if (storages.length === 0) {
-                list.innerHTML = '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800 text-xl">ホース格納庫が登録されていません</p></div>';
+            if (unpinnedStorages.length === 0) {
+                list.innerHTML = '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800 text-xl">該当する格納庫がありません</p></div>';
                 return;
             }
 
-            list.innerHTML = storages.map(storage => {
-                const daysAgo = storage.days_since_inspection;
-                const lastResult = storage.last_inspection_result;
-                let priorityClass = 'priority-low';
-                let priorityText = '正常';
-                let priorityIcon = '✅';
-                
-                // 最新の点検結果を最優先で判定
+            list.innerHTML = unpinnedStorages.map(storage => renderStorageCard(storage, false)).join('');
+        }
+
+        function renderStorageCard(storage, isPinned) {
+            const daysAgo = storage.days_since_inspection;
+            const lastResult = storage.last_inspection_result;
+            let priorityClass = isPinned ? 'pinned-today' : 'priority-low';
+            let priorityText = '正常';
+            let priorityIcon = '✅';
+            
+            if (!isPinned) {
                 if (lastResult === 'abnormal') {
-                    // 異常あり → 最優先で赤
                     priorityClass = 'priority-high';
                     priorityText = '異常あり';
                     priorityIcon = '🚨';
                 } else if (lastResult === 'caution') {
-                    // 要注意 → 橙色
                     priorityClass = 'priority-medium';
                     priorityText = '要注意';
                     priorityIcon = '⚠️';
                 } else if (lastResult === 'normal') {
-                    // 正常 → 緑色(日数に関わらず)
                     priorityClass = 'priority-low';
                     priorityText = '正常';
                     priorityIcon = '✅';
                 } else if (daysAgo === null) {
-                    // 未点検 → 赤
                     priorityClass = 'priority-high';
                     priorityText = '未点検';
                     priorityIcon = '🚨';
-                } else if (daysAgo > 180) {
-                    // 180日以上 → 赤
+                } else if (daysAgo > 730) {
                     priorityClass = 'priority-high';
                     priorityText = '要点検';
                     priorityIcon = '🚨';
-                } else if (daysAgo > 90) {
-                    // 90日以上 → 橙色
+                } else if (daysAgo > 365) {
                     priorityClass = 'priority-medium';
                     priorityText = '点検推奨';
                     priorityIcon = '⚠️';
                 }
+            } else {
+                priorityText = '今日点検';
+                priorityIcon = '📌';
+            }
 
-                const lastInspection = storage.last_inspection_date 
-                    ? new Date(storage.last_inspection_date).toLocaleDateString('ja-JP')
-                    : '未点検';
-                
-                const mapId = 'map-all-' + storage.id;
-                const hasLocation = (storage.latitude && storage.longitude) || storage.google_maps_url;
-                
-                return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
-                    '<div class="text-white">' +
-                        (storage.image_url ? '<div class="mb-4"><img src="' + storage.image_url + '" alt="' + storage.location + '" class="w-full h-48 object-cover rounded-xl"></div>' : '') +
-                        (hasLocation ? '<div id="' + mapId + '" class="storage-map mb-4"></div>' : '') +
-                        '<div class="flex justify-between items-start mb-4">' +
-                            '<div class="flex-1">' +
-                                (storage.district ? '<p class="text-lg opacity-90 mb-1">' + storage.district + '</p>' : '') +
-                                '<h3 class="text-2xl font-bold">' + storage.storage_number + ' | ' + storage.location + '</h3>' +
-                            '</div>' +
-                            '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full text-base font-bold border border-white border-opacity-50 ml-2">' + priorityIcon + ' ' + priorityText + '</span>' +
-                        '</div>' +
-                        '<p class="text-base opacity-90 mb-4">最終点検: ' + lastInspection + (daysAgo !== null ? ' (' + daysAgo + '日前)' : '') + '</p>' +
-                        '<button class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-xl text-base font-semibold transition border border-white border-opacity-50">' +
-                            '📝 点検する' +
-                        '</button>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
+            const lastInspection = storage.last_inspection_date 
+                ? new Date(storage.last_inspection_date).toLocaleDateString('ja-JP')
+                : '未点検';
             
-            // 地図を初期化（DOMレンダリング完了後）
-            setTimeout(async () => {
-                for (const storage of storages) {
-                    let lat = storage.latitude;
-                    let lon = storage.longitude;
-                    
-                    // Google Maps URLから座標を抽出
-                    if (!lat && !lon && storage.google_maps_url) {
-                        if (storage.google_maps_url.includes('maps.app.goo.gl') || storage.google_maps_url.includes('goo.gl')) {
-                            try {
-                                const response = await fetch('/api/expand-maps-url', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ url: storage.google_maps_url })
-                                });
-                                const data = await response.json();
-                                if (data.success && data.lat && data.lon) {
-                                    lat = data.lat;
-                                    lon = data.lon;
-                                }
-                            } catch (e) {
-                                console.error('URL展開エラー:', e);
-                            }
-                        } else {
-                            const coords = extractCoordsFromGoogleMapsUrl(storage.google_maps_url);
-                            if (coords) {
-                                lat = coords.lat;
-                                lon = coords.lon;
-                            }
-                        }
-                    }
-                    
-                    if (lat && lon) {
-                        const mapId = 'map-all-' + storage.id;
-                        const mapElement = document.getElementById(mapId);
-                        if (mapElement && !mapElement.classList.contains('leaflet-container')) {
-                            try {
-                                const map = L.map(mapId, {
-                                    dragging: false,
-                                    touchZoom: false,
-                                    scrollWheelZoom: false,
-                                    doubleClickZoom: false,
-                                    boxZoom: false,
-                                    keyboard: false,
-                                    zoomControl: false
-                                }).setView([lat, lon], 15);
-                                
-                                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                                L.marker([lat, lon]).addTo(map);
-                            } catch (e) {
-                                console.error('Map init error:', e);
-                            }
-                        }
+            const pinButton = isPinned 
+                ? '<button onclick="unpinStorage(\\\'' + storage.id + '\\', event)" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-xl text-sm font-semibold transition border border-white border-opacity-50 mb-2">❌ 固定解除</button>'
+                : '<button onclick="pinTodayInspection(\\\'' + storage.id + '\\', event)" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-xl text-sm font-semibold transition border border-white border-opacity-50 mb-2">📌 今日点検する</button>';
+            
+            return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
+                '<div class="text-white">' +
+                    '<div class="flex justify-between items-start mb-4">' +
+                        '<div class="flex-1">' +
+                            (storage.district ? '<p class="text-lg opacity-90 mb-1">' + storage.district + '</p>' : '') +
+                            '<h3 class="text-2xl font-bold">' + storage.storage_number + ' | ' + storage.location + '</h3>' +
+                        '</div>' +
+                        '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full text-base font-bold border border-white border-opacity-50 ml-2">' + priorityIcon + ' ' + priorityText + '</span>' +
+                    '</div>' +
+                    '<p class="text-base opacity-90 mb-4">最終点検: ' + lastInspection + (daysAgo !== null ? ' (' + daysAgo + '日前)' : '') + '</p>' +
+                    pinButton +
+                    '<button class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-xl text-base font-semibold transition border border-white border-opacity-50">📝 点検する</button>' +
+                '</div>' +
+            '</div>';
+        }
+
+        async function loadMap() {
+            const mapContainer = document.getElementById('allMap');
+            
+            if (allStorages.length === 0) {
+                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">格納庫データがありません</p>';
+                return;
+            }
+
+            leafletMap = L.map('allMap').setView([36.0, 137.9], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(leafletMap);
+
+            for (const storage of allStorages) {
+                let lat = storage.latitude;
+                let lon = storage.longitude;
+                
+                if (!lat && !lon && storage.google_maps_url) {
+                    const coords = extractCoordsFromGoogleMapsUrl(storage.google_maps_url);
+                    if (coords) {
+                        lat = coords.lat;
+                        lon = coords.lon;
                     }
                 }
-            }, 500);
+                
+                if (lat && lon) {
+                    const marker = L.marker([lat, lon]).addTo(leafletMap);
+                    marker.bindPopup('<b>' + storage.storage_number + '</b><br>' + storage.location + '<br><a href="/storage/' + storage.id + '" class="text-blue-600 hover:underline">詳細を見る</a>');
+                }
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const response = await fetch('/api/inspection/all-history');
+                const data = await response.json();
+                allInspections = data.inspections || [];
+                renderHistoryList(allInspections);
+            } catch (error) {
+                document.getElementById('allHistoryList').innerHTML = 
+                    '<p class="text-gray-600 text-center py-8">履歴の読み込みに失敗しました</p>';
+                console.error(error);
+            }
+        }
+
+        function renderHistoryList(inspections) {
+            const container = document.getElementById('allHistoryList');
+            
+            if (inspections.length === 0) {
+                container.innerHTML = '<p class="text-gray-600 text-center py-8">点検履歴がありません</p>';
+                return;
+            }
+
+            container.innerHTML = inspections.map(inspection => {
+                const hasActionItems = inspection.action_item_1 || inspection.action_item_2 || inspection.action_item_3;
+                const resultText = inspection.inspection_result === 'normal' ? '正常' : inspection.inspection_result === 'caution' ? '要注意' : '異常あり';
+                
+                let html = '<div class="bg-white rounded-lg border-2 border-gray-200 p-4">' +
+                    '<div class="flex justify-between items-start">' +
+                        '<div>' +
+                            '<h4 class="text-lg font-bold text-gray-800">📅 ' + inspection.inspection_date + '</h4>' +
+                            '<p class="text-gray-600">📍 ' + inspection.storage_number + ' | ' + inspection.location + '</p>' +
+                            '<p class="text-gray-600">👤 点検者: ' + inspection.inspector_name + '</p>' +
+                            '<p class="text-gray-600">🔍 結果: ' + resultText + '</p>' +
+                        '</div>' +
+                    '</div>';
+                
+                if (hasActionItems) {
+                    html += '<div class="mt-3 bg-yellow-50 border border-yellow-200 rounded p-3">' +
+                        '<p class="font-bold text-sm text-gray-800 mb-1">⚠️ 要対応事項</p>';
+                    if (inspection.action_item_1) html += '<p class="text-sm text-gray-700">① ' + inspection.action_item_1 + '</p>';
+                    if (inspection.action_item_2) html += '<p class="text-sm text-gray-700">② ' + inspection.action_item_2 + '</p>';
+                    if (inspection.action_item_3) html += '<p class="text-sm text-gray-700">③ ' + inspection.action_item_3 + '</p>';
+                    html += '</div>';
+                }
+                
+                if (inspection.notes) {
+                    html += '<p class="text-sm text-gray-600 mt-2">📝 ' + inspection.notes + '</p>';
+                }
+                
+                html += '</div>';
+                return html;
+            }).join('');
         }
     </script>
 </body>
@@ -3337,6 +3366,38 @@ app.get('/api/inspection/priority', async (c) => {
   } catch (error) {
     console.error('Database error:', error)
     return c.json({ storages: [] })
+  }
+})
+
+// ==========================================
+// API: 全点検履歴取得（新しい順）
+// ==========================================
+app.get('/api/inspection/all-history', async (c) => {
+  try {
+    const env = c.env as { DB: D1Database }
+    
+    const result = await env.DB.prepare(`
+      SELECT 
+        hi.id,
+        hi.inspection_date,
+        hi.inspector_name,
+        hi.inspection_result,
+        hi.action_item_1,
+        hi.action_item_2,
+        hi.action_item_3,
+        hi.notes,
+        s.storage_number,
+        s.location
+      FROM hose_inspections hi
+      INNER JOIN hose_storages s ON hi.storage_id = s.id
+      ORDER BY hi.inspection_date DESC
+      LIMIT 200
+    `).all()
+    
+    return c.json({ inspections: result.results || [] })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ inspections: [] })
   }
 })
 
