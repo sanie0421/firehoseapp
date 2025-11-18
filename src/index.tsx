@@ -320,15 +320,56 @@ app.post('/api/water-tanks', async (c) => {
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
     
+    // Google Maps URLから座標を自動抽出
+    let latitude = null
+    let longitude = null
+    
+    if (data.google_maps_url) {
+      try {
+        // 短縮URLの場合は展開
+        if (data.google_maps_url.includes('maps.app.goo.gl') || data.google_maps_url.includes('goo.gl')) {
+          const expandResponse = await fetch(data.google_maps_url, { 
+            method: 'HEAD',
+            redirect: 'follow'
+          })
+          const expandedUrl = expandResponse.url
+          
+          // 展開後のURLから座標を抽出
+          const atMatch = expandedUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+          const qMatch = expandedUrl.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/)
+          
+          if (atMatch) {
+            latitude = parseFloat(atMatch[1])
+            longitude = parseFloat(atMatch[2])
+          } else if (qMatch) {
+            latitude = parseFloat(qMatch[1])
+            longitude = parseFloat(qMatch[2])
+          }
+        } else {
+          // 通常のURLから座標を抽出
+          const atMatch = data.google_maps_url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+          if (atMatch) {
+            latitude = parseFloat(atMatch[1])
+            longitude = parseFloat(atMatch[2])
+          }
+        }
+      } catch (e) {
+        console.error('座標抽出エラー:', e)
+      }
+    }
+    
     await env.DB.prepare(`
       INSERT INTO water_tanks (
-        id, storage_id, location, capacity, notes, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        id, storage_id, location, capacity, google_maps_url, latitude, longitude, notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       data.storage_id,
       data.location,
       data.capacity || null,
+      data.google_maps_url || null,
+      latitude,
+      longitude,
       data.notes || null,
       now,
       now
@@ -349,11 +390,47 @@ app.put('/api/water-tanks/:id', async (c) => {
     const env = c.env as { DB: D1Database }
     const now = new Date().toISOString()
     
+    // Google Maps URLから座標を自動抽出
+    let latitude = null
+    let longitude = null
+    
+    if (data.google_maps_url) {
+      try {
+        if (data.google_maps_url.includes('maps.app.goo.gl') || data.google_maps_url.includes('goo.gl')) {
+          const expandResponse = await fetch(data.google_maps_url, { 
+            method: 'HEAD',
+            redirect: 'follow'
+          })
+          const expandedUrl = expandResponse.url
+          const atMatch = expandedUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+          const qMatch = expandedUrl.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/)
+          if (atMatch) {
+            latitude = parseFloat(atMatch[1])
+            longitude = parseFloat(atMatch[2])
+          } else if (qMatch) {
+            latitude = parseFloat(qMatch[1])
+            longitude = parseFloat(qMatch[2])
+          }
+        } else {
+          const atMatch = data.google_maps_url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+          if (atMatch) {
+            latitude = parseFloat(atMatch[1])
+            longitude = parseFloat(atMatch[2])
+          }
+        }
+      } catch (e) {
+        console.error('座標抽出エラー:', e)
+      }
+    }
+    
     await env.DB.prepare(`
       UPDATE water_tanks SET
         storage_id = ?,
         location = ?,
         capacity = ?,
+        google_maps_url = ?,
+        latitude = ?,
+        longitude = ?,
         notes = ?,
         updated_at = ?
       WHERE id = ?
@@ -361,6 +438,9 @@ app.put('/api/water-tanks/:id', async (c) => {
       data.storage_id,
       data.location,
       data.capacity || null,
+      data.google_maps_url || null,
+      latitude,
+      longitude,
       data.notes || null,
       now,
       id
@@ -2650,6 +2730,12 @@ app.get('/water-tanks', (c) => {
                     </div>
 
                     <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Google Maps URL</label>
+                        <input type="url" id="tankGoogleMapsUrl" placeholder="Google Mapsで共有したリンクを貼り付け" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        <p class="text-xs text-gray-500 mt-1">※位置情報を自動取得します</p>
+                    </div>
+
+                    <div>
                         <label class="block text-sm font-bold text-gray-700 mb-2">備考</label>
                         <textarea id="tankNotes" rows="3" placeholder="その他メモ" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
                     </div>
@@ -2720,6 +2806,7 @@ app.get('/water-tanks', (c) => {
         function showAddTankModal() {
             document.getElementById('tankId').value = '';
             document.getElementById('tankLocation').value = '';
+            document.getElementById('tankGoogleMapsUrl').value = '';
             document.getElementById('tankNotes').value = '';
             document.getElementById('tankModalTitle').textContent = '💧 防火水槽を追加';
             document.getElementById('tankModal').classList.remove('hidden');
@@ -2735,6 +2822,7 @@ app.get('/water-tanks', (c) => {
 
             document.getElementById('tankId').value = tank.id;
             document.getElementById('tankLocation').value = tank.location;
+            document.getElementById('tankGoogleMapsUrl').value = tank.google_maps_url || '';
             document.getElementById('tankNotes').value = tank.notes || '';
             document.getElementById('tankModalTitle').textContent = '✏️ 防火水槽を編集';
             document.getElementById('tankModal').classList.remove('hidden');
@@ -2743,6 +2831,7 @@ app.get('/water-tanks', (c) => {
         async function saveTank() {
             const tankId = document.getElementById('tankId').value;
             const location = document.getElementById('tankLocation').value;
+            const googleMapsUrl = document.getElementById('tankGoogleMapsUrl').value;
 
             if (!location) {
                 alert('設置場所は必須です');
@@ -2753,6 +2842,7 @@ app.get('/water-tanks', (c) => {
                 storage_id: null,
                 location: location,
                 capacity: null,
+                google_maps_url: googleMapsUrl || null,
                 notes: document.getElementById('tankNotes').value || null
             };
 
@@ -2931,11 +3021,69 @@ app.get('/inspection-priority', (c) => {
 
             <!-- 地図タブ -->
             <div id="mapTab" class="p-6 hidden">
+                <!-- フィルタボタン群 -->
+                <div class="mb-6">
+                    <!-- 時間フィルタ -->
+                    <div class="mb-4">
+                        <p class="text-sm font-bold text-gray-700 mb-2">📅 点検時期</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="setTimeFilter('all')" class="filter-btn time-filter-map active px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">すべて</button>
+                            <button onclick="setTimeFilter('under1')" class="filter-btn time-filter-map px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">1年未満</button>
+                            <button onclick="setTimeFilter('1to2')" class="filter-btn time-filter-map px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">1年以上2年未満</button>
+                            <button onclick="setTimeFilter('over2')" class="filter-btn time-filter-map px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">2年以上</button>
+                            <button onclick="setTimeFilter('never')" class="filter-btn time-filter-map px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">未点検</button>
+                        </div>
+                    </div>
+
+                    <!-- 地区フィルタ -->
+                    <div class="mb-4">
+                        <p class="text-sm font-bold text-gray-700 mb-2">📍 地区</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="setDistrictFilter('all')" class="filter-btn district-filter-map active px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">すべて</button>
+                            <button onclick="setDistrictFilter('市場')" class="filter-btn district-filter-map px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">市場</button>
+                            <button onclick="setDistrictFilter('根岸上')" class="filter-btn district-filter-map px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">根岸上</button>
+                            <button onclick="setDistrictFilter('根岸下')" class="filter-btn district-filter-map px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">根岸下</button>
+                            <button onclick="setDistrictFilter('坊村')" class="filter-btn district-filter-map px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">坊村</button>
+                            <button onclick="setDistrictFilter('馬場')" class="filter-btn district-filter-map px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">馬場</button>
+                            <button onclick="setDistrictFilter('宮地')" class="filter-btn district-filter-map px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">宮地</button>
+                        </div>
+                    </div>
+                </div>
+                
                 <div id="allMap"></div>
             </div>
 
             <!-- 全履歴タブ -->
             <div id="historyTab" class="p-6 hidden">
+                <!-- フィルタボタン群 -->
+                <div class="mb-6">
+                    <!-- 時間フィルタ -->
+                    <div class="mb-4">
+                        <p class="text-sm font-bold text-gray-700 mb-2">📅 点検時期</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="setTimeFilter('all')" class="filter-btn time-filter-history active px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">すべて</button>
+                            <button onclick="setTimeFilter('under1')" class="filter-btn time-filter-history px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">1年未満</button>
+                            <button onclick="setTimeFilter('1to2')" class="filter-btn time-filter-history px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">1年以上2年未満</button>
+                            <button onclick="setTimeFilter('over2')" class="filter-btn time-filter-history px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">2年以上</button>
+                            <button onclick="setTimeFilter('never')" class="filter-btn time-filter-history px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">未点検</button>
+                        </div>
+                    </div>
+
+                    <!-- 地区フィルタ -->
+                    <div class="mb-4">
+                        <p class="text-sm font-bold text-gray-700 mb-2">📍 地区</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="setDistrictFilter('all')" class="filter-btn district-filter-history active px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">すべて</button>
+                            <button onclick="setDistrictFilter('市場')" class="filter-btn district-filter-history px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">市場</button>
+                            <button onclick="setDistrictFilter('根岸上')" class="filter-btn district-filter-history px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">根岸上</button>
+                            <button onclick="setDistrictFilter('根岸下')" class="filter-btn district-filter-history px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">根岸下</button>
+                            <button onclick="setDistrictFilter('坊村')" class="filter-btn district-filter-history px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">坊村</button>
+                            <button onclick="setDistrictFilter('馬場')" class="filter-btn district-filter-history px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">馬場</button>
+                            <button onclick="setDistrictFilter('宮地')" class="filter-btn district-filter-history px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm">宮地</button>
+                        </div>
+                    </div>
+                </div>
+                
                 <div id="allHistoryList" class="space-y-4">
                     <p class="text-gray-600 text-center py-8">読み込み中...</p>
                 </div>
@@ -3017,15 +3165,29 @@ app.get('/inspection-priority', (c) => {
 
         function setTimeFilter(filter) {
             currentTimeFilter = filter;
-            document.querySelectorAll('.time-filter').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            // 全タブのフィルタボタンを更新
+            document.querySelectorAll('.time-filter, .time-filter-map, .time-filter-history').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.time-filter, .time-filter-map, .time-filter-history').forEach(btn => {
+                if ((btn.textContent.includes('すべて') && filter === 'all') ||
+                    (btn.textContent.includes('1年未満') && filter === 'under1') ||
+                    (btn.textContent.includes('1年以上2年未満') && filter === '1to2') ||
+                    (btn.textContent.includes('2年以上') && filter === 'over2') ||
+                    (btn.textContent.includes('未点検') && filter === 'never')) {
+                    btn.classList.add('active');
+                }
+            });
             applyFilters();
         }
 
         function setDistrictFilter(filter) {
             currentDistrictFilter = filter;
-            document.querySelectorAll('.district-filter').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            // 全タブのフィルタボタンを更新
+            document.querySelectorAll('.district-filter, .district-filter-map, .district-filter-history').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.district-filter, .district-filter-map, .district-filter-history').forEach(btn => {
+                if (btn.textContent.trim() === filter || (btn.textContent.includes('すべて') && filter === 'all')) {
+                    btn.classList.add('active');
+                }
+            });
             applyFilters();
         }
 
@@ -3060,6 +3222,20 @@ app.get('/inspection-priority', (c) => {
             });
             
             renderStoragesList(filtered);
+            
+            // 地図も更新
+            if (leafletMap) {
+                updateMap(filtered);
+            }
+            
+            // 履歴も更新（格納庫IDで絞り込み）
+            if (allInspections.length > 0) {
+                const filteredStorageIds = filtered.map(s => s.id);
+                const filteredInspections = allInspections.filter(insp => 
+                    filteredStorageIds.some(sid => insp.storage_id === sid)
+                );
+                renderHistoryList(filteredInspections);
+            }
         }
 
         function pinTodayInspection(storageId, event) {
@@ -3150,9 +3326,23 @@ app.get('/inspection-priority', (c) => {
                 ? '<button onclick="unpinStorage(\\\'' + storage.id + '\\', event)" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-xl text-sm font-semibold transition border border-white border-opacity-50 mb-2">❌ 固定解除</button>'
                 : '<button onclick="pinTodayInspection(\\\'' + storage.id + '\\', event)" class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-2 rounded-xl text-sm font-semibold transition border border-white border-opacity-50 mb-2">📌 今日点検する</button>';
             
-            return '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
-                '<div class="text-white">' +
-                    '<div class="flex justify-between items-start mb-4">' +
+            const hasLocation = (storage.latitude && storage.longitude) || storage.google_maps_url;
+            const mapId = 'map-card-' + storage.id;
+            
+            let html = '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
+                '<div class="text-white">';
+            
+            // 画像表示
+            if (storage.image_url) {
+                html += '<div class="mb-4"><img src="' + storage.image_url + '" alt="' + storage.location + '" class="w-full h-48 object-cover rounded-xl"></div>';
+            }
+            
+            // 小地図表示
+            if (hasLocation) {
+                html += '<div id="' + mapId + '" class="storage-map mb-4"></div>';
+            }
+            
+            html += '<div class="flex justify-between items-start mb-4">' +
                         '<div class="flex-1">' +
                             (storage.district ? '<p class="text-lg opacity-90 mb-1">' + storage.district + '</p>' : '') +
                             '<h3 class="text-2xl font-bold">' + storage.storage_number + ' | ' + storage.location + '</h3>' +
@@ -3164,6 +3354,46 @@ app.get('/inspection-priority', (c) => {
                     '<button class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-xl text-base font-semibold transition border border-white border-opacity-50">📝 点検する</button>' +
                 '</div>' +
             '</div>';
+            
+            // 地図初期化（非同期）
+            if (hasLocation) {
+                setTimeout(async () => {
+                    let lat = storage.latitude;
+                    let lon = storage.longitude;
+                    
+                    if (!lat && !lon && storage.google_maps_url) {
+                        const coords = extractCoordsFromGoogleMapsUrl(storage.google_maps_url);
+                        if (coords) {
+                            lat = coords.lat;
+                            lon = coords.lon;
+                        }
+                    }
+                    
+                    if (lat && lon) {
+                        const mapElement = document.getElementById(mapId);
+                        if (mapElement && !mapElement.classList.contains('leaflet-container')) {
+                            try {
+                                const map = L.map(mapId, {
+                                    dragging: false,
+                                    touchZoom: false,
+                                    scrollWheelZoom: false,
+                                    doubleClickZoom: false,
+                                    boxZoom: false,
+                                    keyboard: false,
+                                    zoomControl: false
+                                }).setView([lat, lon], 15);
+                                
+                                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                                L.marker([lat, lon]).addTo(map);
+                            } catch (e) {
+                                console.error('Map init error:', e);
+                            }
+                        }
+                    }
+                }, 500);
+            }
+            
+            return html;
         }
 
         async function loadMap() {
@@ -3174,10 +3404,58 @@ app.get('/inspection-priority', (c) => {
                 return;
             }
 
-            leafletMap = L.map('allMap').setView([36.0, 137.9], 13);
+            leafletMap = L.map('allMap').setView([35.7, 139.75], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(leafletMap);
 
-            for (const storage of allStorages) {
+            // フィルタ適用した格納庫のみ表示
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            let filtered = allStorages.filter(storage => {
+                if (searchTerm) {
+                    const storageNumber = (storage.storage_number || '').toLowerCase();
+                    const location = (storage.location || '').toLowerCase();
+                    const district = (storage.district || '').toLowerCase();
+                    if (!storageNumber.includes(searchTerm) && !location.includes(searchTerm) && !district.includes(searchTerm)) return false;
+                }
+                const daysAgo = storage.days_since_inspection;
+                if (currentTimeFilter === 'under1' && (daysAgo === null || daysAgo >= 365)) return false;
+                if (currentTimeFilter === '1to2' && (daysAgo === null || daysAgo < 365 || daysAgo >= 730)) return false;
+                if (currentTimeFilter === 'over2' && (daysAgo === null || daysAgo < 730)) return false;
+                if (currentTimeFilter === 'never' && daysAgo !== null) return false;
+                if (currentDistrictFilter !== 'all' && storage.district !== currentDistrictFilter) return false;
+                return true;
+            });
+
+            for (const storage of filtered) {
+                let lat = storage.latitude;
+                let lon = storage.longitude;
+                
+                if (!lat && !lon && storage.google_maps_url) {
+                    const coords = extractCoordsFromGoogleMapsUrl(storage.google_maps_url);
+                    if (coords) {
+                        lat = coords.lat;
+                        lon = coords.lon;
+                    }
+                }
+                
+                if (lat && lon) {
+                    const marker = L.marker([lat, lon]).addTo(leafletMap);
+                    marker.bindPopup('<b>' + storage.storage_number + '</b><br>' + storage.location + '<br><a href="/storage/' + storage.id + '" class="text-blue-600 hover:underline">詳細を見る</a>');
+                }
+            }
+        }
+
+        function updateMap(filteredStorages) {
+            if (!leafletMap) return;
+            
+            // 既存のマーカーを全削除
+            leafletMap.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    leafletMap.removeLayer(layer);
+                }
+            });
+            
+            // フィルタされた格納庫のマーカーを再追加
+            for (const storage of filteredStorages) {
                 let lat = storage.latitude;
                 let lon = storage.longitude;
                 
@@ -3379,6 +3657,7 @@ app.get('/api/inspection/all-history', async (c) => {
     const result = await env.DB.prepare(`
       SELECT 
         hi.id,
+        hi.storage_id,
         hi.inspection_date,
         hi.inspector_name,
         hi.inspection_result,
@@ -3387,7 +3666,8 @@ app.get('/api/inspection/all-history', async (c) => {
         hi.action_item_3,
         hi.notes,
         s.storage_number,
-        s.location
+        s.location,
+        s.district
       FROM hose_inspections hi
       INNER JOIN hose_storages s ON hi.storage_id = s.id
       ORDER BY hi.inspection_date DESC
@@ -3415,6 +3695,8 @@ app.get('/water-tank/:id', async (c) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>防火水槽点検 - 活動記録</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
@@ -3425,6 +3707,10 @@ app.get('/water-tank/:id', async (c) => {
             50% { transform: translateY(-20px); }
         }
         .float-animation { animation: float 3s ease-in-out infinite; }
+        #tankMapContainer {
+            height: 600px;
+            border-radius: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -3611,21 +3897,28 @@ app.get('/water-tank/:id', async (c) => {
         // 地図読み込み
         function loadTankMap() {
             const mapContainer = document.getElementById('tankMapContainer');
-            if (!tank || !tank.latitude || !tank.longitude) {
-                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">位置情報が登録されていません</p>';
+            
+            let lat = tank ? tank.latitude : null;
+            let lon = tank ? tank.longitude : null;
+            
+            // Google Maps URLから座標を抽出
+            if (!lat && !lon && tank && tank.google_maps_url) {
+                const atMatch = tank.google_maps_url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+                if (atMatch) {
+                    lat = parseFloat(atMatch[1]);
+                    lon = parseFloat(atMatch[2]);
+                }
+            }
+            
+            if (!lat || !lon) {
+                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">位置情報が登録されていません。防火水槽編集でGoogle Maps URLを追加してください。</p>';
                 return;
             }
 
-            mapContainer.innerHTML = \`
-                <iframe 
-                    width="100%" 
-                    height="400" 
-                    frameborder="0" 
-                    style="border:0; border-radius: 12px;"
-                    src="https://www.google.com/maps?q=\${tank.latitude},\${tank.longitude}&output=embed"
-                    allowfullscreen>
-                </iframe>
-            \`;
+            mapContainer.innerHTML = '';
+            const map = L.map('tankMapContainer').setView([lat, lon], 16);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            L.marker([lat, lon]).addTo(map).bindPopup('<b>' + (tank ? tank.location : '防火水槽') + '</b>').openPopup();
         }
 
         // 全点検履歴表示
