@@ -4920,16 +4920,6 @@ app.get('/storage/:id', async (c) => {
                     <input type="date" id="inspectionDate" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
                 </div>
 
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">✅ 結果 <span class="text-red-500">*</span></label>
-                    <select id="inspectionResult" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
-                        <option value="">選択してください</option>
-                        <option value="normal">正常</option>
-                        <option value="caution">要注意</option>
-                        <option value="abnormal">異常あり</option>
-                    </select>
-                </div>
-
                 <!-- ホース交換数・破損数 -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -4961,18 +4951,24 @@ app.get('/storage/:id', async (c) => {
 
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-3">🚨 要対応事項（あれば）</label>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">要対応事項 1</label>
-                            <textarea id="actionRequired1" rows="3" placeholder="例：格納庫扉の破損" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                    <div class="space-y-4">
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <label class="block text-sm font-bold text-gray-700 mb-2">要対応事項 1</label>
+                            <textarea id="actionRequired1" rows="3" placeholder="例：格納庫扉の破損" class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-2"></textarea>
+                            <label class="block text-xs text-gray-600 mb-1">📷 写真（任意）</label>
+                            <input type="file" id="actionImage1" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                         </div>
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">要対応事項 2</label>
-                            <textarea id="actionRequired2" rows="3" placeholder="例：開栓棒紛失" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <label class="block text-sm font-bold text-gray-700 mb-2">要対応事項 2</label>
+                            <textarea id="actionRequired2" rows="3" placeholder="例：開栓棒紛失" class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-2"></textarea>
+                            <label class="block text-xs text-gray-600 mb-1">📷 写真（任意）</label>
+                            <input type="file" id="actionImage2" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                         </div>
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">要対応事項 3</label>
-                            <textarea id="actionRequired3" rows="3" placeholder="例：周辺草刈り必要" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <label class="block text-sm font-bold text-gray-700 mb-2">要対応事項 3</label>
+                            <textarea id="actionRequired3" rows="3" placeholder="例：周辺草刈り必要" class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-2"></textarea>
+                            <label class="block text-xs text-gray-600 mb-1">📷 写真（任意）</label>
+                            <input type="file" id="actionImage3" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                         </div>
                     </div>
                 </div>
@@ -5527,6 +5523,30 @@ app.get('/storage/:id', async (c) => {
             return imageUrls;
         }
 
+        // 要対応事項の画像をアップロード
+        async function uploadActionItemImage(file, index) {
+            if (!file) return null;
+            
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                const response = await fetch('/api/upload-image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    return result.imageUrl;
+                }
+            } catch (error) {
+                console.error('Action item image upload error:', error);
+            }
+            
+            return null;
+        }
+
         // 点検記録保存（新規作成と編集の両方に対応）
         async function saveInspection() {
             const inspectorName = document.getElementById('inspectorName').value;
@@ -5538,19 +5558,32 @@ app.get('/storage/:id', async (c) => {
             const actionRequired3 = document.getElementById('actionRequired3').value;
             const remarks = document.getElementById('remarks').value;
             
-            // 3つの要対応事項を配列として送信（空でないものだけ）
-            const actionItemsList = [actionRequired1, actionRequired2, actionRequired3].filter(item => item.trim() !== '');
-            
-            // 後方互換性のため、action_requiredも保存（旧形式）
-            const actionRequired = actionItemsList.length > 0 ? actionItemsList.map((item, index) => '[' + (index + 1) + '] ' + item).join('\\n\\n') : null;
-
             if (!inspectorName || !date) {
                 alert('入力者と点検日は必須です');
                 return;
             }
 
-            // 画像アップロード処理
+            // 画像アップロード処理（点検記録の写真）
             const imageUrls = await uploadInspectionImages();
+            
+            // 要対応事項とそれぞれの写真をアップロード
+            const actionItemsWithPhotos = [];
+            for (let i = 1; i <= 3; i++) {
+                const textarea = document.getElementById('actionRequired' + i);
+                const fileInput = document.getElementById('actionImage' + i);
+                const text = textarea.value.trim();
+                
+                if (text) {
+                    let photoUrl = null;
+                    if (fileInput.files && fileInput.files[0]) {
+                        photoUrl = await uploadActionItemImage(fileInput.files[0], i);
+                    }
+                    actionItemsWithPhotos.push({
+                        description: text,
+                        photo_url: photoUrl
+                    });
+                }
+            }
 
             const data = {
                 storage_id: STORAGE_ID,
@@ -5558,8 +5591,7 @@ app.get('/storage/:id', async (c) => {
                 inspection_date: date,
                 hose_replaced_count: hoseReplacedCount,
                 hose_damaged_count: hoseDamagedCount,
-                action_required: actionRequired || null,
-                action_items: actionItemsList,  // 新形式: 配列
+                action_items: actionItemsWithPhotos,
                 remarks: remarks || null,
                 inspector_name: inspectorName,
                 photos: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null
@@ -5749,13 +5781,16 @@ app.post('/api/inspection/record', async (c) => {
     if (data.action_items && Array.isArray(data.action_items)) {
       for (let i = 0; i < data.action_items.length; i++) {
         const item = data.action_items[i]
-        if (item && item.trim() !== '') {
-          // id は INTEGER AUTOINCREMENT なので指定しない
+        // オブジェクト形式 {description, photo_url} または文字列形式に対応
+        const description = typeof item === 'string' ? item : item.description
+        const photoUrl = typeof item === 'object' && item.photo_url ? item.photo_url : null
+        
+        if (description && description.trim() !== '') {
           await env.DB.prepare(`
             INSERT INTO action_items (
-              inspection_id, content, item_order, created_at
-            ) VALUES (?, ?, ?, ?)
-          `).bind(id, item.trim(), i + 1, now).run()
+              inspection_id, content, photo_url, item_order, created_at
+            ) VALUES (?, ?, ?, ?, ?)
+          `).bind(id, description.trim(), photoUrl, i + 1, now).run()
         }
       }
     }
@@ -6078,7 +6113,10 @@ app.get('/action-required', (c) => {
                     '</div>' +
                     '<div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-4">' +
                         '<p class="text-red-800 font-semibold mb-2">🚨 要対応内容:</p>' +
-                        '<p class="text-gray-800">' + item.content + '</p>' +
+                        '<p class="text-gray-800 mb-3">' + item.content + '</p>' +
+                        (item.photo_url ? 
+                            '<img src="' + item.photo_url + '" alt="要対応事項の写真" class="w-full rounded-lg border-2 border-gray-200">' : ''
+                        ) +
                     '</div>' +
                     (function() {
                         if (currentTab === 'pending') {
