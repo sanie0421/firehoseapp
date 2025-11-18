@@ -8234,6 +8234,7 @@ app.get('/stats', (c) => {
 
     <script>
         let logs = [];
+        let hoseChart = null;
 
         window.onload = function() {
             loadStats();
@@ -8519,8 +8520,7 @@ app.get('/stats', (c) => {
         // ==========================================
         // ホース集計機能
         // ==========================================
-        let hoseChart = null;
-
+        
         function initHoseStats() {
             initFiscalYearSelect();
             loadHoseStats();
@@ -8586,7 +8586,19 @@ app.get('/stats', (c) => {
 
         // グラフを更新
         function updateHoseChart(monthlyData) {
-            const ctx = document.getElementById('hoseMonthlyChart').getContext('2d');
+            console.log('updateHoseChart called with data:', monthlyData);
+            
+            const canvas = document.getElementById('hoseMonthlyChart');
+            if (!canvas) {
+                console.error('Canvas element not found: hoseMonthlyChart');
+                return;
+            }
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error('Could not get 2d context from canvas');
+                return;
+            }
             
             if (hoseChart) {
                 hoseChart.destroy();
@@ -8595,6 +8607,10 @@ app.get('/stats', (c) => {
             const labels = monthlyData.map(d => d.month + '月');
             const replacedData = monthlyData.map(d => d.replaced || 0);
             const damagedData = monthlyData.map(d => d.damaged || 0);
+            
+            console.log('Creating chart with labels:', labels);
+            console.log('Replaced data:', replacedData);
+            console.log('Damaged data:', damagedData);
             
             hoseChart = new Chart(ctx, {
                 type: 'bar',
