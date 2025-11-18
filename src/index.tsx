@@ -109,21 +109,21 @@ app.get('/', (c) => {
             </a>
             -->
 
-            <!-- 団員管理 -->
-            <a href="/members" class="card-gradient-4 rounded-2xl shadow-2xl p-6 card-hover">
-                <div class="text-white">
-                    <div class="text-5xl mb-4 text-center">👥</div>
-                    <h2 class="text-xl font-bold mb-2 text-center">団員管理</h2>
-                    <p class="text-center opacity-90 text-sm">団員情報の登録・編集</p>
-                </div>
-            </a>
-
             <!-- 活動集計 -->
             <a href="/stats" class="card-gradient-5 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
                     <div class="text-5xl mb-4 text-center">📊</div>
                     <h2 class="text-xl font-bold mb-2 text-center">活動集計</h2>
                     <p class="text-center opacity-90 text-sm">実績データ・グラフ表示</p>
+                </div>
+            </a>
+
+            <!-- 団員管理 -->
+            <a href="/members" class="card-gradient-4 rounded-2xl shadow-2xl p-6 card-hover">
+                <div class="text-white">
+                    <div class="text-5xl mb-4 text-center">👥</div>
+                    <h2 class="text-xl font-bold mb-2 text-center">団員管理</h2>
+                    <p class="text-center opacity-90 text-sm">団員情報の登録・編集</p>
                 </div>
             </a>
 
