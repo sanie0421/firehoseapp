@@ -5903,7 +5903,7 @@ app.get('/stats', (c) => {
                 <div class="bg-green-50 rounded-2xl p-6 shadow-lg">
                     <div class="text-green-600 text-4xl mb-2">📊</div>
                     <div class="text-3xl font-bold text-green-600 mb-1" id="replacementRate">-</div>
-                    <div class="text-gray-700 font-bold">交換率</div>
+                    <div class="text-gray-700 font-bold">破損率</div>
                 </div>
                 <div class="bg-purple-50 rounded-2xl p-6 shadow-lg">
                     <div class="text-purple-600 text-4xl mb-2">📦</div>
@@ -6263,8 +6263,8 @@ app.get('/stats', (c) => {
                 document.getElementById('totalReplaced').textContent = data.summary.total_replaced + '本';
                 document.getElementById('totalDamaged').textContent = data.summary.total_damaged + '本';
                 
-                const rate = data.summary.total_damaged > 0 
-                    ? Math.round((data.summary.total_replaced / data.summary.total_damaged) * 100) 
+                const rate = data.summary.total_replaced > 0 
+                    ? Math.round((data.summary.total_damaged / data.summary.total_replaced) * 100) 
                     : 0;
                 document.getElementById('replacementRate').textContent = rate + '%';
                 
@@ -6383,7 +6383,7 @@ app.get('/stats', (c) => {
                     [''],
                     ['総交換数', data.summary.total_replaced + '本'],
                     ['総破損数', data.summary.total_damaged + '本'],
-                    ['交換率', (data.summary.total_damaged > 0 ? Math.round((data.summary.total_replaced / data.summary.total_damaged) * 100) : 0) + '%']
+                    ['破損率', (data.summary.total_replaced > 0 ? Math.round((data.summary.total_damaged / data.summary.total_replaced) * 100) : 0) + '%']
                 ];
                 const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
                 XLSX.utils.book_append_sheet(wb, ws1, 'サマリー');
