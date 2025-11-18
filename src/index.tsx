@@ -997,7 +997,7 @@ app.get('/hose', (c) => {
     </div>
 
     <!-- Excel/CSV一括登録モーダル -->
-    <div id="uploadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+    <div id="uploadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
         <div class="min-h-full flex items-start justify-center p-4 py-8">
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
             <div class="flex justify-between items-center mb-6">
@@ -1056,7 +1056,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
     </div>
 
     <!-- 地区一括登録モーダル -->
-    <div id="districtUploadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+    <div id="districtUploadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
         <div class="min-h-full flex items-start justify-center p-4 py-8">
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
             <div class="flex justify-between items-center mb-6">
@@ -1118,7 +1118,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
     </div>
 
     <!-- 格納庫追加/編集モーダル -->
-    <div id="addModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+    <div id="addModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
         <div class="min-h-full flex items-start justify-center p-4 py-8">
             <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-6">
             <div class="flex justify-between items-center mb-6">
@@ -1242,7 +1242,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
     </div>
 
     <!-- ホース格納庫詳細モーダル（地図表示） -->
-    <div id="detailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div id="detailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800" id="detailTitle"></h2>
@@ -2770,7 +2770,7 @@ app.get('/water-tanks', (c) => {
     </div>
 
     <!-- 防火水槽追加・編集モーダル -->
-    <div id="tankModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+    <div id="tankModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
         <div class="min-h-full flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
                 <div class="flex justify-between items-center mb-6">
@@ -4334,7 +4334,7 @@ app.get('/water-tank/:id', async (c) => {
     </div>
 
     <!-- 点検記録モーダル -->
-    <div id="inspectionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+    <div id="inspectionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
         <div class="min-h-full flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
                 <div class="flex justify-between items-center mb-6">
@@ -4900,7 +4900,7 @@ app.get('/storage/:id', async (c) => {
     </div>
 
     <!-- 点検記録モーダル -->
-    <div id="inspectionModal" class="modal-closed fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto">
+    <div id="inspectionModal" class="modal-closed fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-[9999] overflow-y-auto">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 my-4 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">📝 点検を記録</h2>
@@ -5936,7 +5936,7 @@ app.get('/action-required', (c) => {
 
     <!-- 対応完了モーダル -->
     <!-- 対応中にするモーダル -->
-    <div id="inProgressModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+    <div id="inProgressModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
         <div class="min-h-full flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6">🔧 対応中にする</h2>
@@ -5963,7 +5963,7 @@ app.get('/action-required', (c) => {
     </div>
 
     <!-- 対応完了モーダル -->
-    <div id="completeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+    <div id="completeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
         <div class="min-h-full flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6">✅ 対応完了</h2>
@@ -5990,7 +5990,7 @@ app.get('/action-required', (c) => {
     </div>
 
     <!-- 編集モーダル -->
-    <div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+    <div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
         <div class="min-h-full flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6">✏️ 対応内容を編集</h2>
@@ -7012,7 +7012,7 @@ app.get('/logs', (c) => {
     </div>
 
     <!-- 活動記録モーダル -->
-    <div id="activityModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+    <div id="activityModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
         <div class="min-h-full flex items-start justify-center p-4 py-8">
             <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-6 my-8">
                 <div class="flex justify-between items-center mb-6">
@@ -7567,7 +7567,7 @@ app.get('/logs', (c) => {
             const participants = JSON.parse(log.participants || '[]');
             const isApproved = log.approval_status === 'approved';
 
-            const modalContent = '<div class="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto" onclick="hideDetailModal()">' +
+            const modalContent = '<div class="fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto" onclick="hideDetailModal()">' +
                 '<div class="min-h-full flex items-start justify-center p-4 py-8">' +
                     '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full p-6 my-8" onclick="event.stopPropagation()">' +
                         '<div class="flex justify-between items-center mb-6">' +
@@ -7830,7 +7830,7 @@ app.get('/members', (c) => {
     </div>
 
     <!-- 団員追加/編集モーダル -->
-    <div id="memberModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+    <div id="memberModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
         <div class="min-h-full flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
                 <div class="flex justify-between items-center mb-6">
