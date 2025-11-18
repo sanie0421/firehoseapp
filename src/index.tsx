@@ -299,10 +299,16 @@ app.get('/api/water-tanks', async (c) => {
     const result = await env.DB.prepare(`
       SELECT 
         wt.*,
-        s.name as storage_name
+        MAX(wti.inspection_date) as last_inspection_date
       FROM water_tanks wt
-      LEFT JOIN storages s ON wt.storage_id = s.id
-      ORDER BY wt.location
+      LEFT JOIN water_tank_inspections wti ON wt.id = wti.tank_id
+      GROUP BY wt.id
+      ORDER BY 
+        CASE 
+          WHEN MAX(wti.inspection_date) IS NULL THEN 0
+          ELSE 1
+        END,
+        MAX(wti.inspection_date) ASC
     `).all()
     
     return c.json({ tanks: result.results || [] })
@@ -360,8 +366,8 @@ app.post('/api/water-tanks', async (c) => {
     
     await env.DB.prepare(`
       INSERT INTO water_tanks (
-        id, storage_id, location, capacity, google_maps_url, latitude, longitude, notes, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, storage_id, location, capacity, google_maps_url, latitude, longitude, image_url, notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       data.storage_id,
@@ -370,6 +376,7 @@ app.post('/api/water-tanks', async (c) => {
       data.google_maps_url || null,
       latitude,
       longitude,
+      data.image_url || null,
       data.notes || null,
       now,
       now
@@ -431,6 +438,7 @@ app.put('/api/water-tanks/:id', async (c) => {
         google_maps_url = ?,
         latitude = ?,
         longitude = ?,
+        image_url = ?,
         notes = ?,
         updated_at = ?
       WHERE id = ?
@@ -441,6 +449,7 @@ app.put('/api/water-tanks/:id', async (c) => {
       data.google_maps_url || null,
       latitude,
       longitude,
+      data.image_url || null,
       data.notes || null,
       now,
       id
@@ -459,6 +468,12 @@ app.delete('/api/water-tanks/:id', async (c) => {
     const id = c.req.param('id')
     const env = c.env as { DB: D1Database }
     
+    // まず関連する点検記録を削除
+    await env.DB.prepare(`
+      DELETE FROM water_tank_inspections WHERE tank_id = ?
+    `).bind(id).run()
+    
+    // 次に防火水槽を削除
     await env.DB.prepare(`
       DELETE FROM water_tanks WHERE id = ?
     `).bind(id).run()
@@ -466,7 +481,8 @@ app.delete('/api/water-tanks/:id', async (c) => {
     return c.json({ success: true })
   } catch (error) {
     console.error('Database error:', error)
-    return c.json({ success: false }, 500)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return c.json({ success: false, error: errorMessage }, 500)
   }
 })
 
@@ -1753,7 +1769,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             if (map) map.remove();
             
             map = L.map('map').setView([lat, lng], 15);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            L.tileLayer('https://\{s\}.tile.openstreetmap.org/\{z\}/\{x\}/\{y\}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
 
@@ -1964,7 +1980,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
 
             setTimeout(() => {
                 const detailMap = L.map('detailMap').setView([storage.latitude, storage.longitude], 17);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                L.tileLayer('https://\{s\}.tile.openstreetmap.org/\{z\}/\{x\}/\{y\}.png', {
                     attribution: '© OpenStreetMap contributors'
                 }).addTo(detailMap);
                 L.marker([storage.latitude, storage.longitude]).addTo(detailMap);
@@ -2660,6 +2676,8 @@ app.get('/water-tanks', (c) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>防火水槽点検 - 活動記録</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
@@ -2676,6 +2694,15 @@ app.get('/water-tanks', (c) => {
         .tank-card:hover {
             transform: translateY(-8px);
             box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        .filter-btn.active {
+            background-color: #3b82f6;
+            color: white;
+            font-weight: bold;
+        }
+        .custom-marker {
+            background: transparent;
+            border: none;
         }
     </style>
 </head>
@@ -2707,8 +2734,38 @@ app.get('/water-tanks', (c) => {
             </button>
         </div>
 
-        <div id="tanksList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <p class="text-gray-800 text-center py-8 col-span-full">読み込み中...</p>
+        <!-- タブUI -->
+        <div class="bg-white rounded-2xl shadow-lg mb-6">
+            <div class="flex border-b">
+                <button id="tabList" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-blue-500 text-blue-500 whitespace-nowrap">
+                    📝 一覧
+                </button>
+                <button id="tabMap" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                    🗺️ 地図
+                </button>
+                <button id="tabHistory" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                    📋 全履歴
+                </button>
+            </div>
+
+            <!-- 一覧タブ -->
+            <div id="listTab" class="p-6">
+                <div id="tanksList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <p class="text-gray-800 text-center py-8 col-span-full">読み込み中...</p>
+                </div>
+            </div>
+
+            <!-- 地図タブ -->
+            <div id="mapTab" class="p-6 hidden">
+                <div id="tanksMap" style="height: 600px; border-radius: 1rem;"></div>
+            </div>
+
+            <!-- 全履歴タブ -->
+            <div id="historyTab" class="p-6 hidden">
+                <div id="tanksHistoryList" class="space-y-4">
+                    <p class="text-gray-600 text-center py-8">読み込み中...</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2736,16 +2793,34 @@ app.get('/water-tanks', (c) => {
                     </div>
 
                     <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">📷 防火水槽の写真（任意）</label>
+                        <input type="file" id="tankImage" accept="image/*" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        <p class="text-xs text-gray-500 mt-1">💡 防火水槽の外観や状況の写真をアップロードできます</p>
+                        <input type="hidden" id="tankImageUrl" value="">
+                        <div id="tankImagePreview" class="hidden mt-4">
+                            <img id="tankImagePreviewImg" src="" alt="プレビュー" class="w-full h-48 object-cover rounded-lg">
+                            <button type="button" id="clearTankImageBtn" class="mt-2 text-red-500 hover:text-red-700 text-sm">
+                                🗑️ 画像を削除
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
                         <label class="block text-sm font-bold text-gray-700 mb-2">備考</label>
                         <textarea id="tankNotes" rows="3" placeholder="その他メモ" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
                     </div>
 
-                    <div class="flex space-x-3 pt-4">
-                        <button type="button" onclick="saveTank()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
-                            ✅ 保存する
-                        </button>
-                        <button type="button" onclick="hideTankModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
-                            キャンセル
+                    <div class="flex flex-col gap-3 pt-4">
+                        <div class="flex space-x-3">
+                            <button type="button" onclick="saveTank()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
+                                ✅ 保存する
+                            </button>
+                            <button type="button" onclick="hideTankModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
+                                キャンセル
+                            </button>
+                        </div>
+                        <button type="button" id="deleteTankBtn" onclick="deleteTank()" class="hidden w-full bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl transition font-bold">
+                            🗑️ この防火水槽を削除
                         </button>
                     </div>
                 </div>
@@ -2755,20 +2830,91 @@ app.get('/water-tanks', (c) => {
 
     <script>
         let tanks = [];
+        let allInspections = [];
+        let tanksMap = null;
+        
         window.onload = function() {
             loadTanks();
+            setupTabs();
+            
+            // URLパラメータで編集モードチェック
+            const urlParams = new URLSearchParams(window.location.search);
+            const editId = urlParams.get('edit');
+            if (editId) {
+                // データ読み込み後に編集モーダルを開く
+                setTimeout(() => editTank(editId), 500);
+            }
+            
+            // 画像プレビュー
+            const tankImageInput = document.getElementById('tankImage');
+            if (tankImageInput) {
+                tankImageInput.addEventListener('change', previewTankImage);
+            }
+            
+            // 画像削除ボタン
+            const clearTankImageBtn = document.getElementById('clearTankImageBtn');
+            if (clearTankImageBtn) {
+                clearTankImageBtn.addEventListener('click', clearTankImage);
+            }
         };
+
+        function setupTabs() {
+            document.getElementById('tabList').addEventListener('click', () => switchTab('list'));
+            document.getElementById('tabMap').addEventListener('click', () => switchTab('map'));
+            document.getElementById('tabHistory').addEventListener('click', () => switchTab('history'));
+        }
+
+        function switchTab(tabName) {
+            const tabs = ['tabList', 'tabMap', 'tabHistory'];
+            const contents = ['listTab', 'mapTab', 'historyTab'];
+
+            tabs.forEach((tab, i) => {
+                const btn = document.getElementById(tab);
+                const content = document.getElementById(contents[i]);
+                
+                if (contents[i] === tabName + 'Tab') {
+                    btn.classList.add('border-blue-500', 'text-blue-500');
+                    btn.classList.remove('border-transparent', 'text-gray-500');
+                    content.classList.remove('hidden');
+                    
+                    if (tabName === 'map' && !tanksMap) {
+                        loadTanksMap();
+                    } else if (tabName === 'history' && allInspections.length === 0) {
+                        loadTanksHistory();
+                    }
+                } else {
+                    btn.classList.remove('border-blue-500', 'text-blue-500');
+                    btn.classList.add('border-transparent', 'text-gray-500');
+                    content.classList.add('hidden');
+                }
+            });
+        }
 
         async function loadTanks() {
             try {
+                console.log('Loading tanks...');
                 const response = await fetch('/api/water-tanks');
+                console.log('Response status:', response.status);
                 const data = await response.json();
+                console.log('Data:', data);
                 tanks = data.tanks || [];
+                console.log('Tanks count:', tanks.length);
                 displayTanks();
+                console.log('displayTanks() called');
             } catch (error) {
                 console.error('Failed to load tanks:', error);
                 document.getElementById('tanksList').innerHTML = '<p class="text-red-600 text-center py-8 col-span-full">読み込みに失敗しました</p>';
             }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         }
 
         function displayTanks() {
@@ -2779,36 +2925,78 @@ app.get('/water-tanks', (c) => {
                 return;
             }
 
-            container.innerHTML = tanks.map(tank => {
-                return \`
-                    <div class="bg-white rounded-2xl shadow-lg p-6 tank-card cursor-pointer" onclick="goToTankDetail('\${tank.id}')">
-                        <div class="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 class="text-xl font-bold text-gray-800 mb-2">💧 \${tank.location}</h3>
-                            </div>
-                            <button onclick="event.stopPropagation(); editTank('\${tank.id}')" class="text-blue-600 hover:text-blue-800 text-2xl">
-                                ✏️
-                            </button>
-                        </div>
-                        
-                        \${tank.notes ? \`<p class="text-sm text-gray-600 line-clamp-2 mb-4">📝 \${tank.notes}</p>\` : ''}
-                        
-                        <div class="mt-4 pt-4 border-t border-gray-200">
-                            <button onclick="event.stopPropagation(); goToTankDetail('\${tank.id}')" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-3 rounded-lg transition font-bold">
-                                点検記録を見る →
-                            </button>
-                        </div>
-                    </div>
-                \`;
-            }).join('');
+            const cards = [];
+            for (let i = 0; i < tanks.length; i++) {
+                const tank = tanks[i];
+                const hasLocation = (tank.latitude && tank.longitude) || tank.google_maps_url;
+                const mapId = 'tank-map-' + tank.id;
+                
+                let imageHtml = '';
+                if (tank.image_url) {
+                    imageHtml = '<img src="' + escapeHtml(tank.image_url) + '" alt="防火水槽の写真" class="w-full h-48 object-cover rounded-lg mb-4">';
+                }
+                
+                let miniMapHtml = '';
+                if (hasLocation) {
+                    miniMapHtml = '<div id="' + mapId + '" class="tank-mini-map mb-4" style="height: 200px; border-radius: 0.5rem;"></div>';
+                }
+                
+                let inspectionDateHtml = '';
+                if (tank.last_inspection_date) {
+                    inspectionDateHtml = '<p class="text-sm text-gray-600 mb-2">📅 最終点検: ' + escapeHtml(tank.last_inspection_date) + '</p>';
+                } else {
+                    inspectionDateHtml = '<p class="text-sm text-red-600 mb-2">⚠️ 未点検</p>';
+                }
+                
+                let notesHtml = '';
+                if (tank.notes) {
+                    notesHtml = '<p class="text-sm text-gray-600 line-clamp-2 mb-4">📝 ' + escapeHtml(tank.notes) + '</p>';
+                }
+                
+                const card = '<div class="bg-white rounded-2xl shadow-lg p-6 tank-card cursor-pointer" onclick="goToTankDetail(\\'' + tank.id + '\\')">' +
+                    '<div class="flex justify-between items-start mb-4">' +
+                        '<div>' +
+                            '<h3 class="text-xl font-bold text-gray-800 mb-2">💧 ' + escapeHtml(tank.location) + '</h3>' +
+                        '</div>' +
+                        '<button onclick="event.stopPropagation(); editTank(\\'' + tank.id + '\\')" class="text-blue-600 hover:text-blue-800 text-2xl">' +
+                            '✏️' +
+                        '</button>' +
+                    '</div>' +
+                    imageHtml +
+                    miniMapHtml +
+                    inspectionDateHtml +
+                    notesHtml +
+                    '<div class="mt-4 pt-4 border-t border-gray-200">' +
+                        '<button onclick="event.stopPropagation(); goToTankDetail(\\'' + tank.id + '\\')" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg transition font-bold">' +
+                            '点検する' +
+                        '</button>' +
+                    '</div>' +
+                '</div>';
+                
+                cards.push(card);
+            }
+            
+            container.innerHTML = cards.join('');
+            
+            // 小地図を初期化
+            for (let i = 0; i < tanks.length; i++) {
+                const tank = tanks[i];
+                if ((tank.latitude && tank.longitude) || tank.google_maps_url) {
+                    setTimeout(function() { initTankMiniMap(tank); }, 100);
+                }
+            }
         }
 
         function showAddTankModal() {
             document.getElementById('tankId').value = '';
             document.getElementById('tankLocation').value = '';
             document.getElementById('tankGoogleMapsUrl').value = '';
+            document.getElementById('tankImage').value = '';
+            document.getElementById('tankImageUrl').value = '';
             document.getElementById('tankNotes').value = '';
+            document.getElementById('tankImagePreview').classList.add('hidden');
             document.getElementById('tankModalTitle').textContent = '💧 防火水槽を追加';
+            document.getElementById('deleteTankBtn').classList.add('hidden');
             document.getElementById('tankModal').classList.remove('hidden');
         }
 
@@ -2823,8 +3011,18 @@ app.get('/water-tanks', (c) => {
             document.getElementById('tankId').value = tank.id;
             document.getElementById('tankLocation').value = tank.location;
             document.getElementById('tankGoogleMapsUrl').value = tank.google_maps_url || '';
+            document.getElementById('tankImageUrl').value = tank.image_url || '';
             document.getElementById('tankNotes').value = tank.notes || '';
+            
+            if (tank.image_url) {
+                document.getElementById('tankImagePreviewImg').src = tank.image_url;
+                document.getElementById('tankImagePreview').classList.remove('hidden');
+            } else {
+                document.getElementById('tankImagePreview').classList.add('hidden');
+            }
+            
             document.getElementById('tankModalTitle').textContent = '✏️ 防火水槽を編集';
+            document.getElementById('deleteTankBtn').classList.remove('hidden');
             document.getElementById('tankModal').classList.remove('hidden');
         }
 
@@ -2838,16 +3036,20 @@ app.get('/water-tanks', (c) => {
                 return;
             }
 
+            // 画像をアップロード
+            const imageUrl = await uploadTankImage();
+
             const data = {
                 storage_id: null,
                 location: location,
                 capacity: null,
                 google_maps_url: googleMapsUrl || null,
+                image_url: imageUrl || null,
                 notes: document.getElementById('tankNotes').value || null
             };
 
             try {
-                const url = tankId ? \`/api/water-tanks/\${tankId}\` : '/api/water-tanks';
+                const url = tankId ? '/api/water-tanks/' + tankId : '/api/water-tanks';
                 const method = tankId ? 'PUT' : 'POST';
 
                 const response = await fetch(url, {
@@ -2870,6 +3072,280 @@ app.get('/water-tanks', (c) => {
 
         function goToTankDetail(tankId) {
             location.href = '/water-tank/' + tankId;
+        }
+
+        async function deleteTank() {
+            const tankId = document.getElementById('tankId').value;
+            if (!tankId) return;
+
+            const tank = tanks.find(t => t.id === tankId);
+            if (!tank) return;
+
+            if (!confirm('「' + tank.location + '」を本当に削除しますか？\\\\n\\\\nこの操作は取り消せません。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/water-tanks/' + tankId, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert('削除しました');
+                    hideTankModal();
+                    loadTanks();
+                } else {
+                    alert('削除に失敗しました');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('削除中にエラーが発生しました');
+            }
+        }
+
+        // 画像プレビュー
+        function previewTankImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('tankImagePreviewImg').src = e.target.result;
+                    document.getElementById('tankImagePreview').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // 画像クリア
+        function clearTankImage() {
+            document.getElementById('tankImage').value = '';
+            document.getElementById('tankImageUrl').value = '';
+            document.getElementById('tankImagePreview').classList.add('hidden');
+        }
+
+        // 画像アップロード処理
+        async function uploadTankImage() {
+            const fileInput = document.getElementById('tankImage');
+            if (!fileInput.files || !fileInput.files[0]) {
+                return document.getElementById('tankImageUrl').value || null;
+            }
+
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/api/upload-image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    return result.imageUrl;
+                } else {
+                    console.error('Image upload failed');
+                    return null;
+                }
+            } catch (error) {
+                console.error('Image upload error:', error);
+                return null;
+            }
+        }
+
+        function extractCoordsFromGoogleMapsUrl(url) {
+            try {
+                const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+                if (atMatch) return { lat: parseFloat(atMatch[1]), lon: parseFloat(atMatch[2]) };
+                const qMatch = url.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+                if (qMatch) return { lat: parseFloat(qMatch[1]), lon: parseFloat(qMatch[2]) };
+            } catch (e) {
+                console.error('座標抽出エラー:', e);
+            }
+            return null;
+        }
+
+        // 小地図初期化
+        function initTankMiniMap(tank) {
+            const mapId = 'tank-map-' + tank.id;
+            const mapElement = document.getElementById(mapId);
+            if (!mapElement) return;
+
+            let lat = tank.latitude;
+            let lon = tank.longitude;
+
+            if (!lat && !lon && tank.google_maps_url) {
+                const coords = extractCoordsFromGoogleMapsUrl(tank.google_maps_url);
+                if (coords) {
+                    lat = coords.lat;
+                    lon = coords.lon;
+                }
+            }
+
+            if (lat && lon) {
+                const miniMap = L.map(mapId, {
+                    zoomControl: false,
+                    dragging: false,
+                    scrollWheelZoom: false,
+                    doubleClickZoom: false,
+                    boxZoom: false,
+                    keyboard: false
+                }).setView([lat, lon], 15);
+
+                L.tileLayer('https://\{s\}.tile.openstreetmap.org/\{z\}/\{x\}/\{y\}.png').addTo(miniMap);
+
+                L.marker([lat, lon], {
+                    icon: L.divIcon({
+                        className: 'custom-marker',
+                        html: '<div style="background-color: #3b82f6; width: 25px; height: 25px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+                        iconSize: [25, 25],
+                        iconAnchor: [12, 24]
+                    })
+                }).addTo(miniMap);
+
+                // 地図をクリックしたらGoogle Mapsで開く
+                if (tank.google_maps_url) {
+                    mapElement.style.cursor = 'pointer';
+                    mapElement.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        window.open(tank.google_maps_url, '_blank');
+                    });
+                }
+            }
+        }
+
+        async function loadTanksMap() {
+            const mapContainer = document.getElementById('tanksMap');
+            
+            if (tanks.length === 0) {
+                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">防火水槽データがありません</p>';
+                return;
+            }
+
+            tanksMap = L.map('tanksMap').setView([35.325, 139.157], 14);
+            L.tileLayer('https://\{s\}.tile.openstreetmap.org/\{z\}/\{x\}/\{y\}.png').addTo(tanksMap);
+
+            const bounds = [];
+
+            for (const tank of tanks) {
+                let lat = tank.latitude;
+                let lon = tank.longitude;
+                
+                if (!lat && !lon && tank.google_maps_url) {
+                    const coords = extractCoordsFromGoogleMapsUrl(tank.google_maps_url);
+                    if (coords) {
+                        lat = coords.lat;
+                        lon = coords.lon;
+                    }
+                }
+                
+                if (lat && lon) {
+                    const marker = L.marker([lat, lon], {
+                        icon: L.divIcon({
+                            className: 'custom-marker',
+                            html: '<div style="background-color: #3b82f6; width: 25px; height: 25px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+                            iconSize: [25, 25],
+                            iconAnchor: [12, 24]
+                        })
+                    }).addTo(tanksMap);
+                    
+                    marker.bindPopup('<b>💧 ' + tank.location + '</b><br><a href="/water-tank/' + tank.id + '" class="text-blue-600 hover:underline">詳細を見る</a>');
+                    bounds.push([lat, lon]);
+                }
+            }
+            
+            if (bounds.length > 0) {
+                tanksMap.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+
+        async function loadTanksHistory() {
+            try {
+                const response = await fetch('/api/water-tank-inspections');
+                const data = await response.json();
+                allInspections = data.inspections || [];
+                renderTanksHistory();
+            } catch (error) {
+                document.getElementById('tanksHistoryList').innerHTML = 
+                    '<p class="text-gray-600 text-center py-8">履歴の読み込みに失敗しました</p>';
+                console.error(error);
+            }
+        }
+
+        function renderTanksHistory() {
+            const container = document.getElementById('tanksHistoryList');
+            
+            if (allInspections.length === 0) {
+                container.innerHTML = '<p class="text-gray-600 text-center py-8">点検履歴がありません</p>';
+                return;
+            }
+
+            container.innerHTML = allInspections.map(inspection => {
+                const tank = tanks.find(t => t.id === inspection.tank_id);
+                const tankName = tank ? tank.location : '不明';
+                const hasActionItems = inspection.action_item_1 || inspection.action_item_2 || inspection.action_item_3;
+                
+                let html = '<div class="bg-white rounded-lg border-2 border-gray-200 p-4">' +
+                    '<div class="flex justify-between items-start">' +
+                        '<div>' +
+                            '<h4 class="text-lg font-bold text-gray-800">📅 ' + inspection.inspection_date + '</h4>' +
+                            '<p class="text-gray-600">💧 ' + tankName + '</p>' +
+                            '<p class="text-gray-600">👤 点検者: ' + inspection.inspector_name + '</p>' +
+                        '</div>' +
+                        '<div class="flex gap-2">' +
+                            '<button onclick="editTankInspection(\\'' + inspection.id + '\\')" class="text-blue-600 hover:text-blue-800 text-xl">✏️</button>' +
+                            '<button onclick="deleteTankInspection(\\'' + inspection.id + '\\')" class="text-red-600 hover:text-red-800 text-xl">🗑️</button>' +
+                        '</div>' +
+                    '</div>';
+                
+                if (hasActionItems) {
+                    html += '<div class="mt-3 bg-yellow-50 border border-yellow-200 rounded p-3">' +
+                        '<p class="font-bold text-sm text-gray-800 mb-1">⚠️ 要対応事項</p>';
+                    if (inspection.action_item_1) html += '<p class="text-sm text-gray-700">① ' + inspection.action_item_1 + '</p>';
+                    if (inspection.action_item_2) html += '<p class="text-sm text-gray-700">② ' + inspection.action_item_2 + '</p>';
+                    if (inspection.action_item_3) html += '<p class="text-sm text-gray-700">③ ' + inspection.action_item_3 + '</p>';
+                    html += '</div>';
+                }
+                
+                if (inspection.notes) {
+                    html += '<p class="text-sm text-gray-600 mt-2">📝 ' + inspection.notes + '</p>';
+                }
+                
+                html += '</div>';
+                return html;
+            }).join('');
+        }
+        
+        async function editTankInspection(inspectionId) {
+            const inspection = allInspections.find(i => i.id === inspectionId);
+            if (!inspection || !inspection.tank_id) {
+                alert('点検記録が見つかりません');
+                return;
+            }
+            // 防火水槽の詳細ページに遷移
+            location.href = '/water-tank/' + inspection.tank_id + '?edit=' + inspectionId;
+        }
+        
+        async function deleteTankInspection(inspectionId) {
+            if (!confirm('この点検記録を削除しますか？\\n\\nこの操作は取り消せません。')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/water-tank-inspections/' + inspectionId, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('削除しました');
+                    // 履歴を再読み込み
+                    await loadTanksHistory();
+                } else {
+                    alert('削除に失敗しました');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('削除中にエラーが発生しました');
+            }
         }
     </script>
 </body>
@@ -2926,6 +3402,10 @@ app.get('/inspection-priority', (c) => {
             color: white;
             font-weight: bold;
         }
+        .custom-marker {
+            background: transparent;
+            border: none;
+        }
     </style>
 </head>
 <body>
@@ -2968,13 +3448,13 @@ app.get('/inspection-priority', (c) => {
         <!-- タブUI -->
         <div class="bg-white rounded-2xl shadow-lg mb-6">
             <div class="flex border-b">
-                <button id="tabPriority" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-red-500 text-red-500">
+                <button id="tabPriority" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-red-500 text-red-500 whitespace-nowrap">
                     ⚠️ 優先度
                 </button>
-                <button id="tabMap" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                <button id="tabMap" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                     🗺️ 地図
                 </button>
-                <button id="tabHistory" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                <button id="tabHistory" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                     📋 全履歴
                 </button>
             </div>
@@ -3050,7 +3530,38 @@ app.get('/inspection-priority', (c) => {
                     </div>
                 </div>
                 
-                <div id="allMap"></div>
+                <div id="allMap" class="mb-4"></div>
+                
+                <!-- 凡例 -->
+                <div class="bg-white rounded-xl p-4 shadow-lg">
+                    <p class="text-sm font-bold text-gray-700 mb-2">📍 地区</p>
+                    <div class="flex flex-wrap gap-3">
+                        <div class="flex items-center gap-2">
+                            <div style="background-color: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>
+                            <span class="text-sm text-gray-700">市場</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div style="background-color: #f97316; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>
+                            <span class="text-sm text-gray-700">根岸上</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div style="background-color: #eab308; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>
+                            <span class="text-sm text-gray-700">根岸下</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div style="background-color: #22c55e; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>
+                            <span class="text-sm text-gray-700">坊村</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div style="background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>
+                            <span class="text-sm text-gray-700">馬場</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div style="background-color: #a855f7; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>
+                            <span class="text-sm text-gray-700">宮地</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- 全履歴タブ -->
@@ -3148,6 +3659,29 @@ app.get('/inspection-priority', (c) => {
                 console.error('座標抽出エラー:', e);
             }
             return null;
+        }
+        
+        function getDistrictColor(district) {
+            const colors = {
+                '市場': '#ef4444',      // 赤
+                '根岸上': '#f97316',    // オレンジ
+                '根岸下': '#eab308',    // 黄
+                '坊村': '#22c55e',      // 緑
+                '馬場': '#3b82f6',      // 青
+                '宮地': '#a855f7'       // 紫
+            };
+            return colors[district] || '#6b7280';  // デフォルトはグレー
+        }
+        
+        function createColoredMarker(lat, lon, district) {
+            const color = getDistrictColor(district);
+            const icon = L.divIcon({
+                className: 'custom-marker',
+                html: '<div style="background-color: ' + color + '; width: 25px; height: 25px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+                iconSize: [25, 25],
+                iconAnchor: [12, 24]
+            });
+            return L.marker([lat, lon], { icon: icon });
         }
 
         async function loadAllData() {
@@ -3383,7 +3917,7 @@ app.get('/inspection-priority', (c) => {
                                     zoomControl: false
                                 }).setView([lat, lon], 15);
                                 
-                                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                                L.tileLayer('https://\{s\}.tile.openstreetmap.org/\{z\}/\{x\}/\{y\}.png').addTo(map);
                                 L.marker([lat, lon]).addTo(map);
                             } catch (e) {
                                 console.error('Map init error:', e);
@@ -3404,8 +3938,8 @@ app.get('/inspection-priority', (c) => {
                 return;
             }
 
-            leafletMap = L.map('allMap').setView([35.7, 139.75], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(leafletMap);
+            leafletMap = L.map('allMap').setView([35.325, 139.157], 14);
+            L.tileLayer('https://\{s\}.tile.openstreetmap.org/\{z\}/\{x\}/\{y\}.png').addTo(leafletMap);
 
             // フィルタ適用した格納庫のみ表示
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -3425,6 +3959,8 @@ app.get('/inspection-priority', (c) => {
                 return true;
             });
 
+            const bounds = [];
+
             for (const storage of filtered) {
                 let lat = storage.latitude;
                 let lon = storage.longitude;
@@ -3438,9 +3974,16 @@ app.get('/inspection-priority', (c) => {
                 }
                 
                 if (lat && lon) {
-                    const marker = L.marker([lat, lon]).addTo(leafletMap);
-                    marker.bindPopup('<b>' + storage.storage_number + '</b><br>' + storage.location + '<br><a href="/storage/' + storage.id + '" class="text-blue-600 hover:underline">詳細を見る</a>');
+                    const marker = createColoredMarker(lat, lon, storage.district);
+                    marker.addTo(leafletMap);
+                    marker.bindPopup('<b>' + storage.storage_number + '</b><br>' + (storage.district ? storage.district + ' - ' : '') + storage.location + '<br><a href="/storage/' + storage.id + '" class="text-blue-600 hover:underline">詳細を見る</a>');
+                    bounds.push([lat, lon]);
                 }
+            }
+            
+            // 全てのマーカーが見えるように地図を調整
+            if (bounds.length > 0) {
+                leafletMap.fitBounds(bounds, { padding: [50, 50] });
             }
         }
 
@@ -3453,6 +3996,8 @@ app.get('/inspection-priority', (c) => {
                     leafletMap.removeLayer(layer);
                 }
             });
+            
+            const bounds = [];
             
             // フィルタされた格納庫のマーカーを再追加
             for (const storage of filteredStorages) {
@@ -3468,9 +4013,16 @@ app.get('/inspection-priority', (c) => {
                 }
                 
                 if (lat && lon) {
-                    const marker = L.marker([lat, lon]).addTo(leafletMap);
-                    marker.bindPopup('<b>' + storage.storage_number + '</b><br>' + storage.location + '<br><a href="/storage/' + storage.id + '" class="text-blue-600 hover:underline">詳細を見る</a>');
+                    const marker = createColoredMarker(lat, lon, storage.district);
+                    marker.addTo(leafletMap);
+                    marker.bindPopup('<b>' + storage.storage_number + '</b><br>' + (storage.district ? storage.district + ' - ' : '') + storage.location + '<br><a href="/storage/' + storage.id + '" class="text-blue-600 hover:underline">詳細を見る</a>');
+                    bounds.push([lat, lon]);
                 }
+            }
+            
+            // 全てのマーカーが見えるように地図を調整
+            if (bounds.length > 0) {
+                leafletMap.fitBounds(bounds, { padding: [50, 50] });
             }
         }
 
@@ -3479,16 +4031,18 @@ app.get('/inspection-priority', (c) => {
                 const response = await fetch('/api/inspection/all-history');
                 const data = await response.json();
                 allInspections = data.inspections || [];
+                console.log('Loaded inspections:', allInspections.length);
                 renderHistoryList(allInspections);
             } catch (error) {
                 document.getElementById('allHistoryList').innerHTML = 
                     '<p class="text-gray-600 text-center py-8">履歴の読み込みに失敗しました</p>';
-                console.error(error);
+                console.error('History load error:', error);
             }
         }
 
         function renderHistoryList(inspections) {
             const container = document.getElementById('allHistoryList');
+            console.log('Rendering history list:', inspections.length, 'items');
             
             if (inspections.length === 0) {
                 container.innerHTML = '<p class="text-gray-600 text-center py-8">点検履歴がありません</p>';
@@ -3738,13 +4292,13 @@ app.get('/water-tank/:id', async (c) => {
 
         <div class="bg-white rounded-2xl shadow-lg mb-6">
             <div class="flex border-b">
-                <button id="tankTabRecord" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-blue-500 text-blue-500">
+                <button id="tankTabRecord" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-blue-500 text-blue-500 whitespace-nowrap">
                     📝 点検記録
                 </button>
-                <button id="tankTabMap" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                <button id="tankTabMap" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                     🗺️ 地図
                 </button>
-                <button id="tankTabHistory" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                <button id="tankTabHistory" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                     📋 全履歴
                 </button>
             </div>
@@ -3854,6 +4408,14 @@ app.get('/water-tank/:id', async (c) => {
             document.getElementById('tankTabRecord').addEventListener('click', () => switchTankTab('record'));
             document.getElementById('tankTabMap').addEventListener('click', () => switchTankTab('map'));
             document.getElementById('tankTabHistory').addEventListener('click', () => switchTankTab('history'));
+            
+            // URLパラメータで編集モードチェック
+            const urlParams = new URLSearchParams(window.location.search);
+            const editId = urlParams.get('edit');
+            if (editId) {
+                // データ読み込み後に編集モーダルを開く
+                setTimeout(() => editInspection(editId), 1000);
+            }
         };
 
         // タブ切り替え
@@ -3917,7 +4479,7 @@ app.get('/water-tank/:id', async (c) => {
 
             mapContainer.innerHTML = '';
             const map = L.map('tankMapContainer').setView([lat, lon], 16);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            L.tileLayer('https://\{s\}.tile.openstreetmap.org/\{z\}/\{x\}/\{y\}.png').addTo(map);
             L.marker([lat, lon]).addTo(map).bindPopup('<b>' + (tank ? tank.location : '防火水槽') + '</b>').openPopup();
         }
 
@@ -3930,6 +4492,22 @@ app.get('/water-tank/:id', async (c) => {
             }
             container.innerHTML = inspections.map(inspection => {
                 const hasActionItems = inspection.action_item_1 || inspection.action_item_2 || inspection.action_item_3;
+                
+                let actionItemsHtml = '';
+                if (hasActionItems) {
+                    actionItemsHtml = '<div class="mt-3 bg-yellow-50 border border-yellow-200 rounded p-3">' +
+                        '<p class="font-bold text-sm text-gray-800 mb-1">⚠️ 要対応事項</p>';
+                    if (inspection.action_item_1) actionItemsHtml += '<p class="text-sm text-gray-700">① ' + inspection.action_item_1 + '</p>';
+                    if (inspection.action_item_2) actionItemsHtml += '<p class="text-sm text-gray-700">② ' + inspection.action_item_2 + '</p>';
+                    if (inspection.action_item_3) actionItemsHtml += '<p class="text-sm text-gray-700">③ ' + inspection.action_item_3 + '</p>';
+                    actionItemsHtml += '</div>';
+                }
+                
+                let notesHtml = '';
+                if (inspection.notes) {
+                    notesHtml = '<p class="text-sm text-gray-600 mt-2">📝 ' + inspection.notes + '</p>';
+                }
+                
                 return \`
                     <div class="bg-white rounded-lg border-2 border-gray-200 p-4">
                         <div class="flex justify-between items-start">
@@ -3937,19 +4515,54 @@ app.get('/water-tank/:id', async (c) => {
                                 <h4 class="text-lg font-bold text-gray-800">📅 \${inspection.inspection_date}</h4>
                                 <p class="text-gray-600">👤 点検者: \${inspection.inspector_name}</p>
                             </div>
-                        </div>
-                        \${hasActionItems ? \`
-                            <div class="mt-3 bg-yellow-50 border border-yellow-200 rounded p-3">
-                                <p class="font-bold text-sm text-gray-800 mb-1">⚠️ 要対応事項</p>
-                                \${inspection.action_item_1 ? \`<p class="text-sm text-gray-700">① \${inspection.action_item_1}</p>\` : ''}
-                                \${inspection.action_item_2 ? \`<p class="text-sm text-gray-700">② \${inspection.action_item_2}</p>\` : ''}
-                                \${inspection.action_item_3 ? \`<p class="text-sm text-gray-700">③ \${inspection.action_item_3}</p>\` : ''}
+                            <div class="flex gap-2">
+                                <button onclick="editInspection('\${inspection.id}')" class="text-blue-600 hover:text-blue-800 text-xl">✏️</button>
+                                <button onclick="deleteInspection('\${inspection.id}')" class="text-red-600 hover:text-red-800 text-xl">🗑️</button>
                             </div>
-                        \` : ''}
-                        \${inspection.notes ? \`<p class="text-sm text-gray-600 mt-2">📝 \${inspection.notes}</p>\` : ''}
+                        </div>
+                        \${actionItemsHtml}
+                        \${notesHtml}
                     </div>
                 \`;
             }).join('');
+        }
+        
+        function editInspection(inspectionId) {
+            const inspection = inspections.find(i => i.id === inspectionId);
+            if (!inspection) return;
+            
+            document.getElementById('inspectionId').value = inspection.id;
+            document.getElementById('inspectionDate').value = inspection.inspection_date;
+            document.getElementById('inspectorName').value = inspection.inspector_name;
+            document.getElementById('actionItem1').value = inspection.action_item_1 || '';
+            document.getElementById('actionItem2').value = inspection.action_item_2 || '';
+            document.getElementById('actionItem3').value = inspection.action_item_3 || '';
+            document.getElementById('inspectionNotes').value = inspection.notes || '';
+            
+            document.getElementById('inspectionModalTitle').textContent = '✏️ 点検記録を編集';
+            document.getElementById('inspectionModal').classList.remove('hidden');
+        }
+        
+        async function deleteInspection(inspectionId) {
+            if (!confirm('この点検記録を削除しますか？\\n\\nこの操作は取り消せません。')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/water-tank-inspections/' + inspectionId, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('削除しました');
+                    await loadInspections();
+                } else {
+                    alert('削除に失敗しました');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('削除中にエラーが発生しました');
+            }
         }
 
         async function loadMembers() {
@@ -3989,9 +4602,24 @@ app.get('/water-tank/:id', async (c) => {
         }
 
         function displayTankInfo() {
+            let notesHtml = '';
+            if (tank.notes) {
+                notesHtml = '<div class="text-gray-600"><span class="font-bold">📝 備考:</span> ' + tank.notes + '</div>';
+            }
+            
             document.getElementById('tankInfo').innerHTML = \`
-                <h1 class="text-3xl font-bold text-gray-800 mb-4">💧 \${tank.location}</h1>
-                \${tank.notes ? \`<div class="text-gray-600"><span class="font-bold">📝 備考:</span> \${tank.notes}</div>\` : ''}
+                <div class="flex justify-between items-start mb-4">
+                    <h1 class="text-3xl font-bold text-gray-800">💧 \${tank.location}</h1>
+                    <div class="flex space-x-2">
+                        <button onclick="editTank()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition font-bold">
+                            ✏️ 編集
+                        </button>
+                        <button onclick="deleteTank()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition font-bold">
+                            🗑️ 削除
+                        </button>
+                    </div>
+                </div>
+                \${notesHtml}
             \`;
         }
 
@@ -4018,6 +4646,21 @@ app.get('/water-tank/:id', async (c) => {
             container.innerHTML = inspections.map(inspection => {
                 const hasActionItems = inspection.action_item_1 || inspection.action_item_2 || inspection.action_item_3;
                 
+                let actionItemsHtml = '';
+                if (hasActionItems) {
+                    actionItemsHtml = '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">' +
+                        '<p class="font-bold text-gray-800 mb-2">⚠️ 要対応事項</p>';
+                    if (inspection.action_item_1) actionItemsHtml += '<p class="text-gray-700">① ' + inspection.action_item_1 + '</p>';
+                    if (inspection.action_item_2) actionItemsHtml += '<p class="text-gray-700">② ' + inspection.action_item_2 + '</p>';
+                    if (inspection.action_item_3) actionItemsHtml += '<p class="text-gray-700">③ ' + inspection.action_item_3 + '</p>';
+                    actionItemsHtml += '</div>';
+                }
+                
+                let notesHtml = '';
+                if (inspection.notes) {
+                    notesHtml = '<p class="text-gray-600">📝 ' + inspection.notes + '</p>';
+                }
+                
                 return \`
                     <div class="bg-white rounded-2xl shadow-lg p-6">
                         <div class="flex justify-between items-start mb-4">
@@ -4031,16 +4674,8 @@ app.get('/water-tank/:id', async (c) => {
                             </div>
                         </div>
                         
-                        \${hasActionItems ? \`
-                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                                <p class="font-bold text-gray-800 mb-2">⚠️ 要対応事項</p>
-                                \${inspection.action_item_1 ? \`<p class="text-gray-700">① \${inspection.action_item_1}</p>\` : ''}
-                                \${inspection.action_item_2 ? \`<p class="text-gray-700">② \${inspection.action_item_2}</p>\` : ''}
-                                \${inspection.action_item_3 ? \`<p class="text-gray-700">③ \${inspection.action_item_3}</p>\` : ''}
-                            </div>
-                        \` : ''}
-                        
-                        \${inspection.notes ? \`<p class="text-gray-600">📝 \${inspection.notes}</p>\` : ''}
+                        \${actionItemsHtml}
+                        \${notesHtml}
                     </div>
                 \`;
             }).join('');
@@ -4060,21 +4695,6 @@ app.get('/water-tank/:id', async (c) => {
 
         function hideInspectionModal() {
             document.getElementById('inspectionModal').classList.add('hidden');
-        }
-
-        function editInspection(inspectionId) {
-            const inspection = inspections.find(i => i.id === inspectionId);
-            if (!inspection) return;
-
-            document.getElementById('inspectionId').value = inspection.id;
-            document.getElementById('inspectionDate').value = inspection.inspection_date;
-            document.getElementById('inspectorName').value = inspection.inspector_name;
-            document.getElementById('actionItem1').value = inspection.action_item_1 || '';
-            document.getElementById('actionItem2').value = inspection.action_item_2 || '';
-            document.getElementById('actionItem3').value = inspection.action_item_3 || '';
-            document.getElementById('inspectionNotes').value = inspection.notes || '';
-            document.getElementById('inspectionModalTitle').textContent = '✏️ 点検記録を編集';
-            document.getElementById('inspectionModal').classList.remove('hidden');
         }
 
         async function saveInspection() {
@@ -4119,18 +4739,27 @@ app.get('/water-tank/:id', async (c) => {
             }
         }
 
-        async function deleteInspection(inspectionId) {
-            if (!confirm('この点検記録を削除してもよろしいですか？')) {
+
+
+        function editTank() {
+            location.href = '/water-tanks?edit=' + tankId;
+        }
+
+        async function deleteTank() {
+            if (!tank) return;
+
+            if (!confirm('「' + tank.location + '」を本当に削除しますか？\\\\n\\\\nこの操作は取り消せません。\\\\nこの防火水槽に関連する全ての点検記録も削除されます。')) {
                 return;
             }
 
             try {
-                const response = await fetch(\`/api/water-tank-inspections/\${inspectionId}\`, {
+                const response = await fetch('/api/water-tanks/' + tankId, {
                     method: 'DELETE'
                 });
 
                 if (response.ok) {
-                    loadInspections();
+                    alert('削除しました');
+                    location.href = '/water-tanks';
                 } else {
                     alert('削除に失敗しました');
                 }
@@ -4441,23 +5070,59 @@ app.get('/storage/:id', async (c) => {
         }
 
         // 地図読み込み
-        function loadMap() {
+        async function loadMap() {
             const mapContainer = document.getElementById('mapContainer');
-            if (!storageData || !storageData.latitude || !storageData.longitude) {
-                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">位置情報が登録されていません</p>';
+            
+            let lat = storageData ? storageData.latitude : null;
+            let lon = storageData ? storageData.longitude : null;
+            
+            // Google Maps URLから座標を抽出
+            if (!lat && !lon && storageData && storageData.google_maps_url) {
+                let url = storageData.google_maps_url;
+                
+                // 短縮URLの場合はリダイレクト先を取得
+                if (url.includes('maps.app.goo.gl') || url.includes('goo.gl')) {
+                    try {
+                        const response = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+                        url = response.url;
+                    } catch (e) {
+                        console.log('短縮URL展開失敗:', e);
+                    }
+                }
+                
+                // パターン1: @緯度,経度 形式
+                const atMatch = url.match(/@(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);
+                if (atMatch) {
+                    lat = parseFloat(atMatch[1]);
+                    lon = parseFloat(atMatch[2]);
+                }
+                
+                // パターン2: ?q=緯度,経度 形式
+                if (!lat && !lon) {
+                    const qMatch = url.match(/[?&]q=(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);
+                    if (qMatch) {
+                        lat = parseFloat(qMatch[1]);
+                        lon = parseFloat(qMatch[2]);
+                    }
+                }
+            }
+            
+            if (!lat || !lon) {
+                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">位置情報が登録されていません。格納庫編集でGoogle Maps URLを追加してください。</p>';
                 return;
             }
 
-            mapContainer.innerHTML = \`
-                <iframe 
-                    width="100%" 
-                    height="400" 
-                    frameborder="0" 
-                    style="border:0; border-radius: 12px;"
-                    src="https://www.google.com/maps?q=\${storageData.latitude},\${storageData.longitude}&output=embed"
-                    allowfullscreen>
-                </iframe>
-            \`;
+            mapContainer.innerHTML = '<div id="storageLeafletMap" style="height: 500px; border-radius: 12px;"></div>';
+            
+            setTimeout(() => {
+                const map = L.map('storageLeafletMap').setView([lat, lon], 16);
+                L.tileLayer('https://\{s\}.tile.openstreetmap.org/\{z\}/\{x\}/\{y\}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+                
+                const marker = L.marker([lat, lon]).addTo(map);
+                marker.bindPopup('<b>' + (storageData ? storageData.storage_number : '格納庫') + '</b><br>' + (storageData ? storageData.location : '')).openPopup();
+            }, 100);
         }
 
         // ページ読み込み完了後に初期化
@@ -4566,8 +5231,14 @@ app.get('/storage/:id', async (c) => {
             try {
                 let lat, lon;
                 
-                // 優先順位1: Google Maps URLから座標を抽出
-                if (mapUrl) {
+                // 優先順位1: 保存された座標を使用（最優先）
+                if (savedLat && savedLon) {
+                    console.log('Using saved coordinates:', savedLat, savedLon);
+                    lat = savedLat;
+                    lon = savedLon;
+                }
+                // 優先順位2: Google Maps URLから座標を抽出
+                else if (mapUrl) {
                     // 短縮URL (maps.app.goo.gl) の場合、サーバー側で展開
                     if (mapUrl.includes('maps.app.goo.gl') || mapUrl.includes('goo.gl')) {
                         console.log('Shortened URL detected, expanding via API:', mapUrl);
@@ -4613,13 +5284,6 @@ app.get('/storage/:id', async (c) => {
                     }
                 }
                 
-                // 優先順位2: URLがない場合は保存された座標を使用
-                if (!lat && !lon && savedLat && savedLon) {
-                    console.log('Using saved coordinates:', savedLat, savedLon);
-                    lat = savedLat;
-                    lon = savedLon;
-                }
-                
                 // 優先順位3: どちらもない場合はNominatim APIで住所から取得
                 if (!lat || !lon) {
                     const query = encodeURIComponent(location + ' 大井町 神奈川県');
@@ -4637,7 +5301,7 @@ app.get('/storage/:id', async (c) => {
                     const map = L.map('storageMap').setView([lat, lon], 17);
                     
                     // OpenStreetMapタイル追加
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    L.tileLayer('https://\{s\}.tile.openstreetmap.org/\{z\}/\{x\}/\{y\}.png', {
                         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     }).addTo(map);
                     
@@ -4648,7 +5312,7 @@ app.get('/storage/:id', async (c) => {
                 } else {
                     // 座標が取得できない場合はデフォルト位置（大井町役場）
                     const map = L.map('storageMap').setView([35.3580, 139.1047], 15);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    L.tileLayer('https://\{s\}.tile.openstreetmap.org/\{z\}/\{x\}/\{y\}.png', {
                         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     }).addTo(map);
                 }
@@ -5218,10 +5882,13 @@ app.get('/action-required', (c) => {
         <!-- タブ切り替え -->
         <div class="bg-white rounded-2xl shadow-lg mb-6">
             <div class="flex border-b">
-                <button id="tabPending" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-red-500 text-red-500">
+                <button id="tabPending" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-red-500 text-red-500 whitespace-nowrap">
                     ⚠️ 未対応
                 </button>
-                <button id="tabCompleted" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                <button id="tabInProgress" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                    🔧 対応中
+                </button>
+                <button id="tabCompleted" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
                     ✅ 対応済
                 </button>
             </div>
@@ -5229,6 +5896,34 @@ app.get('/action-required', (c) => {
 
         <div id="actionList" class="space-y-4">
             <div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800">読み込み中...</p></div>
+        </div>
+    </div>
+
+    <!-- 対応完了モーダル -->
+    <!-- 対応中にするモーダル -->
+    <div id="inProgressModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">🔧 対応中にする</h2>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
+                        📝 対応内容・メモ <span class="text-red-500">*</span>
+                    </label>
+                    <textarea id="inProgressContent" rows="4" required
+                        placeholder="対応中の内容やメモを記入してください"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"></textarea>
+                </div>
+                
+                <div class="flex flex-col space-y-3">
+                    <button onclick="submitInProgress()" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
+                        🔧 対応中にする
+                    </button>
+                    <button onclick="hideInProgressModal()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
+                        キャンセル
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -5242,7 +5937,7 @@ app.get('/action-required', (c) => {
                     <label class="block text-sm font-bold text-gray-700 mb-2">
                         📝 対応内容 <span class="text-red-500">*</span>
                     </label>
-                    <textarea id="actionContent" rows="4" required
+                    <textarea id="completeContent" rows="4" required
                         placeholder="実施した対応内容を記入してください"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
                 </div>
@@ -5288,31 +5983,39 @@ app.get('/action-required', (c) => {
 
     <script>
         let allItems = [];
-        let currentTab = 'pending'; // 'pending' or 'completed'
+        let currentTab = 'pending'; // 'pending', 'in_progress', or 'completed'
 
         window.onload = function() {
             loadActionRequired();
             
             // タブ切り替えイベント
             document.getElementById('tabPending').addEventListener('click', () => switchTab('pending'));
+            document.getElementById('tabInProgress').addEventListener('click', () => switchTab('in_progress'));
             document.getElementById('tabCompleted').addEventListener('click', () => switchTab('completed'));
         };
 
         function switchTab(tab) {
             currentTab = tab;
             const tabPending = document.getElementById('tabPending');
+            const tabInProgress = document.getElementById('tabInProgress');
             const tabCompleted = document.getElementById('tabCompleted');
             
+            // すべてのタブをリセット
+            [tabPending, tabInProgress, tabCompleted].forEach(t => {
+                t.classList.remove('border-red-500', 'text-red-500', 'border-yellow-500', 'text-yellow-600', 'border-green-500', 'text-green-500');
+                t.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            // 選択されたタブをアクティブに
             if (tab === 'pending') {
-                tabPending.classList.add('border-red-500', 'text-red-500');
                 tabPending.classList.remove('border-transparent', 'text-gray-500');
-                tabCompleted.classList.remove('border-green-500', 'text-green-500');
-                tabCompleted.classList.add('border-transparent', 'text-gray-500');
+                tabPending.classList.add('border-red-500', 'text-red-500');
+            } else if (tab === 'in_progress') {
+                tabInProgress.classList.remove('border-transparent', 'text-gray-500');
+                tabInProgress.classList.add('border-yellow-500', 'text-yellow-600');
             } else {
-                tabCompleted.classList.add('border-green-500', 'text-green-500');
                 tabCompleted.classList.remove('border-transparent', 'text-gray-500');
-                tabPending.classList.remove('border-red-500', 'text-red-500');
-                tabPending.classList.add('border-transparent', 'text-gray-500');
+                tabCompleted.classList.add('border-green-500', 'text-green-500');
             }
             
             renderActionList(allItems);
@@ -5337,14 +6040,20 @@ app.get('/action-required', (c) => {
             // タブに応じてフィルタリング
             const filteredItems = items.filter(item => {
                 if (currentTab === 'pending') {
-                    return item.is_completed === 0;
+                    return item.is_completed === 0 && !item.action_content;
+                } else if (currentTab === 'in_progress') {
+                    return item.is_completed === 0 && item.action_content;
                 } else {
                     return item.is_completed === 1;
                 }
             });
             
             if (filteredItems.length === 0) {
-                const message = currentTab === 'pending' ? '未対応の項目はありません' : '対応済みの項目はありません';
+                let message = '';
+                if (currentTab === 'pending') message = '未対応の項目はありません';
+                else if (currentTab === 'in_progress') message = '対応中の項目はありません';
+                else message = '対応済みの項目はありません';
+                
                 list.innerHTML = '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800 text-xl">' + message + '</p></div>';
                 return;
             }
@@ -5371,20 +6080,51 @@ app.get('/action-required', (c) => {
                         '<p class="text-red-800 font-semibold mb-2">🚨 要対応内容:</p>' +
                         '<p class="text-gray-800">' + item.content + '</p>' +
                     '</div>' +
-                    (isCompleted ? 
-                        '<div>' +
-                            (item.action_content ? 
-                                '<div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-4 mb-4">' +
+                    (function() {
+                        if (currentTab === 'pending') {
+                            return '<button onclick="markInProgress(\\'' + item.id + '\\')" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
+                                '🔧 対応中にする' +
+                            '</button>';
+                        } else if (currentTab === 'in_progress') {
+                            let html = '';
+                            if (item.action_content) {
+                                html += '<div class="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-4 mb-4">' +
+                                    '<p class="text-yellow-800 font-semibold mb-2">🔧 対応内容:</p>' +
+                                    '<p class="text-gray-800">' + item.action_content + '</p>' +
+                                '</div>';
+                            }
+                            html += '<div class="flex gap-3 mb-3">' +
+                                '<button onclick="markCompleted(\\'' + item.id + '\\')" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
+                                    '✅ 対応完了にする' +
+                                '</button>' +
+                                '<button onclick="editInProgress(\\'' + item.id + '\\')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
+                                    '✏️ 編集' +
+                                '</button>' +
+                            '</div>' +
+                            '<button onclick="markPending(\\'' + item.id + '\\')" class="w-full bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded-xl transition font-bold text-sm">' +
+                                '⬅️ 未対応に戻す' +
+                            '</button>';
+                            return html;
+                        } else {
+                            let html = '';
+                            if (item.action_content) {
+                                html += '<div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-4 mb-4">' +
                                     '<p class="text-green-800 font-semibold mb-2">✅ 対応内容:</p>' +
                                     '<p class="text-gray-800">' + item.action_content + '</p>' +
-                                '</div>' : ''
-                            ) +
-                            '<p class="text-gray-600 text-center mb-4">対応完了日: ' + new Date(item.completed_at).toLocaleDateString('ja-JP') + '</p>' +
-                        '</div>' :
-                        '<button onclick="markCompleted(\\'' + item.id + '\\')" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
-                            '✅ 対応完了にする' +
-                        '</button>'
-                    ) +
+                                '</div>';
+                            }
+                            html += '<p class="text-gray-600 text-center mb-4">対応完了日: ' + new Date(item.completed_at).toLocaleDateString('ja-JP') + '</p>' +
+                            '<div class="flex gap-3">' +
+                                '<button onclick="editCompleted(\\'' + item.id + '\\')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
+                                    '✏️ 編集' +
+                                '</button>' +
+                                '<button onclick="markInProgress(\\'' + item.id + '\\')" class="flex-1 bg-gray-400 hover:bg-gray-500 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
+                                    '⬅️ 対応中に戻す' +
+                                '</button>' +
+                            '</div>';
+                            return html;
+                        }
+                    })() +
                 '</div>';
             }).join('');
         }
@@ -5393,7 +6133,8 @@ app.get('/action-required', (c) => {
 
         function markCompleted(actionItemId) {
             currentActionItemId = actionItemId;
-            document.getElementById('actionContent').value = '';
+            const item = allItems.find(i => i.id === actionItemId);
+            document.getElementById('completeContent').value = item && item.action_content ? item.action_content : '';
             document.getElementById('completeModal').classList.remove('hidden');
         }
 
@@ -5403,7 +6144,7 @@ app.get('/action-required', (c) => {
         }
 
         async function submitComplete() {
-            const actionContent = document.getElementById('actionContent').value.trim();
+            const actionContent = document.getElementById('completeContent').value.trim();
             
             if (!actionContent) {
                 alert('対応内容を入力してください');
@@ -5429,6 +6170,80 @@ app.get('/action-required', (c) => {
                 alert('エラーが発生しました');
                 console.error(error);
             }
+        }
+        
+        function markInProgress(actionItemId) {
+            currentActionItemId = actionItemId;
+            const item = allItems.find(i => i.id === actionItemId);
+            document.getElementById('inProgressContent').value = item && item.action_content ? item.action_content : '';
+            document.getElementById('inProgressModal').classList.remove('hidden');
+        }
+        
+        function hideInProgressModal() {
+            document.getElementById('inProgressModal').classList.add('hidden');
+            currentActionItemId = null;
+        }
+        
+        async function submitInProgress() {
+            const actionContent = document.getElementById('inProgressContent').value.trim();
+            
+            if (!actionContent) {
+                alert('対応内容を入力してください');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/action-items/' + currentActionItemId + '/in-progress', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action_content: actionContent })
+                });
+
+                if (response.ok) {
+                    alert('対応中にしました！');
+                    hideInProgressModal();
+                    loadActionRequired();
+                } else {
+                    alert('更新に失敗しました');
+                }
+            } catch (error) {
+                alert('エラーが発生しました');
+                console.error(error);
+            }
+        }
+        
+        async function markPending(actionItemId) {
+            if (!confirm('未対応に戻しますか？')) return;
+            
+            try {
+                const response = await fetch('/api/action-items/' + actionItemId + '/pending', {
+                    method: 'PUT'
+                });
+
+                if (response.ok) {
+                    alert('未対応に戻しました');
+                    loadActionRequired();
+                } else {
+                    alert('更新に失敗しました');
+                }
+            } catch (error) {
+                alert('エラーが発生しました');
+                console.error(error);
+            }
+        }
+        
+        function editInProgress(actionItemId) {
+            currentActionItemId = actionItemId;
+            const item = allItems.find(i => i.id === actionItemId);
+            document.getElementById('inProgressContent').value = item && item.action_content ? item.action_content : '';
+            document.getElementById('inProgressModal').classList.remove('hidden');
+        }
+        
+        function editCompleted(actionItemId) {
+            currentActionItemId = actionItemId;
+            const item = allItems.find(i => i.id === actionItemId);
+            document.getElementById('completeContent').value = item && item.action_content ? item.action_content : '';
+            document.getElementById('completeModal').classList.remove('hidden');
         }
 
         let currentEditInspectionId = null;
@@ -5532,10 +6347,10 @@ app.get('/api/inspection/action-required', async (c) => {
         wti.*,
         wt.location as tank_location,
         wt.storage_id,
-        s.name as storage_name
+        s.location as storage_name
       FROM water_tank_inspections wti
       JOIN water_tanks wt ON wti.tank_id = wt.id
-      LEFT JOIN storages s ON wt.storage_id = s.id
+      LEFT JOIN hose_storages s ON wt.storage_id = s.id
       WHERE wti.action_item_1 IS NOT NULL 
          OR wti.action_item_2 IS NOT NULL 
          OR wti.action_item_3 IS NOT NULL
@@ -5609,7 +6424,7 @@ app.get('/api/inspection/action-required', async (c) => {
     return c.json({ items: allItems })
   } catch (error) {
     console.error('Database error:', error)
-    return c.json({ items: [] })
+    return c.json({ items: [] }, 500)
   }
 })
 
@@ -5840,7 +6655,50 @@ app.put('/api/action-items/:id/complete', async (c) => {
 })
 
 // ==========================================
-// API: 要対応事項を未完了に戻す
+// API: 要対応事項を対応中にする
+// ==========================================
+app.put('/api/action-items/:id/in-progress', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    
+    await env.DB.prepare(`
+      UPDATE action_items
+      SET is_completed = 0, completed_at = NULL, action_content = ?
+      WHERE id = ?
+    `).bind(data.action_content || null, id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
+// API: 要対応事項を未対応に戻す
+// ==========================================
+app.put('/api/action-items/:id/pending', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const env = c.env as { DB: D1Database }
+    
+    await env.DB.prepare(`
+      UPDATE action_items
+      SET is_completed = 0, completed_at = NULL, action_content = NULL
+      WHERE id = ?
+    `).bind(id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
+// API: 要対応事項を未完了に戻す（旧API・互換性のため残す）
 // ==========================================
 app.put('/api/action-items/:id/uncomplete', async (c) => {
   try {
