@@ -2645,20 +2645,8 @@ app.get('/water-tanks', (c) => {
                     <input type="hidden" id="tankId">
                     
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">管理格納庫 <span class="text-red-500">*</span></label>
-                        <select id="tankStorageId" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
-                            <option value="">選択してください</option>
-                        </select>
-                    </div>
-
-                    <div>
                         <label class="block text-sm font-bold text-gray-700 mb-2">設置場所 <span class="text-red-500">*</span></label>
                         <input type="text" id="tankLocation" required placeholder="例: 〇〇公園横" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">容量（リットル）</label>
-                        <input type="number" id="tankCapacity" placeholder="例: 40000" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
                     </div>
 
                     <div>
@@ -2732,15 +2720,13 @@ app.get('/water-tanks', (c) => {
                         <div class="flex justify-between items-start mb-4">
                             <div>
                                 <h3 class="text-xl font-bold text-gray-800 mb-2">💧 \${tank.location}</h3>
-                                <p class="text-sm text-gray-600">📦 \${tank.storage_name || '未設定'}</p>
                             </div>
                             <button onclick="event.stopPropagation(); editTank('\${tank.id}')" class="text-blue-600 hover:text-blue-800 text-2xl">
                                 ✏️
                             </button>
                         </div>
                         
-                        \${tank.capacity ? \`<p class="text-gray-700 mb-2">💧 容量: \${tank.capacity.toLocaleString()}L</p>\` : ''}
-                        \${tank.notes ? \`<p class="text-sm text-gray-600 line-clamp-2">📝 \${tank.notes}</p>\` : ''}
+                        \${tank.notes ? \`<p class="text-sm text-gray-600 line-clamp-2 mb-4">📝 \${tank.notes}</p>\` : ''}
                         
                         <div class="mt-4 pt-4 border-t border-gray-200">
                             <button onclick="event.stopPropagation(); goToTankDetail('\${tank.id}')" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-3 rounded-lg transition font-bold">
@@ -2754,9 +2740,7 @@ app.get('/water-tanks', (c) => {
 
         function showAddTankModal() {
             document.getElementById('tankId').value = '';
-            document.getElementById('tankStorageId').value = '';
             document.getElementById('tankLocation').value = '';
-            document.getElementById('tankCapacity').value = '';
             document.getElementById('tankNotes').value = '';
             document.getElementById('tankModalTitle').textContent = '💧 防火水槽を追加';
             document.getElementById('tankModal').classList.remove('hidden');
@@ -2771,9 +2755,7 @@ app.get('/water-tanks', (c) => {
             if (!tank) return;
 
             document.getElementById('tankId').value = tank.id;
-            document.getElementById('tankStorageId').value = tank.storage_id;
             document.getElementById('tankLocation').value = tank.location;
-            document.getElementById('tankCapacity').value = tank.capacity || '';
             document.getElementById('tankNotes').value = tank.notes || '';
             document.getElementById('tankModalTitle').textContent = '✏️ 防火水槽を編集';
             document.getElementById('tankModal').classList.remove('hidden');
@@ -2781,18 +2763,17 @@ app.get('/water-tanks', (c) => {
 
         async function saveTank() {
             const tankId = document.getElementById('tankId').value;
-            const storageId = document.getElementById('tankStorageId').value;
             const location = document.getElementById('tankLocation').value;
 
-            if (!storageId || !location) {
-                alert('管理格納庫と設置場所は必須です');
+            if (!location) {
+                alert('設置場所は必須です');
                 return;
             }
 
             const data = {
-                storage_id: storageId,
+                storage_id: null,
                 location: location,
-                capacity: parseInt(document.getElementById('tankCapacity').value) || null,
+                capacity: null,
                 notes: document.getElementById('tankNotes').value || null
             };
 
@@ -3429,14 +3410,46 @@ app.get('/water-tank/:id', async (c) => {
             <p class="text-gray-600">読み込み中...</p>
         </div>
 
-        <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
-            <button onclick="showAddInspectionModal()" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition shadow-lg font-bold text-lg">
-                ➕ 点検を記録
-            </button>
-        </div>
+        <div class="bg-white rounded-2xl shadow-lg mb-6">
+            <div class="flex border-b">
+                <button id="tankTabRecord" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-blue-500 text-blue-500">
+                    📝 点検記録
+                </button>
+                <button id="tankTabMap" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                    🗺️ 地図
+                </button>
+                <button id="tankTabHistory" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                    📋 全履歴
+                </button>
+            </div>
 
-        <div id="inspectionsList" class="space-y-4">
-            <p class="text-gray-600 text-center py-8">読み込み中...</p>
+            <!-- 点検記録タブ -->
+            <div id="tankRecordTab" class="p-6">
+                <button onclick="showAddInspectionModal()" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition shadow-lg font-bold text-lg">
+                    ➕ 点検を記録
+                </button>
+                
+                <div id="inspectionsList" class="space-y-4 mt-6">
+                    <p class="text-gray-600 text-center py-8">読み込み中...</p>
+                </div>
+            </div>
+
+            <!-- 地図タブ -->
+            <div id="tankMapTab" class="p-6 hidden">
+                <div id="tankMapContainer" class="mb-6">
+                    <p class="text-gray-600 text-center py-8">地図を読み込んでいます...</p>
+                </div>
+            </div>
+
+            <!-- 点検履歴タブ -->
+            <div id="tankHistoryTab" class="p-6 hidden">
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">📋 全点検履歴</h3>
+                    <div id="tankAllInspections" class="space-y-4">
+                        <p class="text-gray-600 text-center py-8">読み込み中...</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -3510,7 +3523,101 @@ app.get('/water-tank/:id', async (c) => {
             loadMembers();
             loadTank();
             loadInspections();
+            
+            // タブ切り替えイベント
+            document.getElementById('tankTabRecord').addEventListener('click', () => switchTankTab('record'));
+            document.getElementById('tankTabMap').addEventListener('click', () => switchTankTab('map'));
+            document.getElementById('tankTabHistory').addEventListener('click', () => switchTankTab('history'));
         };
+
+        // タブ切り替え
+        function switchTankTab(tabName) {
+            const tabRecord = document.getElementById('tankTabRecord');
+            const tabMap = document.getElementById('tankTabMap');
+            const tabHistory = document.getElementById('tankTabHistory');
+            const recordTab = document.getElementById('tankRecordTab');
+            const mapTab = document.getElementById('tankMapTab');
+            const historyTab = document.getElementById('tankHistoryTab');
+
+            // 全タブのスタイルをリセット
+            [tabRecord, tabMap, tabHistory].forEach(tab => {
+                tab.classList.remove('border-blue-500', 'text-blue-500');
+                tab.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            // 全コンテンツを非表示
+            [recordTab, mapTab, historyTab].forEach(content => {
+                content.classList.add('hidden');
+            });
+
+            // 選択されたタブをアクティブに
+            if (tabName === 'record') {
+                tabRecord.classList.add('border-blue-500', 'text-blue-500');
+                tabRecord.classList.remove('border-transparent', 'text-gray-500');
+                recordTab.classList.remove('hidden');
+            } else if (tabName === 'map') {
+                tabMap.classList.add('border-blue-500', 'text-blue-500');
+                tabMap.classList.remove('border-transparent', 'text-gray-500');
+                mapTab.classList.remove('hidden');
+                loadTankMap();
+            } else if (tabName === 'history') {
+                tabHistory.classList.add('border-blue-500', 'text-blue-500');
+                tabHistory.classList.remove('border-transparent', 'text-gray-500');
+                historyTab.classList.remove('hidden');
+                displayAllInspections();
+            }
+        }
+
+        // 地図読み込み
+        function loadTankMap() {
+            const mapContainer = document.getElementById('tankMapContainer');
+            if (!tank || !tank.latitude || !tank.longitude) {
+                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">位置情報が登録されていません</p>';
+                return;
+            }
+
+            mapContainer.innerHTML = \`
+                <iframe 
+                    width="100%" 
+                    height="400" 
+                    frameborder="0" 
+                    style="border:0; border-radius: 12px;"
+                    src="https://www.google.com/maps?q=\${tank.latitude},\${tank.longitude}&output=embed"
+                    allowfullscreen>
+                </iframe>
+            \`;
+        }
+
+        // 全点検履歴表示
+        function displayAllInspections() {
+            const container = document.getElementById('tankAllInspections');
+            if (inspections.length === 0) {
+                container.innerHTML = '<p class="text-gray-600 text-center py-8">まだ点検記録がありません</p>';
+                return;
+            }
+            container.innerHTML = inspections.map(inspection => {
+                const hasActionItems = inspection.action_item_1 || inspection.action_item_2 || inspection.action_item_3;
+                return \`
+                    <div class="bg-white rounded-lg border-2 border-gray-200 p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h4 class="text-lg font-bold text-gray-800">📅 \${inspection.inspection_date}</h4>
+                                <p class="text-gray-600">👤 点検者: \${inspection.inspector_name}</p>
+                            </div>
+                        </div>
+                        \${hasActionItems ? \`
+                            <div class="mt-3 bg-yellow-50 border border-yellow-200 rounded p-3">
+                                <p class="font-bold text-sm text-gray-800 mb-1">⚠️ 要対応事項</p>
+                                \${inspection.action_item_1 ? \`<p class="text-sm text-gray-700">① \${inspection.action_item_1}</p>\` : ''}
+                                \${inspection.action_item_2 ? \`<p class="text-sm text-gray-700">② \${inspection.action_item_2}</p>\` : ''}
+                                \${inspection.action_item_3 ? \`<p class="text-sm text-gray-700">③ \${inspection.action_item_3}</p>\` : ''}
+                            </div>
+                        \` : ''}
+                        \${inspection.notes ? \`<p class="text-sm text-gray-600 mt-2">📝 \${inspection.notes}</p>\` : ''}
+                    </div>
+                \`;
+            }).join('');
+        }
 
         async function loadMembers() {
             try {
@@ -3551,11 +3658,7 @@ app.get('/water-tank/:id', async (c) => {
         function displayTankInfo() {
             document.getElementById('tankInfo').innerHTML = \`
                 <h1 class="text-3xl font-bold text-gray-800 mb-4">💧 \${tank.location}</h1>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
-                    <div><span class="font-bold">📦 管理格納庫:</span> \${tank.storage_name || '未設定'}</div>
-                    \${tank.capacity ? \`<div><span class="font-bold">💧 容量:</span> \${tank.capacity.toLocaleString()}L</div>\` : ''}
-                </div>
-                \${tank.notes ? \`<div class="mt-4 text-gray-600"><span class="font-bold">📝 備考:</span> \${tank.notes}</div>\` : ''}
+                \${tank.notes ? \`<div class="text-gray-600"><span class="font-bold">📝 備考:</span> \${tank.notes}</div>\` : ''}
             \`;
         }
 
@@ -3793,8 +3896,11 @@ app.get('/storage/:id', async (c) => {
                 <button id="tabRecord" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-red-500 text-red-500">
                     📝 点検記録
                 </button>
+                <button id="tabMap" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                    🗺️ 地図
+                </button>
                 <button id="tabHistory" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
-                    📋 点検履歴
+                    📋 全履歴
                 </button>
             </div>
 
@@ -3803,6 +3909,13 @@ app.get('/storage/:id', async (c) => {
                 <button id="showModalBtn" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
                     📝 点検を記録する
                 </button>
+            </div>
+
+            <!-- 地図タブ -->
+            <div id="mapTab" class="p-6 hidden">
+                <div id="mapContainer" class="mb-6">
+                    <p class="text-gray-600 text-center py-8">地図を読み込んでいます...</p>
+                </div>
             </div>
 
             <!-- 点検履歴タブ -->
@@ -3960,25 +4073,58 @@ app.get('/storage/:id', async (c) => {
         // タブ切り替え
         function switchTab(tabName) {
             const tabRecord = document.getElementById('tabRecord');
+            const tabMap = document.getElementById('tabMap');
             const tabHistory = document.getElementById('tabHistory');
             const recordTab = document.getElementById('recordTab');
+            const mapTab = document.getElementById('mapTab');
             const historyTab = document.getElementById('historyTab');
 
+            // 全タブのスタイルをリセット
+            [tabRecord, tabMap, tabHistory].forEach(tab => {
+                tab.classList.remove('border-red-500', 'text-red-500');
+                tab.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            // 全コンテンツを非表示
+            [recordTab, mapTab, historyTab].forEach(content => {
+                content.classList.add('hidden');
+            });
+
+            // 選択されたタブをアクティブに
             if (tabName === 'record') {
                 tabRecord.classList.add('border-red-500', 'text-red-500');
                 tabRecord.classList.remove('border-transparent', 'text-gray-500');
-                tabHistory.classList.remove('border-red-500', 'text-red-500');
-                tabHistory.classList.add('border-transparent', 'text-gray-500');
                 recordTab.classList.remove('hidden');
-                historyTab.classList.add('hidden');
-            } else {
+            } else if (tabName === 'map') {
+                tabMap.classList.add('border-red-500', 'text-red-500');
+                tabMap.classList.remove('border-transparent', 'text-gray-500');
+                mapTab.classList.remove('hidden');
+                loadMap();
+            } else if (tabName === 'history') {
                 tabHistory.classList.add('border-red-500', 'text-red-500');
                 tabHistory.classList.remove('border-transparent', 'text-gray-500');
-                tabRecord.classList.remove('border-red-500', 'text-red-500');
-                tabRecord.classList.add('border-transparent', 'text-gray-500');
                 historyTab.classList.remove('hidden');
-                recordTab.classList.add('hidden');
             }
+        }
+
+        // 地図読み込み
+        function loadMap() {
+            const mapContainer = document.getElementById('mapContainer');
+            if (!storageData || !storageData.latitude || !storageData.longitude) {
+                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">位置情報が登録されていません</p>';
+                return;
+            }
+
+            mapContainer.innerHTML = \`
+                <iframe 
+                    width="100%" 
+                    height="400" 
+                    frameborder="0" 
+                    style="border:0; border-radius: 12px;"
+                    src="https://www.google.com/maps?q=\${storageData.latitude},\${storageData.longitude}&output=embed"
+                    allowfullscreen>
+                </iframe>
+            \`;
         }
 
         // ページ読み込み完了後に初期化
@@ -3994,6 +4140,7 @@ app.get('/storage/:id', async (c) => {
 
             // タブ切り替えイベント
             document.getElementById('tabRecord').addEventListener('click', () => switchTab('record'));
+            document.getElementById('tabMap').addEventListener('click', () => switchTab('map'));
             document.getElementById('tabHistory').addEventListener('click', () => switchTab('history'));
 
             // イベントリスナー設定（要素が確実に存在する状態で設定）
