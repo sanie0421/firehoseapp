@@ -2669,30 +2669,9 @@ app.get('/water-tanks', (c) => {
 
     <script>
         let tanks = [];
-        let storages = [];
-
         window.onload = function() {
-            loadStorages();
             loadTanks();
         };
-
-        async function loadStorages() {
-            try {
-                const response = await fetch('/api/storages');
-                const data = await response.json();
-                storages = data.storages || [];
-                
-                const select = document.getElementById('tankStorageId');
-                storages.forEach(storage => {
-                    const option = document.createElement('option');
-                    option.value = storage.id;
-                    option.textContent = storage.name;
-                    select.appendChild(option);
-                });
-            } catch (error) {
-                console.error('Failed to load storages:', error);
-            }
-        }
 
         async function loadTanks() {
             try {
