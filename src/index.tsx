@@ -46,6 +46,7 @@ app.get('/', (c) => {
         .card-gradient-3 { background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%); }
         .card-gradient-4 { background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%); }
         .card-gradient-5 { background: linear-gradient(135deg, #ab47bc 0%, #8e24aa 100%); }
+        .card-gradient-6 { background: linear-gradient(135deg, #29b6f6 0%, #0288d1 100%); }
         
         @keyframes float {
             0%, 100% { transform: translateY(0px); }
@@ -86,6 +87,15 @@ app.get('/', (c) => {
                     <div class="text-5xl mb-4 text-center">⚠️</div>
                     <h2 class="text-xl font-bold mb-2 text-center">ホース点検</h2>
                     <p class="text-center opacity-90 text-sm">要点検のホース格納庫を確認</p>
+                </div>
+            </a>
+
+            <!-- 防火水槽点検 -->
+            <a href="/water-tanks" class="card-gradient-6 rounded-2xl shadow-2xl p-6 card-hover">
+                <div class="text-white">
+                    <div class="text-5xl mb-4 text-center">💧</div>
+                    <h2 class="text-xl font-bold mb-2 text-center">防火水槽点検</h2>
+                    <p class="text-center opacity-90 text-sm">防火水槽の点検管理</p>
                 </div>
             </a>
 
@@ -271,6 +281,229 @@ app.delete('/api/members/:id', async (c) => {
     
     await env.DB.prepare(`
       DELETE FROM users WHERE id = ?
+    `).bind(id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
+// API: 防火水槽 - 一覧取得
+// ==========================================
+app.get('/api/water-tanks', async (c) => {
+  try {
+    const env = c.env as { DB: D1Database }
+    const result = await env.DB.prepare(`
+      SELECT 
+        wt.*,
+        s.name as storage_name
+      FROM water_tanks wt
+      LEFT JOIN storages s ON wt.storage_id = s.id
+      ORDER BY wt.location
+    `).all()
+    
+    return c.json({ tanks: result.results || [] })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ tanks: [] }, 500)
+  }
+})
+
+// API: 防火水槽 - 新規作成
+app.post('/api/water-tanks', async (c) => {
+  try {
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    
+    await env.DB.prepare(`
+      INSERT INTO water_tanks (
+        id, storage_id, location, capacity, notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      id,
+      data.storage_id,
+      data.location,
+      data.capacity || null,
+      data.notes || null,
+      now,
+      now
+    ).run()
+    
+    return c.json({ success: true, id })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// API: 防火水槽 - 更新
+app.put('/api/water-tanks/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    const now = new Date().toISOString()
+    
+    await env.DB.prepare(`
+      UPDATE water_tanks SET
+        storage_id = ?,
+        location = ?,
+        capacity = ?,
+        notes = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).bind(
+      data.storage_id,
+      data.location,
+      data.capacity || null,
+      data.notes || null,
+      now,
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// API: 防火水槽 - 削除
+app.delete('/api/water-tanks/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const env = c.env as { DB: D1Database }
+    
+    await env.DB.prepare(`
+      DELETE FROM water_tanks WHERE id = ?
+    `).bind(id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// API: 防火水槽点検 - 一覧取得
+app.get('/api/water-tank-inspections', async (c) => {
+  try {
+    const tankId = c.req.query('tank_id')
+    const env = c.env as { DB: D1Database }
+    
+    let query = `
+      SELECT 
+        wti.*,
+        wt.location as tank_location
+      FROM water_tank_inspections wti
+      LEFT JOIN water_tanks wt ON wti.tank_id = wt.id
+    `
+    
+    if (tankId) {
+      query += ` WHERE wti.tank_id = ?`
+    }
+    
+    query += ` ORDER BY wti.inspection_date DESC`
+    
+    const stmt = env.DB.prepare(query)
+    const result = tankId ? await stmt.bind(tankId).all() : await stmt.all()
+    
+    return c.json({ inspections: result.results || [] })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ inspections: [] }, 500)
+  }
+})
+
+// API: 防火水槽点検 - 新規作成
+app.post('/api/water-tank-inspections', async (c) => {
+  try {
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    
+    const toNullIfEmpty = (val: any) => (val === '' || val === undefined || val === null) ? null : val
+    
+    await env.DB.prepare(`
+      INSERT INTO water_tank_inspections (
+        id, tank_id, inspection_date, inspector_name,
+        action_item_1, action_item_2, action_item_3,
+        notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      id,
+      data.tank_id,
+      data.inspection_date,
+      data.inspector_name,
+      toNullIfEmpty(data.action_item_1),
+      toNullIfEmpty(data.action_item_2),
+      toNullIfEmpty(data.action_item_3),
+      toNullIfEmpty(data.notes),
+      now,
+      now
+    ).run()
+    
+    return c.json({ success: true, id })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// API: 防火水槽点検 - 更新
+app.put('/api/water-tank-inspections/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    const now = new Date().toISOString()
+    
+    const toNullIfEmpty = (val: any) => (val === '' || val === undefined || val === null) ? null : val
+    
+    await env.DB.prepare(`
+      UPDATE water_tank_inspections SET
+        tank_id = ?,
+        inspection_date = ?,
+        inspector_name = ?,
+        action_item_1 = ?,
+        action_item_2 = ?,
+        action_item_3 = ?,
+        notes = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).bind(
+      data.tank_id,
+      data.inspection_date,
+      data.inspector_name,
+      toNullIfEmpty(data.action_item_1),
+      toNullIfEmpty(data.action_item_2),
+      toNullIfEmpty(data.action_item_3),
+      toNullIfEmpty(data.notes),
+      now,
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// API: 防火水槽点検 - 削除
+app.delete('/api/water-tank-inspections/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const env = c.env as { DB: D1Database }
+    
+    await env.DB.prepare(`
+      DELETE FROM water_tank_inspections WHERE id = ?
     `).bind(id).run()
     
     return c.json({ success: true })
@@ -2336,6 +2569,265 @@ app.get('/api/admin/backup', async (c) => {
 })
 
 // ==========================================
+// 防火水槽点検ページ
+// ==========================================
+app.get('/water-tanks', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>防火水槽点検 - 活動記録</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            min-height: 100vh;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .float-animation { animation: float 3s ease-in-out infinite; }
+        .tank-card {
+            transition: all 0.3s ease;
+        }
+        .tank-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body>
+    <nav class="bg-white shadow-md">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center space-x-3">
+                    <span class="text-4xl float-animation">🔥</span>
+                    <div class="text-gray-800">
+                        <div class="font-bold text-xl">活動記録</div>
+                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
+                    </div>
+                </a>
+                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                    ← ホームに戻る
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6">
+        <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">💧 防火水槽点検</h1>
+            <p class="text-base text-gray-600 mb-4">防火水槽の登録と点検管理</p>
+            
+            <button onclick="showAddTankModal()" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition shadow-lg font-bold text-lg">
+                ➕ 防火水槽を追加
+            </button>
+        </div>
+
+        <div id="tanksList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <p class="text-gray-800 text-center py-8 col-span-full">読み込み中...</p>
+        </div>
+    </div>
+
+    <!-- 防火水槽追加・編集モーダル -->
+    <div id="tankModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 id="tankModalTitle" class="text-2xl font-bold text-gray-800">💧 防火水槽を追加</h2>
+                    <button onclick="hideTankModal()" class="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+                </div>
+
+                <div class="space-y-4">
+                    <input type="hidden" id="tankId">
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">管理格納庫 <span class="text-red-500">*</span></label>
+                        <select id="tankStorageId" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                            <option value="">選択してください</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">設置場所 <span class="text-red-500">*</span></label>
+                        <input type="text" id="tankLocation" required placeholder="例: 〇〇公園横" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">容量（リットル）</label>
+                        <input type="number" id="tankCapacity" placeholder="例: 40000" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">備考</label>
+                        <textarea id="tankNotes" rows="3" placeholder="その他メモ" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                    </div>
+
+                    <div class="flex space-x-3 pt-4">
+                        <button type="button" onclick="saveTank()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
+                            ✅ 保存する
+                        </button>
+                        <button type="button" onclick="hideTankModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
+                            キャンセル
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let tanks = [];
+        let storages = [];
+
+        window.onload = function() {
+            loadStorages();
+            loadTanks();
+        };
+
+        async function loadStorages() {
+            try {
+                const response = await fetch('/api/storages');
+                const data = await response.json();
+                storages = data.storages || [];
+                
+                const select = document.getElementById('tankStorageId');
+                storages.forEach(storage => {
+                    const option = document.createElement('option');
+                    option.value = storage.id;
+                    option.textContent = storage.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load storages:', error);
+            }
+        }
+
+        async function loadTanks() {
+            try {
+                const response = await fetch('/api/water-tanks');
+                const data = await response.json();
+                tanks = data.tanks || [];
+                displayTanks();
+            } catch (error) {
+                console.error('Failed to load tanks:', error);
+                document.getElementById('tanksList').innerHTML = '<p class="text-red-600 text-center py-8 col-span-full">読み込みに失敗しました</p>';
+            }
+        }
+
+        function displayTanks() {
+            const container = document.getElementById('tanksList');
+            
+            if (tanks.length === 0) {
+                container.innerHTML = '<p class="text-gray-600 text-center py-8 col-span-full">防火水槽が登録されていません</p>';
+                return;
+            }
+
+            container.innerHTML = tanks.map(tank => {
+                return \`
+                    <div class="bg-white rounded-2xl shadow-lg p-6 tank-card cursor-pointer" onclick="goToTankDetail('\${tank.id}')">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800 mb-2">💧 \${tank.location}</h3>
+                                <p class="text-sm text-gray-600">📦 \${tank.storage_name || '未設定'}</p>
+                            </div>
+                            <button onclick="event.stopPropagation(); editTank('\${tank.id}')" class="text-blue-600 hover:text-blue-800 text-2xl">
+                                ✏️
+                            </button>
+                        </div>
+                        
+                        \${tank.capacity ? \`<p class="text-gray-700 mb-2">💧 容量: \${tank.capacity.toLocaleString()}L</p>\` : ''}
+                        \${tank.notes ? \`<p class="text-sm text-gray-600 line-clamp-2">📝 \${tank.notes}</p>\` : ''}
+                        
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <button onclick="event.stopPropagation(); goToTankDetail('\${tank.id}')" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-3 rounded-lg transition font-bold">
+                                点検記録を見る →
+                            </button>
+                        </div>
+                    </div>
+                \`;
+            }).join('');
+        }
+
+        function showAddTankModal() {
+            document.getElementById('tankId').value = '';
+            document.getElementById('tankStorageId').value = '';
+            document.getElementById('tankLocation').value = '';
+            document.getElementById('tankCapacity').value = '';
+            document.getElementById('tankNotes').value = '';
+            document.getElementById('tankModalTitle').textContent = '💧 防火水槽を追加';
+            document.getElementById('tankModal').classList.remove('hidden');
+        }
+
+        function hideTankModal() {
+            document.getElementById('tankModal').classList.add('hidden');
+        }
+
+        function editTank(tankId) {
+            const tank = tanks.find(t => t.id === tankId);
+            if (!tank) return;
+
+            document.getElementById('tankId').value = tank.id;
+            document.getElementById('tankStorageId').value = tank.storage_id;
+            document.getElementById('tankLocation').value = tank.location;
+            document.getElementById('tankCapacity').value = tank.capacity || '';
+            document.getElementById('tankNotes').value = tank.notes || '';
+            document.getElementById('tankModalTitle').textContent = '✏️ 防火水槽を編集';
+            document.getElementById('tankModal').classList.remove('hidden');
+        }
+
+        async function saveTank() {
+            const tankId = document.getElementById('tankId').value;
+            const storageId = document.getElementById('tankStorageId').value;
+            const location = document.getElementById('tankLocation').value;
+
+            if (!storageId || !location) {
+                alert('管理格納庫と設置場所は必須です');
+                return;
+            }
+
+            const data = {
+                storage_id: storageId,
+                location: location,
+                capacity: parseInt(document.getElementById('tankCapacity').value) || null,
+                notes: document.getElementById('tankNotes').value || null
+            };
+
+            try {
+                const url = tankId ? \`/api/water-tanks/\${tankId}\` : '/api/water-tanks';
+                const method = tankId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    hideTankModal();
+                    loadTanks();
+                } else {
+                    alert('保存に失敗しました');
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                alert('保存中にエラーが発生しました');
+            }
+        }
+
+        function goToTankDetail(tankId) {
+            location.href = '/water-tank/' + tankId;
+        }
+    </script>
+</body>
+</html>
+  `)
+})
+
+// ==========================================
 // 点検優先度ページ
 // ==========================================
 app.get('/inspection-priority', (c) => {
@@ -2886,6 +3378,335 @@ app.get('/api/inspection/priority', async (c) => {
     console.error('Database error:', error)
     return c.json({ storages: [] })
   }
+})
+
+// ==========================================
+// 防火水槽詳細・点検ページ
+// ==========================================
+app.get('/water-tank/:id', async (c) => {
+  const id = c.req.param('id')
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>防火水槽点検 - 活動記録</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            min-height: 100vh;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .float-animation { animation: float 3s ease-in-out infinite; }
+    </style>
+</head>
+<body>
+    <nav class="bg-white shadow-md">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center space-x-3">
+                    <span class="text-4xl float-animation">🔥</span>
+                    <div class="text-gray-800">
+                        <div class="font-bold text-xl">活動記録</div>
+                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
+                    </div>
+                </a>
+                <a href="/water-tanks" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                    ← 一覧に戻る
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6">
+        <div id="tankInfo" class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
+            <p class="text-gray-600">読み込み中...</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
+            <button onclick="showAddInspectionModal()" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition shadow-lg font-bold text-lg">
+                ➕ 点検を記録
+            </button>
+        </div>
+
+        <div id="inspectionsList" class="space-y-4">
+            <p class="text-gray-600 text-center py-8">読み込み中...</p>
+        </div>
+    </div>
+
+    <!-- 点検記録モーダル -->
+    <div id="inspectionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 id="inspectionModalTitle" class="text-2xl font-bold text-gray-800">💧 点検を記録</h2>
+                    <button onclick="hideInspectionModal()" class="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+                </div>
+
+                <div class="space-y-4">
+                    <input type="hidden" id="inspectionId">
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">点検日 <span class="text-red-500">*</span></label>
+                        <input type="date" id="inspectionDate" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">点検者 <span class="text-red-500">*</span></label>
+                        <select id="inspectorName" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                            <option value="">選択してください</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">要対応事項 ①</label>
+                        <input type="text" id="actionItem1" placeholder="例: 蓋の腐食確認" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">要対応事項 ②</label>
+                        <input type="text" id="actionItem2" placeholder="例: 周辺の清掃" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">要対応事項 ③</label>
+                        <input type="text" id="actionItem3" placeholder="例: 標識の確認" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">点検メモ</label>
+                        <textarea id="inspectionNotes" rows="3" placeholder="その他気づいた点など" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                    </div>
+
+                    <div class="flex space-x-3 pt-4">
+                        <button type="button" onclick="saveInspection()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
+                            ✅ 保存する
+                        </button>
+                        <button type="button" onclick="hideInspectionModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-4 rounded-xl transition font-bold text-lg">
+                            キャンセル
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tankId = '${id}';
+        let tank = null;
+        let inspections = [];
+        let members = [];
+
+        window.onload = function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('inspectionDate').value = today;
+            
+            loadMembers();
+            loadTank();
+            loadInspections();
+        };
+
+        async function loadMembers() {
+            try {
+                const response = await fetch('/api/users');
+                const data = await response.json();
+                members = data.users || [];
+                
+                const select = document.getElementById('inspectorName');
+                members.forEach(member => {
+                    const option = document.createElement('option');
+                    option.value = member.name;
+                    option.textContent = member.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load members:', error);
+            }
+        }
+
+        async function loadTank() {
+            try {
+                const response = await fetch('/api/water-tanks');
+                const data = await response.json();
+                tank = (data.tanks || []).find(t => t.id === tankId);
+                
+                if (!tank) {
+                    document.getElementById('tankInfo').innerHTML = '<p class="text-red-600">防火水槽が見つかりません</p>';
+                    return;
+                }
+                
+                displayTankInfo();
+            } catch (error) {
+                console.error('Failed to load tank:', error);
+                document.getElementById('tankInfo').innerHTML = '<p class="text-red-600">読み込みに失敗しました</p>';
+            }
+        }
+
+        function displayTankInfo() {
+            document.getElementById('tankInfo').innerHTML = \`
+                <h1 class="text-3xl font-bold text-gray-800 mb-4">💧 \${tank.location}</h1>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+                    <div><span class="font-bold">📦 管理格納庫:</span> \${tank.storage_name || '未設定'}</div>
+                    \${tank.capacity ? \`<div><span class="font-bold">💧 容量:</span> \${tank.capacity.toLocaleString()}L</div>\` : ''}
+                </div>
+                \${tank.notes ? \`<div class="mt-4 text-gray-600"><span class="font-bold">📝 備考:</span> \${tank.notes}</div>\` : ''}
+            \`;
+        }
+
+        async function loadInspections() {
+            try {
+                const response = await fetch('/api/water-tank-inspections?tank_id=' + tankId);
+                const data = await response.json();
+                inspections = data.inspections || [];
+                displayInspections();
+            } catch (error) {
+                console.error('Failed to load inspections:', error);
+                document.getElementById('inspectionsList').innerHTML = '<p class="text-red-600 text-center py-8">読み込みに失敗しました</p>';
+            }
+        }
+
+        function displayInspections() {
+            const container = document.getElementById('inspectionsList');
+            
+            if (inspections.length === 0) {
+                container.innerHTML = '<p class="text-gray-600 text-center py-8">まだ点検記録がありません</p>';
+                return;
+            }
+
+            container.innerHTML = inspections.map(inspection => {
+                const hasActionItems = inspection.action_item_1 || inspection.action_item_2 || inspection.action_item_3;
+                
+                return \`
+                    <div class="bg-white rounded-2xl shadow-lg p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800">📅 \${inspection.inspection_date}</h3>
+                                <p class="text-gray-600">👤 点検者: \${inspection.inspector_name}</p>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="editInspection('\${inspection.id}')" class="text-blue-600 hover:text-blue-800 text-2xl">✏️</button>
+                                <button onclick="deleteInspection('\${inspection.id}')" class="text-red-600 hover:text-red-800 text-2xl">🗑️</button>
+                            </div>
+                        </div>
+                        
+                        \${hasActionItems ? \`
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                                <p class="font-bold text-gray-800 mb-2">⚠️ 要対応事項</p>
+                                \${inspection.action_item_1 ? \`<p class="text-gray-700">① \${inspection.action_item_1}</p>\` : ''}
+                                \${inspection.action_item_2 ? \`<p class="text-gray-700">② \${inspection.action_item_2}</p>\` : ''}
+                                \${inspection.action_item_3 ? \`<p class="text-gray-700">③ \${inspection.action_item_3}</p>\` : ''}
+                            </div>
+                        \` : ''}
+                        
+                        \${inspection.notes ? \`<p class="text-gray-600">📝 \${inspection.notes}</p>\` : ''}
+                    </div>
+                \`;
+            }).join('');
+        }
+
+        function showAddInspectionModal() {
+            document.getElementById('inspectionId').value = '';
+            document.getElementById('inspectionDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('inspectorName').value = '';
+            document.getElementById('actionItem1').value = '';
+            document.getElementById('actionItem2').value = '';
+            document.getElementById('actionItem3').value = '';
+            document.getElementById('inspectionNotes').value = '';
+            document.getElementById('inspectionModalTitle').textContent = '💧 点検を記録';
+            document.getElementById('inspectionModal').classList.remove('hidden');
+        }
+
+        function hideInspectionModal() {
+            document.getElementById('inspectionModal').classList.add('hidden');
+        }
+
+        function editInspection(inspectionId) {
+            const inspection = inspections.find(i => i.id === inspectionId);
+            if (!inspection) return;
+
+            document.getElementById('inspectionId').value = inspection.id;
+            document.getElementById('inspectionDate').value = inspection.inspection_date;
+            document.getElementById('inspectorName').value = inspection.inspector_name;
+            document.getElementById('actionItem1').value = inspection.action_item_1 || '';
+            document.getElementById('actionItem2').value = inspection.action_item_2 || '';
+            document.getElementById('actionItem3').value = inspection.action_item_3 || '';
+            document.getElementById('inspectionNotes').value = inspection.notes || '';
+            document.getElementById('inspectionModalTitle').textContent = '✏️ 点検記録を編集';
+            document.getElementById('inspectionModal').classList.remove('hidden');
+        }
+
+        async function saveInspection() {
+            const inspectionId = document.getElementById('inspectionId').value;
+            const inspectionDate = document.getElementById('inspectionDate').value;
+            const inspectorName = document.getElementById('inspectorName').value;
+
+            if (!inspectionDate || !inspectorName) {
+                alert('点検日と点検者は必須です');
+                return;
+            }
+
+            const data = {
+                tank_id: tankId,
+                inspection_date: inspectionDate,
+                inspector_name: inspectorName,
+                action_item_1: document.getElementById('actionItem1').value || null,
+                action_item_2: document.getElementById('actionItem2').value || null,
+                action_item_3: document.getElementById('actionItem3').value || null,
+                notes: document.getElementById('inspectionNotes').value || null
+            };
+
+            try {
+                const url = inspectionId ? \`/api/water-tank-inspections/\${inspectionId}\` : '/api/water-tank-inspections';
+                const method = inspectionId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    hideInspectionModal();
+                    loadInspections();
+                } else {
+                    alert('保存に失敗しました');
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                alert('保存中にエラーが発生しました');
+            }
+        }
+
+        async function deleteInspection(inspectionId) {
+            if (!confirm('この点検記録を削除してもよろしいですか？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(\`/api/water-tank-inspections/\${inspectionId}\`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadInspections();
+                } else {
+                    alert('削除に失敗しました');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('削除中にエラーが発生しました');
+            }
+        }
+    </script>
+</body>
+</html>
+  `)
 })
 
 // ==========================================
@@ -4206,15 +5027,16 @@ app.get('/api/inspection/action-required', async (c) => {
   try {
     const env = c.env as { DB: D1Database }
     
-    // action_itemsテーブルから取得
-    const result = await env.DB.prepare(`
+    // ホース点検の要対応事項
+    const hoseResult = await env.DB.prepare(`
       SELECT 
         a.*,
         i.storage_id,
         i.storage_number,
         i.inspection_date,
         s.location,
-        s.district
+        s.district,
+        'hose' as item_type
       FROM action_items a
       JOIN hose_inspections i ON a.inspection_id = i.id
       JOIN hose_storages s ON i.storage_id = s.id
@@ -4224,7 +5046,87 @@ app.get('/api/inspection/action-required', async (c) => {
         a.item_order ASC
     `).all()
     
-    return c.json({ items: result.results })
+    // 防火水槽点検の要対応事項を展開
+    const tankInspections = await env.DB.prepare(`
+      SELECT 
+        wti.*,
+        wt.location as tank_location,
+        wt.storage_id,
+        s.name as storage_name
+      FROM water_tank_inspections wti
+      JOIN water_tanks wt ON wti.tank_id = wt.id
+      LEFT JOIN storages s ON wt.storage_id = s.id
+      WHERE wti.action_item_1 IS NOT NULL 
+         OR wti.action_item_2 IS NOT NULL 
+         OR wti.action_item_3 IS NOT NULL
+      ORDER BY wti.inspection_date DESC
+    `).all()
+    
+    // 防火水槽の要対応事項を個別項目に展開
+    const tankItems: any[] = []
+    tankInspections.results?.forEach((inspection: any) => {
+      if (inspection.action_item_1) {
+        tankItems.push({
+          id: `tank_${inspection.id}_1`,
+          inspection_id: inspection.id,
+          content: inspection.action_item_1,
+          item_order: 1,
+          is_completed: inspection.action_item_1_completed || 0,
+          completed_at: inspection.action_item_1_completed_at,
+          action_content: inspection.action_item_1_action_content,
+          inspection_date: inspection.inspection_date,
+          storage_number: '防火水槽',
+          location: inspection.tank_location,
+          district: inspection.storage_name || '',
+          item_type: 'water_tank'
+        })
+      }
+      if (inspection.action_item_2) {
+        tankItems.push({
+          id: `tank_${inspection.id}_2`,
+          inspection_id: inspection.id,
+          content: inspection.action_item_2,
+          item_order: 2,
+          is_completed: inspection.action_item_2_completed || 0,
+          completed_at: inspection.action_item_2_completed_at,
+          action_content: inspection.action_item_2_action_content,
+          inspection_date: inspection.inspection_date,
+          storage_number: '防火水槽',
+          location: inspection.tank_location,
+          district: inspection.storage_name || '',
+          item_type: 'water_tank'
+        })
+      }
+      if (inspection.action_item_3) {
+        tankItems.push({
+          id: `tank_${inspection.id}_3`,
+          inspection_id: inspection.id,
+          content: inspection.action_item_3,
+          item_order: 3,
+          is_completed: inspection.action_item_3_completed || 0,
+          completed_at: inspection.action_item_3_completed_at,
+          action_content: inspection.action_item_3_action_content,
+          inspection_date: inspection.inspection_date,
+          storage_number: '防火水槽',
+          location: inspection.tank_location,
+          district: inspection.storage_name || '',
+          item_type: 'water_tank'
+        })
+      }
+    })
+    
+    // ホースと防火水槽の要対応事項をマージ
+    const allItems = [...(hoseResult.results || []), ...tankItems]
+    
+    // 未完了を優先、その後は日付順にソート
+    allItems.sort((a, b) => {
+      if (a.is_completed !== b.is_completed) {
+        return a.is_completed - b.is_completed
+      }
+      return new Date(b.inspection_date).getTime() - new Date(a.inspection_date).getTime()
+    })
+    
+    return c.json({ items: allItems })
   } catch (error) {
     console.error('Database error:', error)
     return c.json({ items: [] })
@@ -4267,14 +5169,33 @@ app.put('/api/inspection/mark-completed/:id', async (c) => {
     const env = c.env as { DB: D1Database }
     const now = new Date().toISOString()
     
-    await env.DB.prepare(`
-      UPDATE hose_inspections 
-      SET action_completed = 1,
-          action_completed_at = ?,
-          action_content = ?,
-          updated_at = ?
-      WHERE id = ?
-    `).bind(now, data.action_content || null, now, id).run()
+    // 防火水槽の要対応事項の場合（IDが "tank_" で始まる）
+    if (id.startsWith('tank_')) {
+      const parts = id.split('_')
+      const inspectionId = parts[1]
+      const itemNumber = parts[2]
+      
+      const columnPrefix = `action_item_${itemNumber}`
+      
+      await env.DB.prepare(`
+        UPDATE water_tank_inspections 
+        SET ${columnPrefix}_completed = 1,
+            ${columnPrefix}_completed_at = ?,
+            ${columnPrefix}_action_content = ?,
+            updated_at = ?
+        WHERE id = ?
+      `).bind(now, data.action_content || null, now, inspectionId).run()
+    } else {
+      // ホース点検の場合
+      await env.DB.prepare(`
+        UPDATE action_items
+        SET is_completed = 1,
+            completed_at = ?,
+            action_content = ?,
+            updated_at = ?
+        WHERE id = ?
+      `).bind(now, data.action_content || null, now, id).run()
+    }
     
     return c.json({ success: true })
   } catch (error) {
