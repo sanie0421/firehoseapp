@@ -98,7 +98,8 @@ app.get('/', (c) => {
                 </div>
             </a>
 
-            <!-- 活動日誌 -->
+            <!-- 活動日誌 - 非表示（データは保持） -->
+            <!--
             <a href="/logs" class="card-gradient-3 rounded-2xl shadow-2xl p-6 card-hover">
                 <div class="text-white">
                     <div class="text-5xl mb-4 text-center">📝</div>
@@ -106,6 +107,7 @@ app.get('/', (c) => {
                     <p class="text-center opacity-90 text-sm">活動・訓練の記録と承認</p>
                 </div>
             </a>
+            -->
 
             <!-- 団員管理 -->
             <a href="/members" class="card-gradient-4 rounded-2xl shadow-2xl p-6 card-hover">
@@ -324,10 +326,11 @@ app.post('/api/activity-logs', async (c) => {
         previous_meter, current_meter, distance_km, fuel_liters,
         engine_check, battery_check, grease_supply, fuel_supply, oil_supply,
         fire_suits, boots, helmets, hoses, nozzles,
+        flashlights, flashlight_charge,
         water_discharge, vehicle_power_off_confirmed_by, radio_charge_confirmed_by,
         remarks, special_notes,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id, 
       data.activity_date, 
@@ -355,6 +358,8 @@ app.post('/api/activity-logs', async (c) => {
       data.helmets, 
       data.hoses, 
       data.nozzles,
+      data.flashlights,
+      toNullIfEmpty(data.flashlight_charge),
       toNullIfEmpty(data.water_discharge), 
       toNullIfEmpty(data.vehicle_power_off_confirmed_by), 
       toNullIfEmpty(data.radio_charge_confirmed_by),
@@ -437,6 +442,8 @@ app.put('/api/activity-logs/:id', async (c) => {
         helmets = ?,
         hoses = ?,
         nozzles = ?,
+        flashlights = ?,
+        flashlight_charge = ?,
         water_discharge = ?,
         vehicle_power_off_confirmed_by = ?,
         radio_charge_confirmed_by = ?,
@@ -469,6 +476,8 @@ app.put('/api/activity-logs/:id', async (c) => {
       data.helmets,
       data.hoses,
       data.nozzles,
+      data.flashlights,
+      toNullIfEmpty(data.flashlight_charge),
       toNullIfEmpty(data.water_discharge),
       toNullIfEmpty(data.vehicle_power_off_confirmed_by),
       toNullIfEmpty(data.radio_charge_confirmed_by),
@@ -4867,26 +4876,41 @@ app.get('/logs', (c) => {
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">👔 防火服</label>
-                                    <input type="number" id="fireSuits" placeholder="10" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">👔 防火服（基準: 10着）</label>
+                                    <input type="number" id="fireSuits" placeholder="実数を入力" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">👢 銀長靴</label>
-                                    <input type="number" id="boots" placeholder="10" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">👢 銀長靴（基準: 10足）</label>
+                                    <input type="number" id="boots" placeholder="実数を入力" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">⛑️ ヘルメット</label>
-                                    <input type="number" id="helmets" placeholder="10" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">⛑️ ヘルメット（基準: 10個）</label>
+                                    <input type="number" id="helmets" placeholder="実数を入力" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">🚿 ホース</label>
-                                    <input type="number" id="hoses" placeholder="25" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">🚿 ホース（規定: 26本）</label>
+                                    <input type="number" id="hoses" placeholder="実数を入力" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">🔫 筒先（基準: 2本）</label>
+                                    <input type="number" id="nozzles" placeholder="実数を入力" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">🔫 筒先</label>
-                                    <input type="number" id="nozzles" placeholder="2" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">💡 懐中電灯（基準: 8本）</label>
+                                    <input type="number" id="flashlights" placeholder="実数を入力" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">💡 懐中電灯の充電確認</label>
+                                    <select id="flashlightCharge" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                                        <option value="">-</option>
+                                        <option value="良">良</option>
+                                        <option value="不良">不良</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -5190,6 +5214,8 @@ app.get('/logs', (c) => {
                 helmets: parseInt(document.getElementById('helmets').value) || null,
                 hoses: parseInt(document.getElementById('hoses').value) || null,
                 nozzles: parseInt(document.getElementById('nozzles').value) || null,
+                flashlights: parseInt(document.getElementById('flashlights').value) || null,
+                flashlight_charge: document.getElementById('flashlightCharge').value || null,
                 water_discharge: document.getElementById('waterDischarge').value || null,
                 vehicle_power_off_confirmed_by: document.getElementById('vehiclePowerOffConfirmedBy').value || null,
                 radio_charge_confirmed_by: document.getElementById('radioChargeConfirmedBy').value || null,
@@ -5401,6 +5427,8 @@ app.get('/logs', (c) => {
             document.getElementById('helmets').value = log.helmets || '';
             document.getElementById('hoses').value = log.hoses || '';
             document.getElementById('nozzles').value = log.nozzles || '';
+            document.getElementById('flashlights').value = log.flashlights || '';
+            document.getElementById('flashlightCharge').value = log.flashlight_charge || '';
             document.getElementById('waterDischarge').value = log.water_discharge || '';
             document.getElementById('vehiclePowerOffConfirmedBy').value = log.vehicle_power_off_confirmed_by || '';
             document.getElementById('radioChargeConfirmedBy').value = log.radio_charge_confirmed_by || '';
@@ -5790,27 +5818,26 @@ app.get('/stats', (c) => {
             
             <!-- タブナビゲーション -->
             <div class="flex border-b mt-4">
+                <!-- 活動集計タブ - 非表示（データは保持） -->
+                <!--
                 <button id="tabActivity" class="tab-btn flex-1 py-3 px-6 font-bold text-lg transition active">
                     📝 活動集計
                 </button>
-                <button id="tabHose" class="tab-btn flex-1 py-3 px-6 font-bold text-lg transition text-gray-500 hover:text-gray-700">
+                -->
+                <button id="tabHose" class="tab-btn flex-1 py-3 px-6 font-bold text-lg transition active">
                     📈 ホース集計
                 </button>
             </div>
         </div>
         
-        <!-- 活動集計タブ -->
+        <!-- 活動集計タブ - 非表示（データは保持） -->
+        <!--
         <div id="activityTab">
-
-        <!-- 年度選択 -->
         <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
             <label class="block text-lg font-bold text-gray-700 mb-3">📅 年度選択</label>
             <select id="activityFiscalYear" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg">
-                <!-- JavaScriptで動的に生成 -->
             </select>
         </div>
-
-        <!-- 統計カード -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             <div class="bg-white rounded-2xl p-6 shadow-lg">
                 <div class="text-gray-600 text-sm mb-2">🔥 総活動回数</div>
@@ -5833,8 +5860,6 @@ app.get('/stats', (c) => {
                 <div class="text-gray-500 text-xs mt-2">回</div>
             </div>
         </div>
-
-        <!-- グラフエリア -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <div class="bg-white rounded-2xl p-6 shadow-lg">
                 <h2 class="text-xl font-bold text-gray-800 mb-4">📈 活動種別の割合</h2>
@@ -5845,18 +5870,16 @@ app.get('/stats', (c) => {
                 <canvas id="monthlyChart"></canvas>
             </div>
         </div>
-
-        <!-- 出動回数ランキング -->
         <div class="bg-white rounded-2xl p-6 shadow-lg">
             <h2 class="text-xl font-bold text-gray-800 mb-4">👥 出動回数ランキング</h2>
             <div id="participationRanking" class="space-y-2">
-                <!-- JavaScriptで動的生成 -->
             </div>
         </div>
         </div>
+        -->
         
         <!-- ホース集計タブ -->
-        <div id="hoseTab" class="hidden">
+        <div id="hoseTab">
             <!-- 年度選択 -->
             <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
                 <label class="block text-lg font-bold text-gray-700 mb-3">📅 年度選択</label>
@@ -5923,6 +5946,8 @@ app.get('/stats', (c) => {
 
         // タブ切り替え機能
         function initTabs() {
+            // タブ切り替え処理 - 活動集計タブ非表示のため無効化
+            /*
             const tabActivity = document.getElementById('tabActivity');
             const tabHose = document.getElementById('tabHose');
             const activityTab = document.getElementById('activityTab');
@@ -5945,6 +5970,7 @@ app.get('/stats', (c) => {
                 hoseTab.classList.remove('hidden');
                 activityTab.classList.add('hidden');
             });
+            */
         }
 
         // ホース集計タブ初期化
