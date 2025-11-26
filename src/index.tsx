@@ -36,129 +36,287 @@ app.get('/', (c) => {
     <meta name="theme-color" content="#ef5350">
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
-            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            background: #f5f5f5;
             min-height: 100vh;
+            margin: 0;
+            padding: 0;
         }
-        .card-gradient-1 { background: linear-gradient(135deg, #ef5350 0%, #e53935 100%); }
-        .card-gradient-2 { background: linear-gradient(135deg, #ff6f00 0%, #ff8f00 100%); }
-        .card-gradient-3 { background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%); }
-        .card-gradient-4 { background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%); }
-        .card-gradient-5 { background: linear-gradient(135deg, #ab47bc 0%, #8e24aa 100%); }
-        .card-gradient-6 { background: linear-gradient(135deg, #29b6f6 0%, #0288d1 100%); }
         
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
+        /* ヘッダー赤背景 */
+        .header-red {
+            background: linear-gradient(135deg, #dc143c 0%, #b91c2e 100%);
         }
-        .float-animation { animation: float 3s ease-in-out infinite; }
         
-        .card-hover {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        /* 機能カードアイコン */
+        .function-card {
+            background: transparent;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
         }
-        .card-hover:hover {
-            transform: translateY(-10px) scale(1.02);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        .function-card:hover {
+            transform: translateY(-4px);
+        }
+        .function-card img {
+            width: 100%;
+            height: auto;
+            max-width: 160px;
+            margin: 0 auto 4px;
+            display: block;
+        }
+        .function-card h3 {
+            font-size: 13px;
+            font-weight: 700;
+            color: #333;
+            margin: 0;
+            background: transparent;
+            padding: 4px 8px;
+            text-shadow: 0 1px 3px rgba(255,255,255,0.8), 0 2px 6px rgba(255,255,255,0.5);
+        }
+        
+        /* 火災情報カード */
+        .fire-info-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 16px;
+        }
+        
+        /* Fire Safety Tips */
+        .fire-tips {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .fire-tips-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .fire-tips-content {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #555;
+        }
+        .fire-tips-source {
+            font-size: 11px;
+            color: #999;
+            margin-top: 8px;
         }
     </style>
 </head>
 <body>
     <!-- ヘッダー -->
-    <div class="bg-white shadow-md">
-        <div class="container mx-auto px-4 py-6">
-            <div class="flex items-center justify-center space-x-4">
-                <div class="text-6xl float-animation">🔥</div>
-                <div class="text-gray-800 text-center">
-                    <h1 class="text-3xl md:text-4xl font-bold">活動記録</h1>
-                    <p class="text-lg text-gray-600">大井町消防団第一分団</p>
+    <div class="header-red" style="box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+        <div style="max-width: 1200px; margin: 0 auto; padding: 12px 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <img src="/kanagawa-logo.png" alt="Logo" style="width: 48px; height: 48px;">
+                    <div>
+                        <h1 style="color: white; font-size: 18px; font-weight: 600; margin: 0;">活動記録</h1>
+                        <p style="color: rgba(255,255,255,0.9); font-size: 13px; margin: 0;">大井町消防団第一分団</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- メインコンテンツ -->
-    <div class="container mx-auto px-4 py-12">
-        <!-- 機能カード -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            <!-- ホース点検 -->
-            <a href="/inspection-priority" class="card-gradient-1 rounded-2xl shadow-2xl p-6 card-hover">
-                <div class="text-white">
-                    <div class="text-5xl mb-4 text-center">⚠️</div>
-                    <h2 class="text-xl font-bold mb-2 text-center">ホース点検</h2>
-                    <p class="text-center opacity-90 text-sm">要点検のホース格納庫を確認</p>
+    <div style="max-width: 1200px; margin: 0 auto; padding: 16px;">
+        <!-- 火災情報カード -->
+        <div class="fire-info-card">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="fireInfoIcon" style="font-size: 20px;">🔥</span>
+                    <span style="font-size: 14px; font-weight: 600; color: #333;">火災情報</span>
                 </div>
+                <button onclick="loadFireInfo()" id="fireInfoReloadBtn" style="background: #2196f3; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                    <i class="fas fa-sync-alt" id="fireInfoReloadIcon" style="font-size: 11px;"></i>
+                    更新
+                </button>
+            </div>
+            <div id="fireInfoContent" style="font-size: 13px; line-height: 1.6; color: #555;">
+                <i class="fas fa-spinner fa-spin"></i> 読み込み中...
+            </div>
+            <div id="fireInfoTimestamp" style="font-size: 11px; color: #999; margin-top: 8px;"></div>
+        </div>
+        
+        <!-- 機能カードグリッド -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+            <a href="/inspection-priority" class="function-card" style="text-decoration: none;">
+                <img src="/hose-icon.png" alt="ホース点検">
+                <h3>ホース点検</h3>
             </a>
-
-            <!-- 防火水槽点検 -->
-            <a href="/water-tanks" class="card-gradient-6 rounded-2xl shadow-2xl p-6 card-hover">
-                <div class="text-white">
-                    <div class="text-5xl mb-4 text-center">💧</div>
-                    <h2 class="text-xl font-bold mb-2 text-center">防火水槽点検</h2>
-                    <p class="text-center opacity-90 text-sm">防火水槽の点検管理</p>
-                </div>
+            <a href="/water-tanks" class="function-card" style="text-decoration: none;">
+                <img src="/suisou-icon.png" alt="防火水槽点検">
+                <h3>防火水槽点検</h3>
             </a>
-
-            <!-- 要対応事項一覧 -->
-            <a href="/action-required" class="card-gradient-2 rounded-2xl shadow-2xl p-6 card-hover">
-                <div class="text-white">
-                    <div class="text-5xl mb-4 text-center">🚨</div>
-                    <h2 class="text-xl font-bold mb-2 text-center">要対応事項</h2>
-                    <p class="text-center opacity-90 text-sm">対応が必要な項目一覧</p>
-                </div>
+            <a href="/action-required" class="function-card" style="text-decoration: none;">
+                <img src="/task-icon.png" alt="要対応事項">
+                <h3>要対応事項</h3>
             </a>
-
-            <!-- 活動日誌 - 非表示（データは保持） -->
-            <!--
-            <a href="/logs" class="card-gradient-3 rounded-2xl shadow-2xl p-6 card-hover">
-                <div class="text-white">
-                    <div class="text-5xl mb-4 text-center">📝</div>
-                    <h2 class="text-xl font-bold mb-2 text-center">活動日誌</h2>
-                    <p class="text-center opacity-90 text-sm">活動・訓練の記録と承認</p>
-                </div>
+            <a href="/stats" class="function-card" style="text-decoration: none;">
+                <img src="/statistics-icon.png" alt="活動集計">
+                <h3>活動集計</h3>
             </a>
-            -->
-
-            <!-- 活動集計 -->
-            <a href="/stats" class="card-gradient-5 rounded-2xl shadow-2xl p-6 card-hover">
-                <div class="text-white">
-                    <div class="text-5xl mb-4 text-center">📊</div>
-                    <h2 class="text-xl font-bold mb-2 text-center">活動集計</h2>
-                    <p class="text-center opacity-90 text-sm">実績データ・グラフ表示</p>
-                </div>
+            <a href="/members" class="function-card" style="text-decoration: none;">
+                <img src="/members-icon.png" alt="団員名簿">
+                <h3>団員名簿</h3>
             </a>
-
-            <!-- 団員管理 -->
-            <a href="/members" class="card-gradient-4 rounded-2xl shadow-2xl p-6 card-hover">
-                <div class="text-white">
-                    <div class="text-5xl mb-4 text-center">👥</div>
-                    <h2 class="text-xl font-bold mb-2 text-center">団員管理</h2>
-                    <p class="text-center opacity-90 text-sm">団員情報の登録・編集</p>
-                </div>
-            </a>
-
-            <!-- データ管理 -->
-            <a href="/admin" class="card-gradient-1 rounded-2xl shadow-2xl p-6 card-hover">
-                <div class="text-white">
-                    <div class="text-5xl mb-4 text-center">⚙️</div>
-                    <h2 class="text-xl font-bold mb-2 text-center">データ管理</h2>
-                    <p class="text-center opacity-90 text-sm">データ確認・バックアップ</p>
-                </div>
+            <a href="/admin" class="function-card" style="text-decoration: none;">
+                <img src="/database-icon.png" alt="データ管理">
+                <h3>データ管理</h3>
             </a>
         </div>
-
-        <!-- 使い方案内 -->
-        <div class="mt-12 max-w-2xl mx-auto">
-            <div class="bg-white rounded-2xl p-6 shadow-lg">
-                <p class="text-gray-800 text-center text-lg">
-                    <strong>💡 使い方:</strong> 各カードをタップすると記録画面が開きます
-                </p>
+        
+        <!-- Fire Safety Tips -->
+        <div class="fire-tips">
+            <div class="fire-tips-header">
+                <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                    <span style="font-size: 18px;">🔥</span>
+                    <span style="font-size: 14px; font-weight: 600; color: #333;">Fire Safety Tips</span>
+                </div>
+                <button onclick="refreshTip()" style="background: #f5f5f5; border: none; padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                    <i class="fas fa-sync-alt" id="tipRefreshIcon" style="font-size: 14px; color: #666;"></i>
+                </button>
+            </div>
+            <div class="fire-tips-content">
+                <p id="fireTip" style="margin: 0;"></p>
+                <p id="fireTipSource" class="fire-tips-source" style="margin: 0;"></p>
             </div>
         </div>
     </div>
+
+    <script>
+        // 防災豆知識データ（50以上の豊富な情報）
+        const fireSafetyTips = [
+            { tip: '消火器の使い方は「ピン・ポン・パン」で覚えよう！ピン（安全ピンを抜く）、ポン（ホースを火元に向ける）、パン（レバーを握る）の順番です。', source: '総務省消防庁「消火器の使い方」' },
+            { tip: '火災発生時は、煙を吸わないよう姿勢を低くして避難しましょう。煙は天井付近に溜まるため、床に近いほど安全です。', source: '東京消防庁「火災時の避難方法」' },
+            { tip: '住宅用火災警報器の電池寿命は約10年です。定期的に動作確認を行い、古くなったら交換しましょう。', source: '総務省消防庁「住宅用火災警報器の維持管理」' },
+            { tip: '天ぷら油火災には絶対に水をかけてはいけません！消火器を使うか、濡れたシーツで覆って酸素を遮断しましょう。', source: '東京消防庁「天ぷら油火災への対応」' },
+            { tip: '地震後の通電火災を防ぐため、避難時はブレーカーを落としましょう。', source: '総務省消防庁「地震火災対策」' },
+            { tip: '119番通報では、場所・火災か救急か・状況を落ち着いて伝えましょう。', source: '総務省消防庁「119番通報のポイント」' },
+            { tip: '消防団員は全国に約81万人います（2023年4月時点）。年々減少傾向にあるため、地域の消防力維持が課題となっています。', source: '総務省消防庁「消防団員数の現状」令和5年版消防白書' },
+            { tip: '消防団の出動手当は自治体により異なりますが、5,000円以下が大半です。', source: '総務省消防庁「消防団員の処遇等に関する調査結果」令和4年度' },
+            { tip: '機能別消防団員制度により、特定の活動（予防広報、大規模災害対応など）に限定した活動が可能です。', source: '総務省消防庁「機能別団員・分団制度」' },
+            { tip: '消防団協力事業所表示制度により、従業員の消防団活動に協力する事業所を表彰・PRできます。', source: '総務省消防庁「消防団協力事業所表示制度」' },
+            { tip: '消防団は「自らの地域は自らで守る」という精神に基づく、地域防災の要です。', source: '総務省消防庁「消防団の役割」' }
+        ];
+
+        function refreshTip() {
+            const randomIndex = Math.floor(Math.random() * fireSafetyTips.length);
+            const tip = fireSafetyTips[randomIndex];
+            document.getElementById('fireTip').textContent = tip.tip;
+            document.getElementById('fireTipSource').textContent = '出典: ' + tip.source;
+            
+            const icon = document.getElementById('tipRefreshIcon');
+            icon.style.transform = 'rotate(360deg)';
+            setTimeout(() => { icon.style.transform = 'rotate(0deg)'; }, 300);
+        }
+
+        async function loadFireInfo() {
+            const content = document.getElementById('fireInfoContent');
+            const timestamp = document.getElementById('fireInfoTimestamp');
+            const icon = document.getElementById('fireInfoIcon');
+            const reloadIcon = document.getElementById('fireInfoReloadIcon');
+            
+            reloadIcon.style.animation = 'spin 1s linear infinite';
+            
+            try {
+                const response = await fetch('/api/fire-info');
+                const data = await response.json();
+                
+                if (data.success && data.hasData) {
+                    icon.textContent = '🚨';
+                    content.innerHTML = '<strong style="color: #d32f2f;">' + data.message + '</strong>';
+                    if (data.timestamp) {
+                        timestamp.textContent = '発生時刻: ' + data.timestamp;
+                    }
+                } else {
+                    icon.textContent = '✅';
+                    content.textContent = data.message || '現在、災害は発生しておりません';
+                    timestamp.textContent = '最終確認: ' + (data.lastUpdated || new Date().toLocaleString('ja-JP'));
+                }
+            } catch (error) {
+                console.error('Fire info error:', error);
+                icon.textContent = '⚠️';
+                content.textContent = '火災情報の取得に失敗しました';
+                timestamp.textContent = '';
+            }
+            
+            reloadIcon.style.animation = '';
+        }
+
+        // 初期化
+        refreshTip();
+        loadFireInfo();
+    </script>
 </body>
 </html>
   `)
+})
+
+// ===========================================
+// 【API: 火災情報】
+// ===========================================
+app.get('/api/fire-info', async (c) => {
+  try {
+    const response = await fetch('http://odawara-saigai.sakura.ne.jp/saigai/')
+    const buffer = await response.arrayBuffer()
+    
+    // Shift_JISからUTF-8に変換
+    const decoder = new TextDecoder('shift-jis')
+    const html = decoder.decode(buffer)
+
+    // タイトル部分から災害情報を抽出
+    const titleMatch = html.match(/<span class="TITLE">(.*?)<\/span>/i)
+    const timeMatch = html.match(/<font class="TIME">(.*?)<\/font>/i)
+    
+    if (!titleMatch) {
+      return c.json({
+        success: true,
+        hasData: false,
+        message: '災害情報を取得できませんでした',
+        lastUpdated: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+      })
+    }
+
+    const message = titleMatch[1].trim()
+    const timestamp = timeMatch ? timeMatch[1].trim() : ''
+    
+    // 災害が発生していない場合
+    const hasDisaster = !message.includes('災害は発生しておりません') && !message.includes('災害は発生していません')
+
+    return c.json({
+      success: true,
+      hasData: hasDisaster,
+      message: message,
+      timestamp: timestamp,
+      lastUpdated: new Date().toLocaleString('ja-JP', { 
+        timeZone: 'Asia/Tokyo',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    })
+  } catch (error) {
+    console.error('Fire info fetch error:', error)
+    return c.json({
+      success: false,
+      error: 'データ取得エラー',
+      lastUpdated: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+    }, 500)
+  }
 })
 
 // ==========================================
