@@ -112,6 +112,17 @@ app.get('/', (c) => {
             color: #999;
             margin-top: 8px;
         }
+        
+        /* 火災時の点滅アニメーション */
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -227,6 +238,7 @@ app.get('/', (c) => {
             const content = document.getElementById('fireInfoContent');
             const timestamp = document.getElementById('fireInfoTimestamp');
             const icon = document.getElementById('fireInfoIcon');
+            const card = document.querySelector('.fire-info-card');
             const reloadIcon = document.getElementById('fireInfoReloadIcon');
             
             reloadIcon.style.animation = 'spin 1s linear infinite';
@@ -236,20 +248,47 @@ app.get('/', (c) => {
                 const data = await response.json();
                 
                 if (data.success && data.hasData) {
-                    icon.textContent = '🚨';
-                    content.innerHTML = '<strong style="color: #d32f2f;">' + data.message + '</strong>';
+                    const message = data.message || '';
+                    
+                    // 大井町で火災発生の場合（赤・点滅）
+                    if (message.includes('大井町') || message.includes('大井')) {
+                        icon.textContent = '🚨';
+                        card.style.background = '#ffebee';
+                        card.style.borderLeft = '4px solid #d32f2f';
+                        card.style.animation = 'blink 1s infinite';
+                        content.innerHTML = '<strong style="color: #d32f2f; font-size: 15px;">⚠️ ' + message + '</strong>';
+                    } 
+                    // 他地域で火災（オレンジ）
+                    else {
+                        icon.textContent = '🔥';
+                        card.style.background = '#fff3e0';
+                        card.style.borderLeft = '4px solid #f57c00';
+                        card.style.animation = 'none';
+                        content.innerHTML = '<strong style="color: #f57c00;">' + message + '</strong>';
+                    }
+                    
                     if (data.timestamp) {
                         timestamp.textContent = '発生時刻: ' + data.timestamp;
+                        timestamp.style.color = '#d32f2f';
                     }
                 } else {
+                    // 平常時（緑）
                     icon.textContent = '✅';
-                    content.textContent = data.message || '現在、災害は発生しておりません';
+                    card.style.background = '#e8f5e9';
+                    card.style.borderLeft = '4px solid #43a047';
+                    card.style.animation = 'none';
+                    content.innerHTML = '<span style="color: #43a047; font-weight: 600;">' + (data.message || '現在、災害は発生しておりません') + '</span>';
                     timestamp.textContent = '最終確認: ' + (data.lastUpdated || new Date().toLocaleString('ja-JP'));
+                    timestamp.style.color = '#999';
                 }
             } catch (error) {
                 console.error('Fire info error:', error);
+                // エラー時（オレンジ）
                 icon.textContent = '⚠️';
-                content.textContent = '火災情報の取得に失敗しました';
+                card.style.background = '#fff3e0';
+                card.style.borderLeft = '4px solid #f57c00';
+                card.style.animation = 'none';
+                content.innerHTML = '<span style="color: #f57c00;">火災情報の取得に失敗しました</span>';
                 timestamp.textContent = '';
             }
             
@@ -259,6 +298,9 @@ app.get('/', (c) => {
         // 初期化
         refreshTip();
         loadFireInfo();
+        
+        // 5分ごとに火災情報を自動更新
+        setInterval(loadFireInfo, 5 * 60 * 1000);
     </script>
 </body>
 </html>
