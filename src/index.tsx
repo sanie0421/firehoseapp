@@ -50,33 +50,44 @@ app.get('/', (c) => {
             background: linear-gradient(135deg, #dc143c 0%, #b91c2e 100%);
         }
         
-        /* 機能カードアイコン */
+        /* iOS風アイコンスタイル */
         .function-card {
-            background: transparent;
-            border-radius: 12px;
-            padding: 12px;
             text-align: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        .function-card:hover {
-            transform: translateY(-4px);
-        }
-        .function-card img {
-            width: 100%;
-            height: auto;
-            max-width: 160px;
-            margin: 0 auto 4px;
+            text-decoration: none;
             display: block;
         }
+        .ios-icon-wrapper {
+            position: relative;
+            border-radius: 22%;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+        .ios-icon-wrapper:active {
+            transform: scale(0.92);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+        .ios-icon-wrapper img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        /* iOS風グラデーション背景 */
+        .icon-hose-bg { background: linear-gradient(135deg, #FF3B30 0%, #FF453A 100%); }
+        .icon-tank-bg { background: linear-gradient(135deg, #007AFF 0%, #0A84FF 100%); }
+        .icon-action-bg { background: linear-gradient(135deg, #FF9500 0%, #FF9F0A 100%); }
+        .icon-stats-bg { background: linear-gradient(135deg, #34C759 0%, #30D158 100%); }
+        .icon-members-bg { background: linear-gradient(135deg, #FF2D55 0%, #FF6482 100%); }
+        .icon-admin-bg { background: linear-gradient(135deg, #5856D6 0%, #AF52DE 100%); }
+        
         .function-card h3 {
             font-size: 13px;
             font-weight: 700;
             color: #333;
             margin: 0;
-            background: transparent;
-            padding: 4px 8px;
-            text-shadow: 0 1px 3px rgba(255,255,255,0.8), 0 2px 6px rgba(255,255,255,0.5);
+            text-shadow: 0 1px 3px rgba(255,255,255,0.8);
         }
         
         /* 火災情報カード */
@@ -161,30 +172,53 @@ app.get('/', (c) => {
             <div id="fireInfoTimestamp" style="font-size: 11px; color: #999; margin-top: 8px;"></div>
         </div>
         
-        <!-- 機能カードグリッド -->
+        <!-- 機能メニュー - iOS風アイコン -->
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
-            <a href="/inspection-priority" class="function-card" style="text-decoration: none;">
-                <img src="/hose-icon.png" alt="ホース点検">
+            <!-- ホース点検 -->
+            <a href="/inspection-priority" class="function-card">
+                <div class="ios-icon-wrapper icon-hose-bg">
+                    <img src="/hose-icon.png" alt="ホース点検">
+                </div>
                 <h3>ホース点検</h3>
             </a>
-            <a href="/water-tanks" class="function-card" style="text-decoration: none;">
-                <img src="/suisou-icon.png" alt="防火水槽点検">
+            
+            <!-- 防火水槽点検 -->
+            <a href="/water-tanks" class="function-card">
+                <div class="ios-icon-wrapper icon-tank-bg">
+                    <img src="/suisou-icon.png" alt="防火水槽点検">
+                </div>
                 <h3>防火水槽点検</h3>
             </a>
-            <a href="/action-required" class="function-card" style="text-decoration: none;">
-                <img src="/task-icon.png" alt="要対応事項">
+            
+            <!-- 要対応事項 -->
+            <a href="/action-required" class="function-card">
+                <div class="ios-icon-wrapper icon-action-bg">
+                    <img src="/task-icon.png" alt="要対応事項">
+                </div>
                 <h3>要対応事項</h3>
             </a>
-            <a href="/stats" class="function-card" style="text-decoration: none;">
-                <img src="/statistics-icon.png" alt="活動集計">
+            
+            <!-- 活動集計 -->
+            <a href="/stats" class="function-card">
+                <div class="ios-icon-wrapper icon-stats-bg">
+                    <img src="/statistics-icon.png" alt="活動集計">
+                </div>
                 <h3>活動集計</h3>
             </a>
-            <a href="/members" class="function-card" style="text-decoration: none;">
-                <img src="/members-icon.png" alt="団員名簿">
+            
+            <!-- 団員名簿 -->
+            <a href="/members" class="function-card">
+                <div class="ios-icon-wrapper icon-members-bg">
+                    <img src="/members-icon.png" alt="団員名簿">
+                </div>
                 <h3>団員名簿</h3>
             </a>
-            <a href="/admin" class="function-card" style="text-decoration: none;">
-                <img src="/database-icon.png" alt="データ管理">
+            
+            <!-- データ管理 -->
+            <a href="/admin" class="function-card">
+                <div class="ios-icon-wrapper icon-admin-bg">
+                    <img src="/database-icon.png" alt="データ管理">
+                </div>
                 <h3>データ管理</h3>
             </a>
         </div>
