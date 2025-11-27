@@ -9708,7 +9708,33 @@ app.get('/members', (c) => {
 
             list.innerHTML = memberList.map(member => {
                 const age = member.birth_date ? calculateAge(member.birth_date) : '不明';
-                const years = member.join_date ? calculateYearsOfService(member.join_date) : '不明';
+                
+                // 在籍年数計算（退団者は退団年度まで、現役は現在年度まで）
+                let years = '不明';
+                if (member.join_date) {
+                    const today = new Date();
+                    const currentYear = today.getFullYear();
+                    const currentMonth = today.getMonth() + 1;
+                    const currentFiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+                    
+                    const joinDate = new Date(member.join_date);
+                    const joinYear = joinDate.getFullYear();
+                    const joinMonth = joinDate.getMonth() + 1;
+                    const joinFiscalYear = joinMonth >= 4 ? joinYear : joinYear - 1;
+                    
+                    let endFiscalYear = currentFiscalYear;
+                    if (member.retirement_date && member.retirement_date !== 'null') {
+                        const retireDate = new Date(member.retirement_date);
+                        if (!isNaN(retireDate.getTime())) {
+                            const retireYear = retireDate.getFullYear();
+                            const retireMonth = retireDate.getMonth() + 1;
+                            endFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
+                        }
+                    }
+                    
+                    years = endFiscalYear - joinFiscalYear + 1;
+                }
+                
                 const joinDateDisplay = member.join_date ? new Date(member.join_date).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'}) : '不明';
                 const birthDateDisplay = member.birth_date ? new Date(member.birth_date).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'}) : '不明';
                 
