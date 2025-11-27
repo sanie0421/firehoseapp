@@ -501,6 +501,68 @@ app.put('/api/users/:id/status', async (c) => {
 })
 
 // ==========================================
+// API: 不在期間取得（特定団員）
+// ==========================================
+app.get('/api/absence-periods/:userId', async (c) => {
+  try {
+    const userId = c.req.param('userId')
+    const env = c.env as { DB: D1Database }
+    
+    const result = await env.DB.prepare(`
+      SELECT * FROM absence_periods
+      WHERE user_id = ?
+      ORDER BY start_date DESC
+    `).bind(userId).all()
+    
+    return c.json({ periods: result.results })
+  } catch (error) {
+    console.error('Get absence periods error:', error)
+    return c.json({ periods: [] })
+  }
+})
+
+// ==========================================
+// API: 不在期間追加
+// ==========================================
+app.post('/api/absence-periods', async (c) => {
+  try {
+    const { user_id, start_date, end_date, reason } = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    
+    const id = 'absence_' + Date.now()
+    
+    await env.DB.prepare(`
+      INSERT INTO absence_periods (id, user_id, start_date, end_date, reason, created_at, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
+    `).bind(id, user_id, start_date, end_date, reason).run()
+    
+    return c.json({ success: true, id })
+  } catch (error) {
+    console.error('Add absence period error:', error)
+    return c.json({ error: 'Failed to add absence period' }, 500)
+  }
+})
+
+// ==========================================
+// API: 不在期間削除
+// ==========================================
+app.delete('/api/absence-periods/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const env = c.env as { DB: D1Database }
+    
+    await env.DB.prepare(`
+      DELETE FROM absence_periods WHERE id = ?
+    `).bind(id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete absence period error:', error)
+    return c.json({ error: 'Failed to delete absence period' }, 500)
+  }
+})
+
+// ==========================================
 // API: 団員追加
 // ==========================================
 app.post('/api/members', async (c) => {
@@ -8962,11 +9024,35 @@ app.get('/members', (c) => {
                 const joinDateDisplay = member.join_date ? new Date(member.join_date).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'}) : '不明';
                 const birthDateDisplay = member.birth_date ? new Date(member.birth_date).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'}) : '不明';
                 
+                // ステータスに応じてボタンを変える
+                const isActive = !member.status || member.status === 1;
+                const isOB = member.status === 2;
+                const isRetired = member.status === 3;
+                
+                let statusButtons = '';
+                if (isActive) {
+                    // 現役: 引退・退団ボタン
+                    statusButtons = '<button onclick="changeStatus(\\'' + member.id + '\\', 2)" class="bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg transition shadow-md font-bold">' +
+                        '😊 引退' +
+                    '</button>' +
+                    '<button onclick="changeStatus(\\'' + member.id + '\\', 3)" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-lg transition shadow-md font-bold">' +
+                        '🚪 退団' +
+                    '</button>';
+                } else {
+                    // OBまたは退団: 現役復帰ボタン
+                    statusButtons = '<button onclick="changeStatus(\\'' + member.id + '\\', 1)" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-3 rounded-lg transition shadow-md font-bold col-span-2">' +
+                        '🔄 現役復帰' +
+                    '</button>';
+                }
+                
                 return '<div class="bg-white rounded-2xl p-6 shadow-lg border-2 border-gray-200 hover:border-blue-400 transition">' +
                     '<h3 class="text-2xl font-bold text-gray-800 mb-4">👤 ' + member.name + '</h3>' +
                     '<div class="space-y-2 mb-4">' +
                         '<p class="text-gray-700 text-base">🎂 生年月日: ' + birthDateDisplay + ' (' + age + '歳)</p>' +
                         '<p class="text-gray-700 text-base">📅 入団: ' + joinDateDisplay + ' (' + years + '年目)</p>' +
+                    '</div>' +
+                    '<div class="grid grid-cols-2 gap-2 mb-2">' +
+                        statusButtons +
                     '</div>' +
                     '<div class="grid grid-cols-2 gap-2">' +
                         '<button onclick="editMember(\\'' + member.id + '\\')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg transition shadow-md font-bold">' +
@@ -9033,7 +9119,16 @@ app.get('/members', (c) => {
             html += '</tr></thead><tbody>';
             
             members.forEach(member => {
-                html += '<tr><td class="border px-4 py-2 font-bold">' + member.name + '</td>';
+                const currentAge = member.birth_date ? calculateAge(member.birth_date) : null;
+                const currentYears = member.join_date ? calculateYearsOfService(member.join_date) : null;
+                
+                // バッジ判定（5年🥉、10年🥈、20年🏆）
+                let badge = '';
+                if (currentYears >= 20) badge = '🏆';
+                else if (currentYears >= 10) badge = '🥈';
+                else if (currentYears >= 5) badge = '🥉';
+                
+                html += '<tr><td class="border px-4 py-2 font-bold">' + badge + ' ' + member.name + '</td>';
                 
                 for (let i = 20; i >= 0; i--) {
                     const year = currentFiscalYear - i;
@@ -9046,8 +9141,13 @@ app.get('/members', (c) => {
                     
                     if (joinFiscalYear && year >= joinFiscalYear) {
                         const yearsOfService = year - joinFiscalYear + 1;
+                        const age = currentAge ? (currentAge - (currentFiscalYear - year)) : null;
+                        
                         cellClass += ' bg-green-100';
                         cellContent = yearsOfService + '年';
+                        if (age) {
+                            cellContent += '<br>(' + age + '歳)';
+                        }
                     } else {
                         cellClass += ' bg-gray-50';
                     }
@@ -9145,6 +9245,33 @@ app.get('/members', (c) => {
                 }
             } catch (error) {
                 alert('❌ 削除中にエラーが発生しました');
+                console.error(error);
+            }
+        }
+        
+        async function changeStatus(userId, newStatus) {
+            const statusNames = { 1: '現役', 2: 'OB', 3: '退団' };
+            const confirmMsg = 'ステータスを「' + statusNames[newStatus] + '」に変更しますか？';
+            
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/users/' + userId + '/status', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                
+                if (response.ok) {
+                    alert('✅ ステータスを変更しました');
+                    loadMembers();
+                } else {
+                    alert('❌ ステータス変更中にエラーが発生しました');
+                }
+            } catch (error) {
+                alert('❌ ステータス変更中にエラーが発生しました');
                 console.error(error);
             }
         }
