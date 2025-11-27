@@ -485,10 +485,13 @@ app.put('/api/users/:id/status', async (c) => {
         WHERE id = ?
       `).bind(status, userId).run()
     } else {
-      // OBまたは退団の場合、retirement_date を記録
+      // OBまたは退団の場合
+      // 既存のretirement_dateがあれば保持、なければ今日の日付を設定
       await env.DB.prepare(`
         UPDATE users
-        SET status = ?, retirement_date = ?, updated_at = datetime('now', 'localtime')
+        SET status = ?, 
+            retirement_date = COALESCE(retirement_date, ?),
+            updated_at = datetime('now', 'localtime')
         WHERE id = ?
       `).bind(status, now, userId).run()
     }
@@ -4306,6 +4309,16 @@ app.get('/inspection-priority', (c) => {
 
             <!-- 優先度タブ -->
             <div id="priorityTab" class="p-6">
+                <!-- AI優先度判断ボタン -->
+                <div class="mb-6">
+                    <button onclick="analyzeWithAI()" id="aiAnalyzeBtn" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg shadow-lg flex items-center justify-center gap-2">
+                        <span>🤖</span>
+                        <span>AIで優先度を判断</span>
+                        <span id="aiAnalyzeSpinner" class="hidden">⏳</span>
+                    </button>
+                    <p class="text-xs text-gray-600 mt-2 text-center">※ Claude AIがホース製造年月・点検履歴を総合的に分析します</p>
+                </div>
+                
                 <!-- フィルタボタン群 -->
                 <div class="mb-6">
                     <!-- 時間フィルタ -->
@@ -4542,6 +4555,68 @@ app.get('/inspection-priority', (c) => {
             }
         }
 
+        async function analyzeWithAI() {
+            const btn = document.getElementById('aiAnalyzeBtn');
+            const spinner = document.getElementById('aiAnalyzeSpinner');
+            
+            if (allStorages.length === 0) {
+                alert('格納庫データがありません');
+                return;
+            }
+            
+            // ボタンを無効化
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            btn.innerHTML = '<span>🤖</span><span>AI分析中...</span><span>⏳</span>';
+            
+            try {
+                const response = await fetch('/api/inspection/ai-priority', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ storages: allStorages })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('AI分析に失敗しました');
+                }
+                
+                const result = await response.json();
+                
+                if (result.rankings && result.rankings.length > 0) {
+                    // AI判定結果をallStoragesに反映
+                    allStorages = allStorages.map(storage => {
+                        const ranking = result.rankings.find(r => r.storage_id === storage.id);
+                        if (ranking) {
+                            return {
+                                ...storage,
+                                ai_priority_score: ranking.priority_score,
+                                ai_reason: ranking.reason,
+                                oldest_hose_age_years: ranking.oldest_hose_age_years
+                            };
+                        }
+                        return storage;
+                    });
+                    
+                    // AIスコア順にソート
+                    allStorages.sort((a, b) => (b.ai_priority_score || 0) - (a.ai_priority_score || 0));
+                    
+                    applyFilters();
+                    alert('✅ AI優先度判定が完了しました！\\n\\n上位の格納庫から順に表示されます。');
+                } else {
+                    alert('❌ AI判定結果が取得できませんでした');
+                }
+                
+            } catch (error) {
+                console.error('AI analysis error:', error);
+                alert('❌ AI分析中にエラーが発生しました\\n\\n' + error.message);
+            } finally {
+                // ボタンを元に戻す
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+                btn.innerHTML = '<span>🤖</span><span>AIで優先度を判断</span>';
+            }
+        }
+
         function setTimeFilter(filter) {
             currentTimeFilter = filter;
             // 全タブのフィルタボタンを更新
@@ -4728,8 +4803,20 @@ app.get('/inspection-priority', (c) => {
                         '</div>' +
                         '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full text-base font-bold border border-white border-opacity-50 ml-2">' + priorityIcon + ' ' + priorityText + '</span>' +
                     '</div>' +
-                    '<p class="text-base opacity-90 mb-4">最終点検: ' + lastInspection + (daysAgo !== null ? ' (' + daysAgo + '日前)' : '') + '</p>' +
-                    pinButton +
+                    '<p class="text-base opacity-90 mb-2">最終点検: ' + lastInspection + (daysAgo !== null ? ' (' + daysAgo + '日前)' : '') + '</p>';
+            
+            // AIスコアと理由表示
+            if (storage.ai_priority_score) {
+                html += '<div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-3 mb-4 border border-white border-opacity-30">' +
+                           '<p class="text-sm font-bold mb-1">🤖 AI優先度: ' + storage.ai_priority_score + '点/100点</p>' +
+                           '<p class="text-xs opacity-90">' + (storage.ai_reason || '') + '</p>';
+                if (storage.oldest_hose_age_years) {
+                    html += '<p class="text-xs opacity-90 mt-1">最古ホース: ' + storage.oldest_hose_age_years + '年経過</p>';
+                }
+                html += '</div>';
+            }
+            
+            html += pinButton +
                     '<button class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-xl text-base font-semibold transition border border-white border-opacity-50">📝 点検する</button>' +
                 '</div>' +
             '</div>';
@@ -5064,22 +5151,35 @@ app.post('/api/inspection/ai-priority', async (c) => {
 格納庫データ（JSON）:
 ${JSON.stringify(storages, null, 2)}
 
-判定基準:
-1. 最終点検日が古い（未点検含む）
-2. 前回点検結果が異常・要注意
-3. 地区的に重要な拠点
-4. ホース破損・交換が多い
+【重要】判定基準（優先度順）:
+1. **ホース製造年月（最重要）**
+   - 製造から10年以上経過したホースがある場合は最優先
+   - ホースは新しければ10年は使用可能
+   - hose_1_manufacture_date～hose_4_manufacture_date の最古のものを基準に判定
+   
+2. **点検履歴**
+   - 最終点検日が古い（未点検含む）
+   - 備考に「【消火栓点検のみ】」と記載されている場合、ホース点検はカウントしない
+   
+3. **前回点検結果**
+   - 異常・要注意・ホース破損/交換が多い
+   
+4. **地区的重要性**
+   - 人口密集地域、重要施設近辺
 
 各格納庫について、100点満点で優先度スコアを算出し、以下のJSON形式で返してください:
 {
   "rankings": [
     {
       "storage_id": "格納庫ID",
-      "priority_score": 85,
-      "reason": "優先する理由（30文字以内）"
+      "priority_score": 95,
+      "reason": "ホース製造12年経過、要点検",
+      "oldest_hose_age_years": 12
     }
   ]
-}`
+}
+
+必ず上記JSON形式のみで回答してください。説明文は不要です。`
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -5882,6 +5982,14 @@ app.get('/storage/:id', async (c) => {
                     <input type="date" id="inspectionDate" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
                 </div>
 
+                <!-- 消火栓点検のみ -->
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="hydrantOnlyCheckbox" class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <span class="text-sm font-bold text-gray-700">🚰 消火栓点検のみ（ホース点検なし）</span>
+                    </label>
+                </div>
+
                 <!-- ホース交換数・破損数 -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -6554,7 +6662,13 @@ app.get('/storage/:id', async (c) => {
             const actionRequired1 = document.getElementById('actionRequired1').value;
             const actionRequired2 = document.getElementById('actionRequired2').value;
             const actionRequired3 = document.getElementById('actionRequired3').value;
-            const remarks = document.getElementById('remarks').value;
+            
+            // 消火栓点検のみチェック
+            const hydrantOnly = document.getElementById('hydrantOnlyCheckbox').checked;
+            let remarks = document.getElementById('remarks').value;
+            if (hydrantOnly) {
+                remarks = '【消火栓点検のみ】' + (remarks ? ' ' + remarks : '');
+            }
             
             // ホース製造年月日
             const hose1MfgDate = document.getElementById('hose1ManufactureDate').value;
@@ -6787,6 +6901,9 @@ app.post('/api/inspection/record', async (c) => {
       nextMandatoryDate = tenYearsLater.toISOString().split('T')[0]
     }
     
+    // remarksに「消火栓点検のみ」が含まれているかチェック
+    const hydrantOnly = data.remarks && data.remarks.includes('【消火栓点検のみ】') ? 1 : 0
+    
     await env.DB.prepare(`
       INSERT INTO hose_inspections (
         id, storage_id, storage_number, inspection_date,
@@ -6795,8 +6912,9 @@ app.post('/api/inspection/record', async (c) => {
         inspector_id, inspector_name,
         hose_1_manufacture_date, hose_2_manufacture_date,
         hose_3_manufacture_date, hose_4_manufacture_date,
+        hydrant_only,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       data.storage_id,
@@ -6813,6 +6931,7 @@ app.post('/api/inspection/record', async (c) => {
       data.hose_2_manufacture_date || null,
       data.hose_3_manufacture_date || null,
       data.hose_4_manufacture_date || null,
+      hydrantOnly,
       now,
       now
     ).run()
