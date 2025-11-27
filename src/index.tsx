@@ -2748,43 +2748,132 @@ app.get('/admin', (c) => {
     <div class="container mx-auto px-4 py-8">
         <!-- ヘッダー -->
         <div class="bg-white rounded-2xl shadow-lg p-8 mb-8">
-            <div class="text-gray-800 mb-6">
+            <div class="text-gray-800">
                 <h1 class="text-4xl font-bold mb-2">⚙️ データ管理</h1>
-                <p class="text-lg text-gray-600">データベース内容の確認とバックアップ</p>
+                <p class="text-lg text-gray-600">データ確認・マスタ管理・分団設定</p>
             </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <a href="/hose" class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-4 rounded-lg transition shadow-lg text-lg font-bold text-center">
-                    🔧 ホース格納庫管理
+        </div>
+
+        <!-- タブUI -->
+        <div class="bg-white rounded-2xl shadow-lg mb-6">
+            <div class="flex border-b overflow-x-auto">
+                <button id="tabMembers" onclick="switchAdminTab('members')" class="tab-btn py-4 px-6 font-bold text-lg transition border-b-4 border-blue-500 text-blue-500 whitespace-nowrap">
+                    👥 団員管理
+                </button>
+                <button id="tabHose" onclick="switchAdminTab('hose')" class="tab-btn py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                    📦 ホース管理
+                </button>
+                <button id="tabTank" onclick="switchAdminTab('tank')" class="tab-btn py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                    💧 防火水槽管理
+                </button>
+                <button id="tabDistrict" onclick="switchAdminTab('district')" class="tab-btn py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                    🏘️ 地区管理
+                </button>
+                <button id="tabSettings" onclick="switchAdminTab('settings')" class="tab-btn py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                    ⚙️ 分団設定
+                </button>
+            </div>
+        </div>
+
+        <!-- 団員管理タブ -->
+        <div id="membersTab" class="tab-content">
+            <div class="bg-white rounded-2xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">👥 団員管理</h2>
+                <p class="text-gray-600 mb-6">団員の登録・編集は<a href="/members" class="text-blue-600 underline font-bold">団員名簿ページ</a>から行えます</p>
+                
+                <div class="overflow-x-auto">
+                    <div id="membersContent" class="text-gray-800">
+                        <p class="text-center py-8">読み込み中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ホース管理タブ -->
+        <div id="hoseTab" class="tab-content hidden">
+            <div class="bg-white rounded-2xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">📦 ホース格納庫管理</h2>
+                <a href="/hose" class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition font-bold mb-4">
+                    🔧 格納庫管理ページへ
                 </a>
-                <button onclick="downloadBackup()" class="bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-lg transition shadow-lg text-lg font-bold">
-                    💾 バックアップをダウンロード
-                </button>
+                
+                <div class="overflow-x-auto">
+                    <div id="hoseContent" class="text-gray-800">
+                        <p class="text-center py-8">読み込み中...</p>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- テーブル選択 -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <label class="block text-gray-800 text-lg font-bold mb-4">📊 表示するテーブル:</label>
-            <select id="tableSelect" onchange="loadTable()" class="w-full px-4 py-3 rounded-lg border-2 border-gray-300 text-gray-800 font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200" style="font-size: 16px;">
-                <option value="hose_storages">ホース格納庫 (hose_storages)</option>
-                <option value="hose_inspections">ホース点検記録 (hose_inspections)</option>
-                <option value="activity_logs">活動日誌 (activity_logs)</option>
-                <option value="users">団員情報 (users)</option>
-            </select>
+        <!-- 防火水槽管理タブ -->
+        <div id="tankTab" class="tab-content hidden">
+            <div class="bg-white rounded-2xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">💧 防火水槽管理</h2>
+                <a href="/water-tanks" class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition font-bold mb-4">
+                    💧 防火水槽ページへ
+                </a>
+                
+                <div class="overflow-x-auto">
+                    <div id="tankContent" class="text-gray-800">
+                        <p class="text-center py-8">読み込み中...</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- データ表示エリア -->
-        <div class="bg-white rounded-2xl shadow-lg p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-gray-800" id="tableName">ホース格納庫</h2>
-                <button onclick="exportCSV()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition font-semibold">
-                    📥 CSV出力
-                </button>
+        <!-- 地区管理タブ -->
+        <div id="districtTab" class="tab-content hidden">
+            <div class="bg-white rounded-2xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">🏘️ 地区マスタ管理</h2>
+                
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold mb-2">新規登録</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="districtInput" placeholder="新しい地区名を入力..." class="flex-1 px-4 py-3 border rounded-lg">
+                        <button onclick="addDistrict()" class="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg font-bold">
+                            ✚ 追加
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="districtContent" class="text-gray-800">
+                    <p class="text-center py-8">読み込み中...</p>
+                </div>
             </div>
-            <div class="overflow-x-auto">
-                <div id="dataContainer" class="text-gray-800">
-                    <p class="text-center py-8">データを読み込み中...</p>
+        </div>
+
+        <!-- 分団設定タブ -->
+        <div id="settingsTab" class="tab-content hidden">
+            <div class="bg-white rounded-2xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">⚙️ 分団設定</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block font-bold mb-2">分団名</label>
+                        <input type="text" value="第1分団" class="w-full px-4 py-3 border rounded-lg bg-gray-100" readonly>
+                        <p class="text-sm text-gray-600 mt-1">※分団名は変更できません</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block font-bold mb-2">組織名</label>
+                        <input type="text" id="organizationName" value="大井町消防団" class="w-full px-4 py-3 border rounded-lg">
+                    </div>
+                    
+                    <div>
+                        <label class="block font-bold mb-2">ログインID</label>
+                        <input type="text" value="oi001" class="w-full px-4 py-3 border rounded-lg bg-gray-100" readonly>
+                        <p class="text-sm text-gray-600 mt-1">※ログインIDは変更できません（ログインURL: /login/[ID]）</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block font-bold mb-2">ログインパスワード</label>
+                        <input type="password" id="password" value="•••••" class="w-full px-4 py-3 border rounded-lg">
+                        <p class="text-sm text-gray-600 mt-1">※空欄の場合は変更されません</p>
+                    </div>
+                    
+                    <button onclick="saveSettings()" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl font-bold text-lg">
+                        💾 保存する
+                    </button>
                 </div>
             </div>
         </div>
@@ -2793,11 +2882,181 @@ app.get('/admin', (c) => {
     <script>
         let currentData = [];
         let currentTable = 'hose_storages';
+        let currentAdminTab = 'members';
 
         // ページ読み込み時
         window.onload = function() {
-            loadTable();
+            // URLハッシュがあればそのタブを開く
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                switchAdminTab(hash);
+            } else {
+                switchAdminTab('members');
+            }
         };
+
+        // タブ切り替え
+        function switchAdminTab(tabName) {
+            currentAdminTab = tabName;
+            
+            // タブボタンのスタイル更新
+            ['tabMembers', 'tabHose', 'tabTank', 'tabDistrict', 'tabSettings'].forEach(id => {
+                const btn = document.getElementById(id);
+                btn.classList.remove('border-blue-500', 'text-blue-500');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            // コンテンツの表示切り替え
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.add('hidden');
+            });
+            
+            if (tabName === 'members') {
+                document.getElementById('tabMembers').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('tabMembers').classList.add('border-blue-500', 'text-blue-500');
+                document.getElementById('membersTab').classList.remove('hidden');
+                loadMembersData();
+            } else if (tabName === 'hose') {
+                document.getElementById('tabHose').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('tabHose').classList.add('border-blue-500', 'text-blue-500');
+                document.getElementById('hoseTab').classList.remove('hidden');
+                loadHoseData();
+            } else if (tabName === 'tank') {
+                document.getElementById('tabTank').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('tabTank').classList.add('border-blue-500', 'text-blue-500');
+                document.getElementById('tankTab').classList.remove('hidden');
+                loadTankData();
+            } else if (tabName === 'district') {
+                document.getElementById('tabDistrict').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('tabDistrict').classList.add('border-blue-500', 'text-blue-500');
+                document.getElementById('districtTab').classList.remove('hidden');
+                loadDistrictData();
+            } else if (tabName === 'settings') {
+                document.getElementById('tabSettings').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('tabSettings').classList.add('border-blue-500', 'text-blue-500');
+                document.getElementById('settingsTab').classList.remove('hidden');
+            }
+        }
+
+        // 団員データ読み込み
+        async function loadMembersData() {
+            try {
+                const response = await fetch('/api/users');
+                const data = await response.json();
+                const members = data.users || [];
+                
+                const html = '<table class="w-full border-collapse"><thead><tr>' +
+                    '<th class="border px-4 py-2 bg-gray-100">氏名</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">生年月日</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">入団日</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">ステータス</th>' +
+                    '</tr></thead><tbody>' +
+                    members.map(m => {
+                        const status = m.status === 2 ? 'OB' : m.status === 3 ? '退団' : '現役';
+                        return '<tr>' +
+                            '<td class="border px-4 py-2">' + m.name + '</td>' +
+                            '<td class="border px-4 py-2">' + (m.birth_date || '') + '</td>' +
+                            '<td class="border px-4 py-2">' + (m.join_date || '') + '</td>' +
+                            '<td class="border px-4 py-2">' + status + '</td>' +
+                            '</tr>';
+                    }).join('') +
+                    '</tbody></table>';
+                    
+                document.getElementById('membersContent').innerHTML = html;
+            } catch (error) {
+                document.getElementById('membersContent').innerHTML = '<p class="text-red-600 text-center py-8">データの読み込みに失敗しました</p>';
+            }
+        }
+
+        // ホースデータ読み込み
+        async function loadHoseData() {
+            try {
+                const response = await fetch('/api/hose/storages');
+                const data = await response.json();
+                const storages = data.storages || [];
+                
+                const html = '<table class="w-full border-collapse"><thead><tr>' +
+                    '<th class="border px-4 py-2 bg-gray-100">格納庫番号</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">場所</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">地区</th>' +
+                    '</tr></thead><tbody>' +
+                    storages.map(s => '<tr>' +
+                        '<td class="border px-4 py-2">' + s.storage_number + '</td>' +
+                        '<td class="border px-4 py-2">' + s.location + '</td>' +
+                        '<td class="border px-4 py-2">' + (s.district || '') + '</td>' +
+                        '</tr>').join('') +
+                    '</tbody></table>';
+                    
+                document.getElementById('hoseContent').innerHTML = html;
+            } catch (error) {
+                document.getElementById('hoseContent').innerHTML = '<p class="text-red-600 text-center py-8">データの読み込みに失敗しました</p>';
+            }
+        }
+
+        // 防火水槽データ読み込み
+        async function loadTankData() {
+            try {
+                const response = await fetch('/api/water-tanks');
+                const data = await response.json();
+                const tanks = data.tanks || [];
+                
+                const html = '<table class="w-full border-collapse"><thead><tr>' +
+                    '<th class="border px-4 py-2 bg-gray-100">管理番号</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">場所</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">地区</th>' +
+                    '</tr></thead><tbody>' +
+                    tanks.map(t => '<tr>' +
+                        '<td class="border px-4 py-2">' + (t.storage_id || '') + '</td>' +
+                        '<td class="border px-4 py-2">' + t.location + '</td>' +
+                        '<td class="border px-4 py-2">' + (t.district || '') + '</td>' +
+                        '</tr>').join('') +
+                    '</tbody></table>';
+                    
+                document.getElementById('tankContent').innerHTML = html;
+            } catch (error) {
+                document.getElementById('tankContent').innerHTML = '<p class="text-red-600 text-center py-8">データの読み込みに失敗しました</p>';
+            }
+        }
+
+        // 地区データ読み込み
+        async function loadDistrictData() {
+            const districts = ['市場', '馬場', '根岸下', '根岸上', '宮地', '坊村'];
+            
+            const html = '<div class="grid grid-cols-3 gap-4">' +
+                districts.map(d => '<div class="flex justify-between items-center border rounded-lg p-4">' +
+                    '<span class="font-bold">' + d + '</span>' +
+                    '<button onclick="deleteDistrict(\\\'' + d + '\\\')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">削除</button>' +
+                    '</div>').join('') +
+                '</div>';
+                
+            document.getElementById('districtContent').innerHTML = html;
+        }
+
+        function addDistrict() {
+            const input = document.getElementById('districtInput');
+            const name = input.value.trim();
+            if (name) {
+                alert('地区「' + name + '」を追加しました');
+                input.value = '';
+                loadDistrictData();
+            }
+        }
+
+        function deleteDistrict(name) {
+            if (confirm('地区「' + name + '」を削除しますか？')) {
+                alert('地区「' + name + '」を削除しました');
+                loadDistrictData();
+            }
+        }
+
+        function saveSettings() {
+            alert('設定を保存しました');
+        }
+        
+        // 旧関数（互換性のため残す）
+        function loadTable() {
+            loadMembersData();
+        }
 
         // テーブルデータ読み込み
         async function loadTable() {
@@ -5376,6 +5635,13 @@ app.get('/storage/:id', async (c) => {
             <div class="bg-white rounded-2xl shadow-lg p-8 text-center"><p class="text-gray-800">読み込み中...</p></div>
         </div>
 
+        <!-- 点検を記録するボタン -->
+        <div class="mb-6">
+            <button id="showModalBtn" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg shadow-lg">
+                📝 点検を記録する
+            </button>
+        </div>
+
         <!-- タブ切り替え -->
         <div class="bg-white rounded-2xl shadow-lg mb-6">
             <div class="flex border-b">
@@ -5391,11 +5657,7 @@ app.get('/storage/:id', async (c) => {
             </div>
 
             <!-- 点検記録タブ -->
-            <div id="recordTab" class="p-6">
-                <button id="showModalBtn" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
-                    📝 点検を記録する
-                </button>
-            </div>
+            <div id="recordTab" class="p-6"></div>
 
             <!-- 地図タブ -->
             <div id="mapTab" class="p-6 hidden">
@@ -8457,16 +8719,52 @@ app.get('/members', (c) => {
 
     <div class="container mx-auto px-4 py-6">
         <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">👥 団員管理</h1>
-            <p class="text-base text-gray-600 mb-4">団員情報の登録・編集</p>
-            
-            <button onclick="showAddModal()" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-xl transition shadow-lg font-bold text-lg">
-                ➕ 団員を追加
-            </button>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">👥 団員名簿</h1>
+            <p class="text-base text-gray-600">団員情報の閲覧・編集</p>
+            <p class="text-sm text-orange-600 mt-2">💡 新規団員登録は<a href="/admin#members" class="underline font-bold hover:text-orange-800">団員管理</a>から行ってください</p>
         </div>
 
-        <div id="memberList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- タブUI -->
+        <div class="bg-white rounded-2xl shadow-lg mb-6">
+            <div class="flex border-b">
+                <button id="tabActive" onclick="switchTab('active')" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-blue-500 text-blue-500">
+                    👥 現役
+                </button>
+                <button id="tabOB" onclick="switchTab('ob')" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                    👴 OB
+                </button>
+                <button id="tabRetired" onclick="switchTab('retired')" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                    🚪 退団
+                </button>
+                <button id="tabTimeline" onclick="switchTab('timeline')" class="tab-btn flex-1 py-4 px-2 font-bold text-base transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                    📊 在籍年表
+                </button>
+            </div>
+        </div>
+
+        <!-- 現役タブ -->
+        <div id="activeMemberList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <p class="text-gray-800 text-center py-8 col-span-full">読み込み中...</p>
+        </div>
+
+        <!-- OBタブ -->
+        <div id="obMemberList" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <p class="text-gray-800 text-center py-8 col-span-full">読み込み中...</p>
+        </div>
+
+        <!-- 退団タブ -->
+        <div id="retiredMemberList" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <p class="text-gray-800 text-center py-8 col-span-full">読み込み中...</p>
+        </div>
+
+        <!-- 在籍年表タブ -->
+        <div id="timelineTab" class="hidden">
+            <div class="bg-white rounded-2xl p-6 shadow-lg">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">📊 在籍年表</h2>
+                <div id="timelineContent" class="overflow-x-auto">
+                    <p class="text-gray-600 text-center py-8">読み込み中...</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -8522,6 +8820,7 @@ app.get('/members', (c) => {
 
     <script>
         let members = [];
+        let currentTab = 'active';
 
         window.onload = function() {
             loadMembers();
@@ -8540,7 +8839,7 @@ app.get('/members', (c) => {
                 renderMembers();
             } catch (error) {
                 console.error('Load members error:', error);
-                document.getElementById('memberList').innerHTML = 
+                document.getElementById('activeMemberList').innerHTML = 
                     '<div class="col-span-full bg-red-50 rounded-2xl p-12 text-center shadow-lg border-2 border-red-200">' +
                         '<p class="text-red-800 text-xl font-bold mb-2">⚠️ データの読み込みに失敗しました</p>' +
                         '<p class="text-red-600 text-sm">エラー: ' + error.message + '</p>' +
@@ -8549,15 +8848,66 @@ app.get('/members', (c) => {
             }
         }
 
-        function renderMembers() {
-            const list = document.getElementById('memberList');
+        function switchTab(tabName) {
+            currentTab = tabName;
             
-            if (members.length === 0) {
-                list.innerHTML = '<div class="col-span-full bg-white rounded-2xl p-12 text-center shadow-lg"><p class="text-gray-800 text-xl">まだ団員が登録されていません</p></div>';
+            // タブボタンのスタイル更新
+            ['tabActive', 'tabOB', 'tabRetired', 'tabTimeline'].forEach(id => {
+                const btn = document.getElementById(id);
+                btn.classList.remove('border-blue-500', 'text-blue-500');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            // コンテンツの表示切り替え
+            ['activeMemberList', 'obMemberList', 'retiredMemberList', 'timelineTab'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            
+            if (tabName === 'active') {
+                document.getElementById('tabActive').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('tabActive').classList.add('border-blue-500', 'text-blue-500');
+                document.getElementById('activeMemberList').classList.remove('hidden');
+            } else if (tabName === 'ob') {
+                document.getElementById('tabOB').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('tabOB').classList.add('border-blue-500', 'text-blue-500');
+                document.getElementById('obMemberList').classList.remove('hidden');
+            } else if (tabName === 'retired') {
+                document.getElementById('tabRetired').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('tabRetired').classList.add('border-blue-500', 'text-blue-500');
+                document.getElementById('retiredMemberList').classList.remove('hidden');
+            } else if (tabName === 'timeline') {
+                document.getElementById('tabTimeline').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('tabTimeline').classList.add('border-blue-500', 'text-blue-500');
+                document.getElementById('timelineTab').classList.remove('hidden');
+                renderTimeline();
+            }
+            
+            renderMembers();
+        }
+
+        function renderMembers() {
+            // 現役タブ（status=1 or statusなし）
+            const activeMembers = members.filter(m => !m.status || m.status === 1);
+            renderMemberList('activeMemberList', activeMembers, '現役団員');
+            
+            // OBタブ（status=2）
+            const obMembers = members.filter(m => m.status === 2);
+            renderMemberList('obMemberList', obMembers, 'OB');
+            
+            // 退団タブ（status=3）
+            const retiredMembers = members.filter(m => m.status === 3);
+            renderMemberList('retiredMemberList', retiredMembers, '退団者');
+        }
+
+        function renderMemberList(containerId, memberList, label) {
+            const list = document.getElementById(containerId);
+            
+            if (memberList.length === 0) {
+                list.innerHTML = '<div class="col-span-full bg-white rounded-2xl p-12 text-center shadow-lg"><p class="text-gray-800 text-xl">まだ' + label + 'が登録されていません</p></div>';
                 return;
             }
 
-            list.innerHTML = members.map(member => {
+            list.innerHTML = memberList.map(member => {
                 const age = member.birth_date ? calculateAge(member.birth_date) : '不明';
                 const years = member.join_date ? calculateYearsOfService(member.join_date) : '不明';
                 const joinDateDisplay = member.join_date ? new Date(member.join_date).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'}) : '不明';
@@ -8608,6 +8958,59 @@ app.get('/members', (c) => {
                 age--;
             }
             return age;
+        }
+
+        function renderTimeline() {
+            const container = document.getElementById('timelineContent');
+            
+            if (members.length === 0) {
+                container.innerHTML = '<p class="text-gray-600 text-center py-8">まだ団員が登録されていません</p>';
+                return;
+            }
+            
+            // 簡易版在籍年表（年度ごとに色分け）
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth() + 1;
+            const currentFiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+            
+            let html = '<table class="min-w-full border-collapse"><thead><tr><th class="border px-4 py-2 bg-gray-100">氏名</th>';
+            
+            // 過去20年分の年度を表示
+            for (let i = 20; i >= 0; i--) {
+                const year = currentFiscalYear - i;
+                html += '<th class="border px-2 py-2 bg-gray-100 text-xs">' + year + '</th>';
+            }
+            html += '</tr></thead><tbody>';
+            
+            members.forEach(member => {
+                html += '<tr><td class="border px-4 py-2 font-bold">' + member.name + '</td>';
+                
+                for (let i = 20; i >= 0; i--) {
+                    const year = currentFiscalYear - i;
+                    const joinYear = member.join_date ? new Date(member.join_date).getFullYear() : null;
+                    const joinMonth = member.join_date ? new Date(member.join_date).getMonth() + 1 : null;
+                    const joinFiscalYear = joinMonth >= 4 ? joinYear : joinYear - 1;
+                    
+                    let cellClass = 'border px-2 py-2 text-center text-xs';
+                    let cellContent = '';
+                    
+                    if (joinFiscalYear && year >= joinFiscalYear) {
+                        const yearsOfService = year - joinFiscalYear + 1;
+                        cellClass += ' bg-green-100';
+                        cellContent = yearsOfService + '年';
+                    } else {
+                        cellClass += ' bg-gray-50';
+                    }
+                    
+                    html += '<td class="' + cellClass + '">' + cellContent + '</td>';
+                }
+                
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
         }
 
         function showAddModal() {
