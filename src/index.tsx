@@ -9959,10 +9959,23 @@ app.get('/members', (c) => {
             container.innerHTML = rows.join('');
         }
         
-        // デフォルトソート：退団が早い順（現役は最後）
+        // デフォルトソート：年数が長い順（入団が早い順）
         function sortByRetirementDate() {
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth() + 1;
+            const currentFiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+            
             const memberData = members.map(member => {
+                let joinFiscalYear = null;
                 let retirementFiscalYear = null;
+                
+                if (member.join_date) {
+                    const joinDate = new Date(member.join_date);
+                    const joinYear = joinDate.getFullYear();
+                    const joinMonth = joinDate.getMonth() + 1;
+                    joinFiscalYear = joinMonth >= 4 ? joinYear : joinYear - 1;
+                }
                 
                 if (member.retirement_date && member.retirement_date !== 'null') {
                     const retireDate = new Date(member.retirement_date);
@@ -9973,19 +9986,22 @@ app.get('/members', (c) => {
                     }
                 }
                 
+                // 在籍年数計算
+                const endFiscalYear = retirementFiscalYear || currentFiscalYear;
+                const yearsOfService = joinFiscalYear ? (endFiscalYear - joinFiscalYear + 1) : 0;
+                
                 return { 
                     member: member,
-                    retirementFiscalYear: retirementFiscalYear
+                    joinFiscalYear: joinFiscalYear,
+                    yearsOfService: yearsOfService
                 };
             });
             
-            // ソート：退団が早い順（nullは最後＝現役は最後）
+            // ソート：年数が長い順（入団が早い順）
             memberData.sort((a, b) => {
-                if (a.retirementFiscalYear && b.retirementFiscalYear) {
-                    return a.retirementFiscalYear - b.retirementFiscalYear;
+                if (a.yearsOfService !== b.yearsOfService) {
+                    return b.yearsOfService - a.yearsOfService; // 降順
                 }
-                if (a.retirementFiscalYear && !b.retirementFiscalYear) return -1;
-                if (!a.retirementFiscalYear && b.retirementFiscalYear) return 1;
                 return a.member.name.localeCompare(b.member.name, 'ja');
             });
             
