@@ -4253,9 +4253,9 @@ app.get('/water-tanks', (c) => {
 
         function extractCoordsFromGoogleMapsUrl(url) {
             try {
-                const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+                const atMatch = url.match(/@(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);
                 if (atMatch) return { lat: parseFloat(atMatch[1]), lon: parseFloat(atMatch[2]) };
-                const qMatch = url.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+                const qMatch = url.match(/q=(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);
                 if (qMatch) return { lat: parseFloat(qMatch[1]), lon: parseFloat(qMatch[2]) };
             } catch (e) {
                 console.error('座標抽出エラー:', e);
@@ -4871,11 +4871,11 @@ app.get('/inspection-priority', (c) => {
         
         function extractCoordsFromGoogleMapsUrl(url) {
             try {
-                const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+                const atMatch = url.match(/@(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);
                 if (atMatch) return { lat: parseFloat(atMatch[1]), lon: parseFloat(atMatch[2]) };
-                const qMatch = url.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+                const qMatch = url.match(/q=(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);
                 if (qMatch) return { lat: parseFloat(qMatch[1]), lon: parseFloat(qMatch[2]) };
-                const llMatch = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+                const llMatch = url.match(/ll=(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);
                 if (llMatch) return { lat: parseFloat(llMatch[1]), lon: parseFloat(llMatch[2]) };
             } catch (e) {
                 console.error('座標抽出エラー:', e);
