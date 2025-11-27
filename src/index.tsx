@@ -10304,10 +10304,23 @@ app.get('/stats', (c) => {
                 </div>
             </div>
 
-            <!-- グラフ -->
+            <!-- 要対応事項統計 -->
             <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
-                <h2 class="text-xl font-bold text-gray-800 mb-4">📈 月別推移</h2>
-                <canvas id="hoseMonthlyChart"></canvas>
+                <h2 class="text-xl font-bold text-gray-800 mb-4">🚨 要対応事項統計</h2>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="text-center bg-red-50 rounded-xl p-4">
+                        <div class="text-3xl font-bold text-red-600 mb-1" id="totalActionItems">-</div>
+                        <div class="text-sm text-gray-700 font-bold">総数</div>
+                    </div>
+                    <div class="text-center bg-green-50 rounded-xl p-4">
+                        <div class="text-3xl font-bold text-green-600 mb-1" id="completedActionItems">-</div>
+                        <div class="text-sm text-gray-700 font-bold">対応済み</div>
+                    </div>
+                    <div class="text-center bg-blue-50 rounded-xl p-4">
+                        <div class="text-3xl font-bold text-blue-600 mb-1" id="actionItemCompletionRate">-</div>
+                        <div class="text-sm text-gray-700 font-bold">対応率</div>
+                    </div>
+                </div>
             </div>
 
             <!-- ホース別ランキング -->
@@ -10424,8 +10437,33 @@ app.get('/stats', (c) => {
                 calculateStats();
                 renderCharts();
                 renderParticipationRanking();
+                
+                // 要対応事項統計を読み込む
+                loadActionItemsStats();
             } catch (error) {
                 console.error('Failed to load stats:', error);
+            }
+        }
+        
+        // 要対応事項統計を読み込む
+        async function loadActionItemsStats() {
+            try {
+                const response = await fetch('/api/inspection/action-required');
+                const data = await response.json();
+                const items = data.items || [];
+                
+                const totalItems = items.length;
+                const completedItems = items.filter(item => item.is_completed === 1).length;
+                const completionRate = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+                
+                document.getElementById('totalActionItems').textContent = totalItems + '件';
+                document.getElementById('completedActionItems').textContent = completedItems + '件';
+                document.getElementById('actionItemCompletionRate').textContent = completionRate + '%';
+            } catch (error) {
+                console.error('Failed to load action items stats:', error);
+                document.getElementById('totalActionItems').textContent = '-';
+                document.getElementById('completedActionItems').textContent = '-';
+                document.getElementById('actionItemCompletionRate').textContent = '-';
             }
         }
 
@@ -10668,8 +10706,8 @@ app.get('/stats', (c) => {
                     : 0;
                 document.getElementById('inspectionCoverage').textContent = inspectedStorages + '/' + totalStorages + ' (' + inspectionRate + '%)';
                 
-                // グラフ更新
-                updateHoseChart(data.monthly);
+                // グラフ更新（削除済み）
+                // updateHoseChart(data.monthly);
                 
                 // ランキング更新
                 updateStorageRanking(data.by_storage);
