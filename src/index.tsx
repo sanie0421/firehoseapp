@@ -5635,13 +5635,6 @@ app.get('/storage/:id', async (c) => {
             <div class="bg-white rounded-2xl shadow-lg p-8 text-center"><p class="text-gray-800">読み込み中...</p></div>
         </div>
 
-        <!-- 点検を記録するボタン -->
-        <div class="mb-6">
-            <button id="showModalBtn" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg shadow-lg">
-                📝 点検を記録する
-            </button>
-        </div>
-
         <!-- タブ切り替え -->
         <div class="bg-white rounded-2xl shadow-lg mb-6">
             <div class="flex border-b">
@@ -5664,6 +5657,11 @@ app.get('/storage/:id', async (c) => {
                 <div id="mapContainer" class="mb-6">
                     <p class="text-gray-600 text-center py-8">地図を読み込んでいます...</p>
                 </div>
+                
+                <!-- 点検を記録するボタン（地図の下） -->
+                <button id="showModalBtn" class="w-full bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg shadow-lg">
+                    📝 点検を記録する
+                </button>
             </div>
 
             <!-- 点検履歴タブ -->
