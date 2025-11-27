@@ -9908,32 +9908,37 @@ app.get('/members', (c) => {
         function sortByYear(targetYear) {
             console.log('Sorting by year:', targetYear);
             
-            // 各団員について対象年度に在籍していたかチェック
-            const membersWithStatus = members.map(member => {
-                const joinYear = member.join_date ? new Date(member.join_date).getFullYear() : null;
-                const joinMonth = member.join_date ? new Date(member.join_date).getMonth() + 1 : null;
-                const joinFiscalYear = joinMonth >= 4 ? joinYear : joinYear - 1;
-                
-                let retirementFiscalYear = null;
-                if (member.retirement_date && member.retirement_date !== 'null') {
-                    const retireYear = new Date(member.retirement_date).getFullYear();
-                    const retireMonth = new Date(member.retirement_date).getMonth() + 1;
-                    retirementFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
+            // 対象年度在籍者を上に、そうでない人を下にソート
+            members.sort((a, b) => {
+                // aの在籍チェック
+                const aJoinYear = a.join_date ? new Date(a.join_date).getFullYear() : null;
+                const aJoinMonth = a.join_date ? new Date(a.join_date).getMonth() + 1 : null;
+                const aJoinFiscalYear = aJoinMonth >= 4 ? aJoinYear : aJoinYear - 1;
+                let aRetirementFiscalYear = null;
+                if (a.retirement_date && a.retirement_date !== 'null') {
+                    const aRetireYear = new Date(a.retirement_date).getFullYear();
+                    const aRetireMonth = new Date(a.retirement_date).getMonth() + 1;
+                    aRetirementFiscalYear = aRetireMonth >= 4 ? aRetireYear : aRetireYear - 1;
                 }
+                const aWasActive = aJoinFiscalYear && targetYear >= aJoinFiscalYear && 
+                                  (!aRetirementFiscalYear || targetYear <= aRetirementFiscalYear);
                 
-                const wasActive = joinFiscalYear && targetYear >= joinFiscalYear && 
-                                (!retirementFiscalYear || targetYear <= retirementFiscalYear);
+                // bの在籍チェック
+                const bJoinYear = b.join_date ? new Date(b.join_date).getFullYear() : null;
+                const bJoinMonth = b.join_date ? new Date(b.join_date).getMonth() + 1 : null;
+                const bJoinFiscalYear = bJoinMonth >= 4 ? bJoinYear : bJoinYear - 1;
+                let bRetirementFiscalYear = null;
+                if (b.retirement_date && b.retirement_date !== 'null') {
+                    const bRetireYear = new Date(b.retirement_date).getFullYear();
+                    const bRetireMonth = new Date(b.retirement_date).getMonth() + 1;
+                    bRetirementFiscalYear = bRetireMonth >= 4 ? bRetireYear : bRetireYear - 1;
+                }
+                const bWasActive = bJoinFiscalYear && targetYear >= bJoinFiscalYear && 
+                                  (!bRetirementFiscalYear || targetYear <= bRetirementFiscalYear);
                 
-                return {
-                    ...member,
-                    wasActiveInYear: wasActive
-                };
-            });
-            
-            // 対象年度在籍者を上に、そうでない人を下に
-            members = membersWithStatus.sort((a, b) => {
-                if (a.wasActiveInYear && !b.wasActiveInYear) return -1;
-                if (!a.wasActiveInYear && b.wasActiveInYear) return 1;
+                // ソートロジック
+                if (aWasActive && !bWasActive) return -1;
+                if (!aWasActive && bWasActive) return 1;
                 return a.name.localeCompare(b.name, 'ja');
             });
             
