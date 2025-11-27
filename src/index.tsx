@@ -6313,14 +6313,18 @@ app.get('/storage/:id', async (c) => {
             min-height: 48px;
         }
         .tab-btn {
-            -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+            -webkit-tap-highlight-color: rgba(59, 130, 246, 0.3);
             touch-action: manipulation;
             user-select: none;
             -webkit-user-select: none;
             cursor: pointer;
+            pointer-events: auto;
+            position: relative;
+            z-index: 10;
         }
         .tab-btn:active {
             background-color: rgba(0, 0, 0, 0.05);
+            transform: scale(0.98);
         }
         .modal-open {
             display: flex !important;
@@ -6572,12 +6576,18 @@ app.get('/storage/:id', async (c) => {
 
         // タブ切り替え
         function switchTab(tabName) {
+            console.log('switchTab called:', tabName);
             const tabRecord = document.getElementById('tabRecord');
             const tabMap = document.getElementById('tabMap');
             const tabHistory = document.getElementById('tabHistory');
             const recordTab = document.getElementById('recordTab');
             const mapTab = document.getElementById('mapTab');
             const historyTab = document.getElementById('historyTab');
+
+            if (!tabRecord || !tabMap || !tabHistory || !recordTab || !mapTab || !historyTab) {
+                console.error('Tab elements not found!');
+                return;
+            }
 
             // 全タブのスタイルをリセット
             [tabRecord, tabMap, tabHistory].forEach(tab => {
@@ -6605,6 +6615,7 @@ app.get('/storage/:id', async (c) => {
                 tabHistory.classList.remove('border-transparent', 'text-gray-500');
                 historyTab.classList.remove('hidden');
             }
+            console.log('switchTab completed:', tabName);
         }
 
         // 地図読み込み
@@ -6674,19 +6685,25 @@ app.get('/storage/:id', async (c) => {
             imageInput = document.getElementById('inspectionImage');
             clearImagesBtn = document.getElementById('clearImagesBtn');
 
-            // タブ切り替えイベント（スマホ対応: touchstartも追加）
+            // タブ切り替えイベント（スマホ対応: clickのみで統一、passiveオプション）
             const tabRecord = document.getElementById('tabRecord');
             const tabMap = document.getElementById('tabMap');
             const tabHistory = document.getElementById('tabHistory');
             
-            tabRecord.addEventListener('click', () => switchTab('record'));
-            tabRecord.addEventListener('touchstart', (e) => { e.preventDefault(); switchTab('record'); });
+            if (tabRecord) tabRecord.addEventListener('click', function(e) { 
+                e.stopPropagation(); 
+                switchTab('record'); 
+            }, { passive: true });
             
-            tabMap.addEventListener('click', () => switchTab('map'));
-            tabMap.addEventListener('touchstart', (e) => { e.preventDefault(); switchTab('map'); });
+            if (tabMap) tabMap.addEventListener('click', function(e) { 
+                e.stopPropagation(); 
+                switchTab('map'); 
+            }, { passive: true });
             
-            tabHistory.addEventListener('click', () => switchTab('history'));
-            tabHistory.addEventListener('touchstart', (e) => { e.preventDefault(); switchTab('history'); });
+            if (tabHistory) tabHistory.addEventListener('click', function(e) { 
+                e.stopPropagation(); 
+                switchTab('history'); 
+            }, { passive: true });
 
             // イベントリスナー設定（要素が確実に存在する状態で設定）
             if (showModalBtn) showModalBtn.addEventListener('click', showModal);
