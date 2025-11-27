@@ -9905,7 +9905,7 @@ app.get('/members', (c) => {
         
         // 指定年度の在籍者でソート（高速化版）
         function sortByYear(targetYear) {
-            // 事前計算：各メンバーの在籍状況
+            // 事前計算：各メンバーの在籍状況と年度情報
             const activeStatus = members.map(member => {
                 let joinFiscalYear = null;
                 let retirementFiscalYear = null;
@@ -9929,20 +9929,37 @@ app.get('/members', (c) => {
                 const wasActive = joinFiscalYear && targetYear >= joinFiscalYear && 
                                 (!retirementFiscalYear || targetYear <= retirementFiscalYear);
                 
-                return { member: member, wasActive: wasActive };
+                return { 
+                    member: member, 
+                    wasActive: wasActive,
+                    joinFiscalYear: joinFiscalYear,
+                    retirementFiscalYear: retirementFiscalYear
+                };
             });
             
-            // ソート
+            // ソート：在籍者を上に、入団が早い順（年数長い順）→退団が早い順
             activeStatus.sort((a, b) => {
+                // 在籍状態で分ける
                 if (a.wasActive && !b.wasActive) return -1;
                 if (!a.wasActive && b.wasActive) return 1;
+                
+                // 両方在籍者：入団年度が早い順（年数が長い順）
+                if (a.wasActive && b.wasActive && a.joinFiscalYear && b.joinFiscalYear) {
+                    if (a.joinFiscalYear !== b.joinFiscalYear) {
+                        return a.joinFiscalYear - b.joinFiscalYear;
+                    }
+                    // 入団年度同じ：退団年度が早い順（nullは最後＝現役は最後）
+                    if (a.retirementFiscalYear && b.retirementFiscalYear) {
+                        return a.retirementFiscalYear - b.retirementFiscalYear;
+                    }
+                    if (a.retirementFiscalYear && !b.retirementFiscalYear) return -1;
+                    if (!a.retirementFiscalYear && b.retirementFiscalYear) return 1;
+                }
+                
                 return a.member.name.localeCompare(b.member.name, 'ja');
             });
             
-            // membersを更新
             members = activeStatus.map(item => item.member);
-            
-            // 年表を再描画
             renderTimeline();
         }
 
