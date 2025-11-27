@@ -9837,13 +9837,20 @@ app.get('/members', (c) => {
                     
                     // 退団年度を計算（月単位で正確に）
                     let retirementFiscalYear = null;
-                    if (member.retirement_date && member.retirement_date !== 'null') {
-                        const retireYear = new Date(member.retirement_date).getFullYear();
-                        const retireMonth = new Date(member.retirement_date).getMonth() + 1;
-                        // 退団月が4月以降なら当年度、3月以前なら前年度
-                        // 例: 2025/3/31退団 → 2024年度が最終在籍年度
-                        // 例: 2025/4/1退団 → 2025年度が最終在籍年度
-                        retirementFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
+                    if (member.retirement_date && member.retirement_date !== 'null' && member.retirement_date !== null) {
+                        try {
+                            const retireDate = new Date(member.retirement_date);
+                            if (!isNaN(retireDate.getTime())) {
+                                const retireYear = retireDate.getFullYear();
+                                const retireMonth = retireDate.getMonth() + 1;
+                                // 退団月が4月以降なら当年度、3月以前なら前年度
+                                // 例: 2025/3/31退団 → 2024年度が最終在籍年度
+                                // 例: 2025/4/1退団 → 2025年度が最終在籍年度
+                                retirementFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
+                            }
+                        } catch (e) {
+                            console.error('Invalid retirement_date:', member.retirement_date, e);
+                        }
                     }
                     
                     let cellClass = 'border px-2 py-2 text-center text-xs';
@@ -9851,8 +9858,14 @@ app.get('/members', (c) => {
                     
                     // 在籍期間のチェック（入団年度 ≤ 対象年度 ≤ 退団年度）
                     // 例: 2024/4/1入団、2025/3/31退団 → 入団年度2024、退団年度2024 → 2024年度のみ在籍（満1年）
+                    // ただし、退団年度が未来の場合は現在年度で止める（まだ退団していない）
+                    let effectiveRetirementYear = retirementFiscalYear;
+                    if (retirementFiscalYear && retirementFiscalYear > currentFiscalYear) {
+                        effectiveRetirementYear = null; // まだ在籍中として扱う
+                    }
+                    
                     const isActive = joinFiscalYear && year >= joinFiscalYear && 
-                                    (!retirementFiscalYear || year <= retirementFiscalYear);
+                                    (!effectiveRetirementYear || year <= effectiveRetirementYear);
                     
                     if (isActive) {
                         const yearsOfService = year - joinFiscalYear + 1;
