@@ -142,7 +142,7 @@ app.get('/', (c) => {
         <div style="max-width: 1200px; margin: 0 auto; padding: 12px 16px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 48px;">🔥</span>
+                    <img src="/kanagawa-logo.png" alt="Logo" style="width: 48px; height: 48px;">
                     <div>
                         <h1 style="color: white; font-size: 18px; font-weight: 600; margin: 0;">活動記録</h1>
                         <p style="color: rgba(255,255,255,0.9); font-size: 13px; margin: 0;">大井町消防団第一分団</p>
@@ -177,7 +177,7 @@ app.get('/', (c) => {
             <!-- ホース点検 -->
             <a href="/inspection-priority" class="function-card">
                 <div class="ios-icon-wrapper icon-hose-bg">
-                    <span style="font-size: 40px;">🚒</span>
+                    <img src="/hose-icon.png" alt="ホース点検">
                 </div>
                 <h3>ホース点検</h3>
             </a>
@@ -185,7 +185,7 @@ app.get('/', (c) => {
             <!-- 防火水槽点検 -->
             <a href="/water-tanks" class="function-card">
                 <div class="ios-icon-wrapper icon-tank-bg">
-                    <span style="font-size: 40px;">💧</span>
+                    <img src="/suisou-icon.png" alt="防火水槽点検">
                 </div>
                 <h3>防火水槽点検</h3>
             </a>
@@ -193,7 +193,7 @@ app.get('/', (c) => {
             <!-- 要対応事項 -->
             <a href="/action-required" class="function-card">
                 <div class="ios-icon-wrapper icon-action-bg">
-                    <span style="font-size: 40px;">⚠️</span>
+                    <img src="/task-icon.png" alt="要対応事項">
                 </div>
                 <h3>要対応事項</h3>
             </a>
@@ -201,7 +201,7 @@ app.get('/', (c) => {
             <!-- 活動集計 -->
             <a href="/stats" class="function-card">
                 <div class="ios-icon-wrapper icon-stats-bg">
-                    <span style="font-size: 40px;">📊</span>
+                    <img src="/statistics-icon.png" alt="活動集計">
                 </div>
                 <h3>活動集計</h3>
             </a>
@@ -209,7 +209,7 @@ app.get('/', (c) => {
             <!-- 団員名簿 -->
             <a href="/members" class="function-card">
                 <div class="ios-icon-wrapper icon-members-bg">
-                    <span style="font-size: 40px;">👥</span>
+                    <img src="/members-icon.png" alt="団員名簿">
                 </div>
                 <h3>団員名簿</h3>
             </a>
@@ -217,7 +217,7 @@ app.get('/', (c) => {
             <!-- データ管理 -->
             <a href="/admin" class="function-card">
                 <div class="ios-icon-wrapper icon-admin-bg">
-                    <span style="font-size: 40px;">🗄️</span>
+                    <img src="/database-icon.png" alt="データ管理">
                 </div>
                 <h3>データ管理</h3>
             </a>
