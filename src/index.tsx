@@ -9890,7 +9890,7 @@ app.get('/members', (c) => {
             });
             
             // HTML生成（高速化：配列結合）
-            const rows = ['<table class="min-w-full border-collapse"><thead><tr><th class="border px-4 py-2 bg-gray-100">氏名</th>'];
+            const rows = ['<table class="min-w-full border-collapse"><thead><tr><th class="border px-4 py-2 bg-gray-100 sticky left-0 z-10">氏名</th>'];
             
             for (let i = 20; i >= 0; i--) {
                 const year = currentFiscalYear - i;
@@ -9899,7 +9899,7 @@ app.get('/members', (c) => {
             rows.push('</tr></thead><tbody>');
             
             memberData.forEach(data => {
-                rows.push('<tr><td class="border px-4 py-2 font-bold">' + data.badge + ' ' + data.name + '</td>');
+                rows.push('<tr><td class="border px-4 py-2 font-bold bg-white sticky left-0 z-10">' + data.badge + ' ' + data.name + '</td>');
                 
                 for (let i = 20; i >= 0; i--) {
                     const year = currentFiscalYear - i;
