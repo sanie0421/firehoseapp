@@ -6686,6 +6686,9 @@ app.get('/storage/:id', async (c) => {
 
         // ページ読み込み完了後に初期化
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('[INIT] START');
+            try {
+            
             // DOM要素の取得（ここでDOM準備完了してるから確実に取れる）
             modal = document.getElementById('inspectionModal');
             showModalBtn = document.getElementById('showModalBtn');
@@ -6694,26 +6697,29 @@ app.get('/storage/:id', async (c) => {
             saveBtn = document.getElementById('saveBtn');
             imageInput = document.getElementById('inspectionImage');
             clearImagesBtn = document.getElementById('clearImagesBtn');
-
-            // タブ切り替えイベント（スマホ対応: clickのみで統一、passiveオプション）
+            
+            
+            // タブ切り替えイベント（スマホ対応）
             const tabRecord = document.getElementById('tabRecord');
             const tabMap = document.getElementById('tabMap');
             const tabHistory = document.getElementById('tabHistory');
             
-            if (tabRecord) tabRecord.addEventListener('click', function(e) { 
-                e.stopPropagation(); 
+            console.log('[TABS]', tabRecord?'R':'', tabMap?'M':'', tabHistory?'H':'');
+            
+            if (tabRecord) tabRecord.onclick = function() { 
+                console.log('[TAB] record');
                 switchTab('record'); 
-            }, { passive: true });
+            };
             
-            if (tabMap) tabMap.addEventListener('click', function(e) { 
-                e.stopPropagation(); 
+            if (tabMap) tabMap.onclick = function() { 
+                console.log('[TAB] map');
                 switchTab('map'); 
-            }, { passive: true });
+            };
             
-            if (tabHistory) tabHistory.addEventListener('click', function(e) { 
-                e.stopPropagation(); 
+            if (tabHistory) tabHistory.onclick = function() { 
+                console.log('[TAB] history');
                 switchTab('history'); 
-            }, { passive: true });
+            };
 
             // イベントリスナー設定（要素が確実に存在する状態で設定）
             if (showModalBtn) showModalBtn.addEventListener('click', showModal);
@@ -6724,18 +6730,25 @@ app.get('/storage/:id', async (c) => {
             if (imageInput) imageInput.addEventListener('change', previewInspectionImages);
             if (clearImagesBtn) clearImagesBtn.addEventListener('click', clearInspectionImages);
             
-            // デバッグ用
-            console.log('showModalBtn:', showModalBtn);
-            console.log('modal:', modal);
-
+            
             // 初期値設定と読み込み
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('inspectionDate').value = today;
+            const dateInput = document.getElementById('inspectionDate');
+            if (dateInput) dateInput.value = today;
             
+            console.log('[LOAD] members...');
             loadMembers();
+            console.log('[LOAD] storage...');
             loadStorageDetail();
+            console.log('[LOAD] history...');
             loadInspectionHistory();
             loadActionHistory();
+            
+            console.log('[INIT] END');
+            } catch(err) {
+                console.error('[ERROR]', err);
+                alert('初期化エラー: ' + err.message);
+            }
             
             // URLパラメータをチェックして、openModal=trueならモーダルを自動オープン
             const urlParams = new URLSearchParams(window.location.search);
