@@ -9803,7 +9803,6 @@ app.get('/members', (c) => {
                 let joinFiscalYear = null;
                 let retirementFiscalYear = null;
                 const currentAge = member.birth_date ? calculateAge(member.birth_date) : null;
-                const currentYears = member.join_date ? calculateYearsOfService(member.join_date) : null;
                 
                 // 入団年度計算
                 if (member.join_date) {
@@ -9814,13 +9813,24 @@ app.get('/members', (c) => {
                 }
                 
                 // 退団年度計算
+                let retireDate = null;
                 if (member.retirement_date && member.retirement_date !== 'null') {
-                    const retireDate = new Date(member.retirement_date);
+                    retireDate = new Date(member.retirement_date);
                     if (!isNaN(retireDate.getTime())) {
                         const retireYear = retireDate.getFullYear();
                         const retireMonth = retireDate.getMonth() + 1;
                         retirementFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
                     }
+                }
+                
+                // 満年数計算（退団済みなら退団日まで、現役なら現在まで）
+                let actualYears = null;
+                if (member.join_date) {
+                    const joinDate = new Date(member.join_date);
+                    const endDate = retireDate || today;
+                    const diffMs = endDate - joinDate;
+                    const diffYears = diffMs / (1000 * 60 * 60 * 24 * 365.25);
+                    actualYears = Math.floor(diffYears);
                 }
                 
                 // 欠席期間を年度範囲に変換
@@ -9840,11 +9850,11 @@ app.get('/members', (c) => {
                     return { start: startFiscalYear, end: endFiscalYear };
                 });
                 
-                // バッジ
+                // バッジ（満年数で判定）
                 let badge = '';
-                if (currentYears >= 20) badge = '🏆';
-                else if (currentYears >= 10) badge = '🥈';
-                else if (currentYears >= 5) badge = '🥉';
+                if (actualYears >= 20) badge = '🏆';
+                else if (actualYears >= 10) badge = '🥈';
+                else if (actualYears >= 5) badge = '🥉';
                 
                 return {
                     name: member.name,
