@@ -4604,7 +4604,7 @@ app.get('/inspection-priority', (c) => {
             const hasLocation = (storage.latitude && storage.longitude) || storage.google_maps_url;
             const mapId = 'map-card-' + storage.id;
             
-            let html = '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '\\'">' +
+            let html = '<div class="' + priorityClass + ' rounded-2xl shadow-2xl p-6 cursor-pointer" onclick="location.href=\\'/storage/' + storage.id + '?openModal=true\\'">' +
                 '<div class="text-white">';
             
             // 画像表示
@@ -5969,6 +5969,15 @@ app.get('/storage/:id', async (c) => {
             loadStorageDetail();
             loadInspectionHistory();
             loadActionHistory();
+            
+            // URLパラメータをチェックして、openModal=trueならモーダルを自動オープン
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('openModal') === 'true') {
+                // データ読み込み完了を待ってからモーダルを開く
+                setTimeout(() => {
+                    showModal();
+                }, 500);
+            }
         });
 
         // 団員一覧読み込み
