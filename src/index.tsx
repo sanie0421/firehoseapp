@@ -4995,16 +4995,22 @@ app.get('/inspection-priority', (c) => {
 
             container.innerHTML = inspections.map(inspection => {
                 const hasActionItems = inspection.action_item_1 || inspection.action_item_2 || inspection.action_item_3;
-                const resultText = inspection.inspection_result === 'normal' ? '正常' : inspection.inspection_result === 'caution' ? '要注意' : '異常あり';
                 
                 let html = '<div class="bg-white rounded-lg border-2 border-gray-200 p-4">' +
                     '<div class="flex justify-between items-start">' +
                         '<div>' +
                             '<h4 class="text-lg font-bold text-gray-800">📅 ' + inspection.inspection_date + '</h4>' +
                             '<p class="text-gray-600">📍 ' + inspection.storage_number + ' | ' + inspection.location + '</p>' +
-                            '<p class="text-gray-600">👤 点検者: ' + inspection.inspector_name + '</p>' +
-                            '<p class="text-gray-600">🔍 結果: ' + resultText + '</p>' +
-                        '</div>' +
+                            '<p class="text-gray-600">👤 点検者: ' + inspection.inspector_name + '</p>';
+                
+                // inspection_resultが存在する場合のみ表示
+                if (inspection.inspection_result) {
+                    const resultText = inspection.inspection_result === 'normal' ? '正常' : 
+                                      inspection.inspection_result === 'caution' ? '要注意' : '異常あり';
+                    html += '<p class="text-gray-600">🔍 結果: ' + resultText + '</p>';
+                }
+                
+                html += '</div>' +
                     '</div>';
                 
                 if (hasActionItems) {
