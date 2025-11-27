@@ -6312,6 +6312,16 @@ app.get('/storage/:id', async (c) => {
             -webkit-tap-highlight-color: transparent;
             min-height: 48px;
         }
+        .tab-btn {
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: pointer;
+        }
+        .tab-btn:active {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
         .modal-open {
             display: flex !important;
         }
@@ -6664,10 +6674,19 @@ app.get('/storage/:id', async (c) => {
             imageInput = document.getElementById('inspectionImage');
             clearImagesBtn = document.getElementById('clearImagesBtn');
 
-            // タブ切り替えイベント
-            document.getElementById('tabRecord').addEventListener('click', () => switchTab('record'));
-            document.getElementById('tabMap').addEventListener('click', () => switchTab('map'));
-            document.getElementById('tabHistory').addEventListener('click', () => switchTab('history'));
+            // タブ切り替えイベント（スマホ対応: touchstartも追加）
+            const tabRecord = document.getElementById('tabRecord');
+            const tabMap = document.getElementById('tabMap');
+            const tabHistory = document.getElementById('tabHistory');
+            
+            tabRecord.addEventListener('click', () => switchTab('record'));
+            tabRecord.addEventListener('touchstart', (e) => { e.preventDefault(); switchTab('record'); });
+            
+            tabMap.addEventListener('click', () => switchTab('map'));
+            tabMap.addEventListener('touchstart', (e) => { e.preventDefault(); switchTab('map'); });
+            
+            tabHistory.addEventListener('click', () => switchTab('history'));
+            tabHistory.addEventListener('touchstart', (e) => { e.preventDefault(); switchTab('history'); });
 
             // イベントリスナー設定（要素が確実に存在する状態で設定）
             if (showModalBtn) showModalBtn.addEventListener('click', showModal);
