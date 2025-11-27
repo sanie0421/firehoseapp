@@ -602,6 +602,45 @@ app.post('/api/members', async (c) => {
 })
 
 // ==========================================
+// API: 団員新規登録
+// ==========================================
+app.post('/api/members', async (c) => {
+  try {
+    const data = await c.req.json()
+    const env = c.env as { DB: D1Database }
+    
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    
+    // デフォルト値設定
+    const email = data.email || `${id}@example.com`
+    const password_hash = 'default_hash' // ログイン機能実装時に変更
+    const role = data.role || 'member'
+    const join_year = data.join_date ? new Date(data.join_date).getFullYear() : null
+    
+    await env.DB.prepare(`
+      INSERT INTO users (
+        id, email, password_hash, name, role, position, 
+        join_date, birth_date, blood_type, phone, phone_mobile,
+        address, district, occupation, company_name, 
+        join_year, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    `).bind(
+      id, email, password_hash, data.name, role, data.position || null,
+      data.join_date || null, data.birth_date || null, data.blood_type || null,
+      data.phone || null, data.phone_mobile || null, data.address || null,
+      data.district || null, data.occupation || null, data.company_name || null,
+      join_year, now, now
+    ).run()
+    
+    return c.json({ success: true, id })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
 // API: 団員更新
 // ==========================================
 app.put('/api/members/:id', async (c) => {
@@ -2885,8 +2924,12 @@ app.get('/admin', (c) => {
         <!-- 団員管理タブ -->
         <div id="membersTab" class="tab-content">
             <div class="bg-white rounded-2xl shadow-lg p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">👥 団員管理</h2>
-                <p class="text-gray-600 mb-6">団員の登録・編集は<a href="/members" class="text-blue-600 underline font-bold">団員名簿ページ</a>から行えます</p>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">👥 団員管理</h2>
+                    <button onclick="openMemberModal()" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-bold transition">
+                        ✚ 新規登録
+                    </button>
+                </div>
                 
                 <div class="overflow-x-auto">
                     <div id="membersContent" class="text-gray-800">
@@ -2899,10 +2942,12 @@ app.get('/admin', (c) => {
         <!-- ホース管理タブ -->
         <div id="hoseTab" class="tab-content hidden">
             <div class="bg-white rounded-2xl shadow-lg p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">📦 ホースホース管理</h2>
-                <a href="/hose" class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition font-bold mb-4">
-                    🔧 ホース管理ページへ
-                </a>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">📦 ホース管理</h2>
+                    <button onclick="openHoseModal()" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-bold transition">
+                        ✚ 新規登録
+                    </button>
+                </div>
                 
                 <div class="overflow-x-auto">
                     <div id="hoseContent" class="text-gray-800">
@@ -2915,10 +2960,12 @@ app.get('/admin', (c) => {
         <!-- 防火水槽管理タブ -->
         <div id="tankTab" class="tab-content hidden">
             <div class="bg-white rounded-2xl shadow-lg p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">💧 防火水槽管理</h2>
-                <a href="/water-tanks" class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition font-bold mb-4">
-                    💧 防火水槽ページへ
-                </a>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">💧 防火水槽管理</h2>
+                    <button onclick="openTankModal()" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-bold transition">
+                        ✚ 新規登録
+                    </button>
+                </div>
                 
                 <div class="overflow-x-auto">
                     <div id="tankContent" class="text-gray-800">
@@ -2983,6 +3030,127 @@ app.get('/admin', (c) => {
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 団員登録/編集モーダル -->
+    <div id="memberModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target === this) closeMemberModal()">
+        <div class="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 id="memberModalTitle" class="text-2xl font-bold mb-6">✚ 団員新規登録</h3>
+            <form id="memberForm" onsubmit="saveMember(event)">
+                <input type="hidden" id="memberId" />
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block font-bold mb-2">氏名 *</label>
+                        <input type="text" id="memberName" required class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-2">生年月日</label>
+                        <input type="date" id="memberBirthDate" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block font-bold mb-2">入団日</label>
+                        <input type="date" id="memberJoinDate" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-2">地区</label>
+                        <input type="text" id="memberDistrict" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                </div>
+                
+                <div class="flex gap-4 mt-6">
+                    <button type="button" onclick="closeMemberModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-3 rounded-lg font-bold">
+                        キャンセル
+                    </button>
+                    <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-bold">
+                        💾 保存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ホース登録/編集モーダル -->
+    <div id="hoseModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target === this) closeHoseModal()">
+        <div class="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 id="hoseModalTitle" class="text-2xl font-bold mb-6">✚ ホース新規登録</h3>
+            <form id="hoseForm" onsubmit="saveHose(event)">
+                <input type="hidden" id="hoseId" />
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block font-bold mb-2">ホース番号 *</label>
+                        <input type="text" id="hoseStorageNumber" required class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-2">地区</label>
+                        <input type="text" id="hoseDistrict" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block font-bold mb-2">場所 *</label>
+                    <input type="text" id="hoseLocation" required class="w-full px-4 py-2 border rounded-lg">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block font-bold mb-2">Google Maps URL</label>
+                    <input type="text" id="hoseGoogleMapsUrl" class="w-full px-4 py-2 border rounded-lg">
+                </div>
+                
+                <div class="flex gap-4 mt-6">
+                    <button type="button" onclick="closeHoseModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-3 rounded-lg font-bold">
+                        キャンセル
+                    </button>
+                    <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-bold">
+                        💾 保存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 防火水槽登録/編集モーダル -->
+    <div id="tankModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target === this) closeTankModal()">
+        <div class="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 id="tankModalTitle" class="text-2xl font-bold mb-6">✚ 防火水槽新規登録</h3>
+            <form id="tankForm" onsubmit="saveTank(event)">
+                <input type="hidden" id="tankId" />
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block font-bold mb-2">防火水槽番号 *</label>
+                        <input type="text" id="tankNumber" required class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-2">地区</label>
+                        <input type="text" id="tankDistrict" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block font-bold mb-2">場所 *</label>
+                    <input type="text" id="tankLocation" required class="w-full px-4 py-2 border rounded-lg">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block font-bold mb-2">Google Maps URL</label>
+                    <input type="text" id="tankGoogleMapsUrl" class="w-full px-4 py-2 border rounded-lg">
+                </div>
+                
+                <div class="flex gap-4 mt-6">
+                    <button type="button" onclick="closeTankModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-3 rounded-lg font-bold">
+                        キャンセル
+                    </button>
+                    <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-bold">
+                        💾 保存
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -3056,7 +3224,9 @@ app.get('/admin', (c) => {
                     '<th class="border px-4 py-2 bg-gray-100">氏名</th>' +
                     '<th class="border px-4 py-2 bg-gray-100">生年月日</th>' +
                     '<th class="border px-4 py-2 bg-gray-100">入団日</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">地区</th>' +
                     '<th class="border px-4 py-2 bg-gray-100">ステータス</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">操作</th>' +
                     '</tr></thead><tbody>' +
                     members.map(m => {
                         const status = m.status === 2 ? 'OB' : m.status === 3 ? '退団' : '現役';
@@ -3064,7 +3234,9 @@ app.get('/admin', (c) => {
                             '<td class="border px-4 py-2">' + m.name + '</td>' +
                             '<td class="border px-4 py-2">' + (m.birth_date || '') + '</td>' +
                             '<td class="border px-4 py-2">' + (m.join_date || '') + '</td>' +
+                            '<td class="border px-4 py-2">' + (m.district || '') + '</td>' +
                             '<td class="border px-4 py-2">' + status + '</td>' +
+                            '<td class="border px-4 py-2"><button onclick="editMember(\'' + m.id + '\')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm">編集</button></td>' +
                             '</tr>';
                     }).join('') +
                     '</tbody></table>';
@@ -3086,11 +3258,13 @@ app.get('/admin', (c) => {
                     '<th class="border px-4 py-2 bg-gray-100">ホース番号</th>' +
                     '<th class="border px-4 py-2 bg-gray-100">場所</th>' +
                     '<th class="border px-4 py-2 bg-gray-100">地区</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">操作</th>' +
                     '</tr></thead><tbody>' +
                     storages.map(s => '<tr>' +
                         '<td class="border px-4 py-2">' + s.storage_number + '</td>' +
                         '<td class="border px-4 py-2">' + s.location + '</td>' +
                         '<td class="border px-4 py-2">' + (s.district || '') + '</td>' +
+                        '<td class="border px-4 py-2"><button onclick="editHose(\'' + s.id + '\')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm">編集</button></td>' +
                         '</tr>').join('') +
                     '</tbody></table>';
                     
@@ -3111,11 +3285,13 @@ app.get('/admin', (c) => {
                     '<th class="border px-4 py-2 bg-gray-100">管理番号</th>' +
                     '<th class="border px-4 py-2 bg-gray-100">場所</th>' +
                     '<th class="border px-4 py-2 bg-gray-100">地区</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">操作</th>' +
                     '</tr></thead><tbody>' +
                     tanks.map(t => '<tr>' +
                         '<td class="border px-4 py-2">' + (t.storage_id || '') + '</td>' +
                         '<td class="border px-4 py-2">' + t.location + '</td>' +
                         '<td class="border px-4 py-2">' + (t.district || '') + '</td>' +
+                        '<td class="border px-4 py-2"><button onclick="editTank(\'' + t.id + '\')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm">編集</button></td>' +
                         '</tr>').join('') +
                     '</tbody></table>';
                     
@@ -3258,6 +3434,177 @@ app.get('/admin', (c) => {
             } catch (error) {
                 alert('バックアップの作成に失敗しました');
                 console.error(error);
+            }
+        }
+
+        // ===== 団員管理モーダル処理 =====
+        function openMemberModal() {
+            document.getElementById('memberModalTitle').textContent = '✚ 団員新規登録';
+            document.getElementById('memberForm').reset();
+            document.getElementById('memberId').value = '';
+            document.getElementById('memberModal').classList.remove('hidden');
+        }
+
+        function closeMemberModal() {
+            document.getElementById('memberModal').classList.add('hidden');
+        }
+
+        async function editMember(id) {
+            const response = await fetch('/api/users');
+            const data = await response.json();
+            const member = data.users.find(m => m.id === id);
+            
+            if (member) {
+                document.getElementById('memberModalTitle').textContent = '✏️ 団員編集';
+                document.getElementById('memberId').value = member.id;
+                document.getElementById('memberName').value = member.name;
+                document.getElementById('memberBirthDate').value = member.birth_date || '';
+                document.getElementById('memberJoinDate').value = member.join_date || '';
+                document.getElementById('memberDistrict').value = member.district || '';
+                document.getElementById('memberModal').classList.remove('hidden');
+            }
+        }
+
+        async function saveMember(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('memberId').value;
+            const data = {
+                name: document.getElementById('memberName').value,
+                birth_date: document.getElementById('memberBirthDate').value,
+                join_date: document.getElementById('memberJoinDate').value,
+                district: document.getElementById('memberDistrict').value
+            };
+            
+            const url = id ? '/api/members/' + id : '/api/members';
+            const method = id ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                alert('保存しました！');
+                closeMemberModal();
+                loadMembersData();
+            } else {
+                alert('保存に失敗しました');
+            }
+        }
+
+        // ===== ホース管理モーダル処理 =====
+        function openHoseModal() {
+            document.getElementById('hoseModalTitle').textContent = '✚ ホース新規登録';
+            document.getElementById('hoseForm').reset();
+            document.getElementById('hoseId').value = '';
+            document.getElementById('hoseModal').classList.remove('hidden');
+        }
+
+        function closeHoseModal() {
+            document.getElementById('hoseModal').classList.add('hidden');
+        }
+
+        async function editHose(id) {
+            const response = await fetch('/api/hose/storages');
+            const data = await response.json();
+            const hose = data.storages.find(s => s.id === parseInt(id));
+            
+            if (hose) {
+                document.getElementById('hoseModalTitle').textContent = '✏️ ホース編集';
+                document.getElementById('hoseId').value = hose.id;
+                document.getElementById('hoseStorageNumber').value = hose.storage_number;
+                document.getElementById('hoseDistrict').value = hose.district || '';
+                document.getElementById('hoseLocation').value = hose.location;
+                document.getElementById('hoseGoogleMapsUrl').value = hose.google_maps_url || '';
+                document.getElementById('hoseModal').classList.remove('hidden');
+            }
+        }
+
+        async function saveHose(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('hoseId').value;
+            const data = {
+                storage_number: document.getElementById('hoseStorageNumber').value,
+                district: document.getElementById('hoseDistrict').value,
+                location: document.getElementById('hoseLocation').value,
+                google_maps_url: document.getElementById('hoseGoogleMapsUrl').value
+            };
+            
+            const url = id ? '/api/hose/storages/' + id : '/api/hose/storages';
+            const method = id ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                alert('保存しました！');
+                closeHoseModal();
+                loadHoseData();
+            } else {
+                alert('保存に失敗しました');
+            }
+        }
+
+        // ===== 防火水槽管理モーダル処理 =====
+        function openTankModal() {
+            document.getElementById('tankModalTitle').textContent = '✚ 防火水槽新規登録';
+            document.getElementById('tankForm').reset();
+            document.getElementById('tankId').value = '';
+            document.getElementById('tankModal').classList.remove('hidden');
+        }
+
+        function closeTankModal() {
+            document.getElementById('tankModal').classList.add('hidden');
+        }
+
+        async function editTank(id) {
+            const response = await fetch('/api/water-tanks');
+            const data = await response.json();
+            const tank = data.tanks.find(t => t.id === parseInt(id));
+            
+            if (tank) {
+                document.getElementById('tankModalTitle').textContent = '✏️ 防火水槽編集';
+                document.getElementById('tankId').value = tank.id;
+                document.getElementById('tankNumber').value = tank.storage_id || '';
+                document.getElementById('tankDistrict').value = tank.district || '';
+                document.getElementById('tankLocation').value = tank.location;
+                document.getElementById('tankGoogleMapsUrl').value = tank.google_maps_url || '';
+                document.getElementById('tankModal').classList.remove('hidden');
+            }
+        }
+
+        async function saveTank(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('tankId').value;
+            const data = {
+                storage_id: document.getElementById('tankNumber').value,
+                district: document.getElementById('tankDistrict').value,
+                location: document.getElementById('tankLocation').value,
+                google_maps_url: document.getElementById('tankGoogleMapsUrl').value
+            };
+            
+            const url = id ? '/api/water-tanks/' + id : '/api/water-tanks';
+            const method = id ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                alert('保存しました！');
+                closeTankModal();
+                loadTankData();
+            } else {
+                alert('保存に失敗しました');
             }
         }
     </script>
