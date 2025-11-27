@@ -14,6 +14,11 @@ app.use('/api/*', cors())
 
 // Serve static files
 app.use('/static/*', serveStatic({ root: './public' }))
+// Serve root-level files (images, etc.)
+app.use('/*.png', serveStatic({ root: './' }))
+app.use('/*.jpg', serveStatic({ root: './' }))
+app.use('/*.gif', serveStatic({ root: './' }))
+app.use('/*.svg', serveStatic({ root: './' }))
 
 // ==========================================
 // ホーム画面（ログイン不要）
