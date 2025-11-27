@@ -9787,167 +9787,160 @@ app.get('/members', (c) => {
         }
 
         function renderTimeline() {
-            console.log('renderTimeline called');
             const container = document.getElementById('timelineContent');
-            console.log('Container element:', container);
-            console.log('Members count:', members.length);
-            
-            if (!container) {
-                console.error('timelineContent element not found!');
+            if (!container || members.length === 0) {
+                if (container) container.innerHTML = '<p class="text-gray-600 text-center py-8">まだ団員が登録されていません</p>';
                 return;
             }
             
-            if (members.length === 0) {
-                container.innerHTML = '<p class="text-gray-600 text-center py-8">まだ団員が登録されていません</p>';
-                return;
-            }
-            
-            // 簡易版在籍年表（年度ごとに色分け）
             const today = new Date();
             const currentYear = today.getFullYear();
             const currentMonth = today.getMonth() + 1;
             const currentFiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
             
-            let html = '<table class="min-w-full border-collapse"><thead><tr><th class="border px-4 py-2 bg-gray-100">氏名</th>';
-            
-            // 過去20年分の年度を表示（クリック可能）
-            for (let i = 20; i >= 0; i--) {
-                const year = currentFiscalYear - i;
-                html += '<th class="border px-2 py-2 bg-gray-100 text-xs cursor-pointer hover:bg-blue-100 transition" onclick="sortByYear(' + year + ')" title="クリックして' + year + '年度在籍者でソート">' + year + '</th>';
-            }
-            html += '</tr></thead><tbody>';
-            
-            members.forEach(member => {
+            // 事前計算：メンバーごとに入団年度・退団年度・欠席期間を1回だけ計算
+            const memberData = members.map(member => {
+                let joinFiscalYear = null;
+                let retirementFiscalYear = null;
                 const currentAge = member.birth_date ? calculateAge(member.birth_date) : null;
                 const currentYears = member.join_date ? calculateYearsOfService(member.join_date) : null;
                 
-                // バッジ判定（5年🥉、10年🥈、20年🏆）
+                // 入団年度計算
+                if (member.join_date) {
+                    const joinDate = new Date(member.join_date);
+                    const joinYear = joinDate.getFullYear();
+                    const joinMonth = joinDate.getMonth() + 1;
+                    joinFiscalYear = joinMonth >= 4 ? joinYear : joinYear - 1;
+                }
+                
+                // 退団年度計算
+                if (member.retirement_date && member.retirement_date !== 'null') {
+                    const retireDate = new Date(member.retirement_date);
+                    if (!isNaN(retireDate.getTime())) {
+                        const retireYear = retireDate.getFullYear();
+                        const retireMonth = retireDate.getMonth() + 1;
+                        retirementFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
+                    }
+                }
+                
+                // 欠席期間を年度範囲に変換
+                const absenceRanges = (absencePeriods[member.id] || []).map(absence => {
+                    const startDate = new Date(absence.start_date);
+                    const startYear = startDate.getFullYear();
+                    const startMonth = startDate.getMonth() + 1;
+                    const startFiscalYear = startMonth >= 4 ? startYear : startYear - 1;
+                    
+                    let endFiscalYear = currentFiscalYear;
+                    if (absence.end_date) {
+                        const endDate = new Date(absence.end_date);
+                        const endYear = endDate.getFullYear();
+                        const endMonth = endDate.getMonth() + 1;
+                        endFiscalYear = endMonth >= 4 ? endYear : endYear - 1;
+                    }
+                    return { start: startFiscalYear, end: endFiscalYear };
+                });
+                
+                // バッジ
                 let badge = '';
                 if (currentYears >= 20) badge = '🏆';
                 else if (currentYears >= 10) badge = '🥈';
                 else if (currentYears >= 5) badge = '🥉';
                 
-                html += '<tr><td class="border px-4 py-2 font-bold">' + badge + ' ' + member.name + '</td>';
+                return {
+                    name: member.name,
+                    badge: badge,
+                    joinFiscalYear: joinFiscalYear,
+                    retirementFiscalYear: retirementFiscalYear,
+                    currentAge: currentAge,
+                    absenceRanges: absenceRanges
+                };
+            });
+            
+            // HTML生成（高速化：配列結合）
+            const rows = ['<table class="min-w-full border-collapse"><thead><tr><th class="border px-4 py-2 bg-gray-100">氏名</th>'];
+            
+            for (let i = 20; i >= 0; i--) {
+                const year = currentFiscalYear - i;
+                rows.push('<th class="border px-2 py-2 bg-gray-100 text-xs cursor-pointer hover:bg-blue-100 transition" onclick="sortByYear(' + year + ')" title="クリックして' + year + '年度在籍者でソート">' + year + '</th>');
+            }
+            rows.push('</tr></thead><tbody>');
+            
+            memberData.forEach(data => {
+                rows.push('<tr><td class="border px-4 py-2 font-bold">' + data.badge + ' ' + data.name + '</td>');
                 
                 for (let i = 20; i >= 0; i--) {
                     const year = currentFiscalYear - i;
-                    const joinYear = member.join_date ? new Date(member.join_date).getFullYear() : null;
-                    const joinMonth = member.join_date ? new Date(member.join_date).getMonth() + 1 : null;
-                    const joinFiscalYear = joinMonth >= 4 ? joinYear : joinYear - 1;
-                    
-                    // 退団年度を計算（月単位で正確に）
-                    let retirementFiscalYear = null;
-                    if (member.retirement_date && member.retirement_date !== 'null' && member.retirement_date !== null) {
-                        try {
-                            const retireDate = new Date(member.retirement_date);
-                            if (!isNaN(retireDate.getTime())) {
-                                const retireYear = retireDate.getFullYear();
-                                const retireMonth = retireDate.getMonth() + 1;
-                                // 退団月が4月以降なら当年度、3月以前なら前年度
-                                // 例: 2025/3/31退団 → 2024年度が最終在籍年度
-                                // 例: 2025/4/1退団 → 2025年度が最終在籍年度
-                                retirementFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
-                            }
-                        } catch (e) {
-                            console.error('Invalid retirement_date:', member.retirement_date, e);
-                        }
-                    }
+                    const isActive = data.joinFiscalYear && year >= data.joinFiscalYear && 
+                                    (!data.retirementFiscalYear || year <= data.retirementFiscalYear);
                     
                     let cellClass = 'border px-2 py-2 text-center text-xs';
                     let cellContent = '';
                     
-                    // 在籍期間のチェック（入団年度 ≤ 対象年度 ≤ 退団年度）
-                    // 例: 2024/4/1入団、2025/3/31退団 → 入団年度2024、退団年度2024 → 2024年度のみ在籍（満1年）
-                    const isActive = joinFiscalYear && year >= joinFiscalYear && 
-                                    (!retirementFiscalYear || year <= retirementFiscalYear);
-                    
                     if (isActive) {
-                        const yearsOfService = year - joinFiscalYear + 1;
-                        const age = currentAge ? (currentAge - (currentFiscalYear - year)) : null;
-                        
-                        // 欠席期間チェック（該当年度が欠席期間に含まれるか）
-                        let isAbsent = false;
-                        const memberAbsences = absencePeriods[member.id] || [];
-                        for (const absence of memberAbsences) {
-                            const absenceStartYear = new Date(absence.start_date).getFullYear();
-                            const absenceStartMonth = new Date(absence.start_date).getMonth() + 1;
-                            const absenceStartFiscalYear = absenceStartMonth >= 4 ? absenceStartYear : absenceStartYear - 1;
-                            
-                            let absenceEndFiscalYear = currentFiscalYear; // デフォルトは現在
-                            if (absence.end_date) {
-                                const absenceEndYear = new Date(absence.end_date).getFullYear();
-                                const absenceEndMonth = new Date(absence.end_date).getMonth() + 1;
-                                absenceEndFiscalYear = absenceEndMonth >= 4 ? absenceEndYear : absenceEndYear - 1;
-                            }
-                            
-                            // 該当年度が欠席期間に含まれるか
-                            if (year >= absenceStartFiscalYear && year <= absenceEndFiscalYear) {
-                                isAbsent = true;
-                                break;
-                            }
-                        }
+                        // 欠席チェック（高速化：事前計算した範囲で判定）
+                        const isAbsent = data.absenceRanges.some(range => year >= range.start && year <= range.end);
                         
                         if (isAbsent) {
                             cellClass += ' absence-period';
                             cellContent = '🏝️欠席';
                         } else {
+                            const yearsOfService = year - data.joinFiscalYear + 1;
+                            const age = data.currentAge ? (data.currentAge - (currentFiscalYear - year)) : null;
                             cellClass += ' bg-green-100';
                             cellContent = yearsOfService + '年';
-                            if (age) {
-                                cellContent += '<br>(' + age + '歳)';
-                            }
+                            if (age) cellContent += '<br>(' + age + '歳)';
                         }
                     } else {
                         cellClass += ' bg-gray-50';
                     }
                     
-                    html += '<td class="' + cellClass + '">' + cellContent + '</td>';
+                    rows.push('<td class="' + cellClass + '">' + cellContent + '</td>');
                 }
-                
-                html += '</tr>';
+                rows.push('</tr>');
             });
             
-            html += '</tbody></table>';
-            container.innerHTML = html;
+            rows.push('</tbody></table>');
+            container.innerHTML = rows.join('');
         }
         
-        // 指定年度の在籍者でソート
+        // 指定年度の在籍者でソート（高速化版）
         function sortByYear(targetYear) {
-            console.log('Sorting by year:', targetYear);
-            
-            // 対象年度在籍者を上に、そうでない人を下にソート
-            members.sort((a, b) => {
-                // aの在籍チェック
-                const aJoinYear = a.join_date ? new Date(a.join_date).getFullYear() : null;
-                const aJoinMonth = a.join_date ? new Date(a.join_date).getMonth() + 1 : null;
-                const aJoinFiscalYear = aJoinMonth >= 4 ? aJoinYear : aJoinYear - 1;
-                let aRetirementFiscalYear = null;
-                if (a.retirement_date && a.retirement_date !== 'null') {
-                    const aRetireYear = new Date(a.retirement_date).getFullYear();
-                    const aRetireMonth = new Date(a.retirement_date).getMonth() + 1;
-                    aRetirementFiscalYear = aRetireMonth >= 4 ? aRetireYear : aRetireYear - 1;
-                }
-                const aWasActive = aJoinFiscalYear && targetYear >= aJoinFiscalYear && 
-                                  (!aRetirementFiscalYear || targetYear <= aRetirementFiscalYear);
+            // 事前計算：各メンバーの在籍状況
+            const activeStatus = members.map(member => {
+                let joinFiscalYear = null;
+                let retirementFiscalYear = null;
                 
-                // bの在籍チェック
-                const bJoinYear = b.join_date ? new Date(b.join_date).getFullYear() : null;
-                const bJoinMonth = b.join_date ? new Date(b.join_date).getMonth() + 1 : null;
-                const bJoinFiscalYear = bJoinMonth >= 4 ? bJoinYear : bJoinYear - 1;
-                let bRetirementFiscalYear = null;
-                if (b.retirement_date && b.retirement_date !== 'null') {
-                    const bRetireYear = new Date(b.retirement_date).getFullYear();
-                    const bRetireMonth = new Date(b.retirement_date).getMonth() + 1;
-                    bRetirementFiscalYear = bRetireMonth >= 4 ? bRetireYear : bRetireYear - 1;
+                if (member.join_date) {
+                    const joinDate = new Date(member.join_date);
+                    const joinYear = joinDate.getFullYear();
+                    const joinMonth = joinDate.getMonth() + 1;
+                    joinFiscalYear = joinMonth >= 4 ? joinYear : joinYear - 1;
                 }
-                const bWasActive = bJoinFiscalYear && targetYear >= bJoinFiscalYear && 
-                                  (!bRetirementFiscalYear || targetYear <= bRetirementFiscalYear);
                 
-                // ソートロジック
-                if (aWasActive && !bWasActive) return -1;
-                if (!aWasActive && bWasActive) return 1;
-                return a.name.localeCompare(b.name, 'ja');
+                if (member.retirement_date && member.retirement_date !== 'null') {
+                    const retireDate = new Date(member.retirement_date);
+                    if (!isNaN(retireDate.getTime())) {
+                        const retireYear = retireDate.getFullYear();
+                        const retireMonth = retireDate.getMonth() + 1;
+                        retirementFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
+                    }
+                }
+                
+                const wasActive = joinFiscalYear && targetYear >= joinFiscalYear && 
+                                (!retirementFiscalYear || targetYear <= retirementFiscalYear);
+                
+                return { member: member, wasActive: wasActive };
             });
+            
+            // ソート
+            activeStatus.sort((a, b) => {
+                if (a.wasActive && !b.wasActive) return -1;
+                if (!a.wasActive && b.wasActive) return 1;
+                return a.member.name.localeCompare(b.member.name, 'ja');
+            });
+            
+            // membersを更新
+            members = activeStatus.map(item => item.member);
             
             // 年表を再描画
             renderTimeline();
