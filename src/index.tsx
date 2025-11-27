@@ -5392,7 +5392,7 @@ app.get('/inspection-priority', (c) => {
                 
                 let html = '<div class="bg-white rounded-lg border-2 border-gray-200 p-4">' +
                     '<div class="flex justify-between items-start">' +
-                        '<div>' +
+                        '<div class="flex-1">' +
                             '<h4 class="text-lg font-bold text-gray-800">📅 ' + inspection.inspection_date + '</h4>' +
                             '<p class="text-gray-600">📍 ' + inspection.storage_number + ' | ' + inspection.location + '</p>' +
                             '<p class="text-gray-600">👤 点検者: ' + inspection.inspector_name + '</p>';
@@ -5405,6 +5405,9 @@ app.get('/inspection-priority', (c) => {
                 }
                 
                 html += '</div>' +
+                        '<button onclick="deleteInspection(\'' + inspection.id + '\')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-bold transition ml-2">' +
+                            '🗑️ 削除' +
+                        '</button>' +
                     '</div>';
                 
                 if (hasActionItems) {
@@ -5423,6 +5426,26 @@ app.get('/inspection-priority', (c) => {
                 html += '</div>';
                 return html;
             }).join('');
+        }
+
+        async function deleteInspection(inspectionId) {
+            if (!confirm('この点検履歴を削除しますか？')) return;
+            
+            try {
+                const response = await fetch('/api/inspection/' + inspectionId, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('削除しました');
+                    loadHistory();
+                } else {
+                    alert('削除に失敗しました');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('削除に失敗しました');
+            }
         }
     </script>
 </body>
