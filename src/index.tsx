@@ -815,31 +815,42 @@ app.put('/api/water-tank-inspections/:id', async (c) => {
   try {
     const id = c.req.param('id')
     const data = await c.req.json()
-    const env = c.env as { DB: D1Database }
-    const now = new Date().toISOString()
+    const env = c.env as { DB: D1Database, R2: R2Bucket }
     
-    const toNullIfEmpty = (val: any) => (val === '' || val === undefined || val === null) ? null : val
+    // R2画像アップロード処理
+    let imageUrls: string[] = []
+    if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+      for (const imageData of data.images) {
+        const key = `water-tank-inspections/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`
+        const base64Data = imageData.split(',')[1] || imageData
+        const binaryString = atob(base64Data)
+        const bytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i)
+        }
+        await env.R2.put(key, bytes, { httpMetadata: { contentType: 'image/jpeg' } })
+        imageUrls.push(key)
+      }
+    }
     
     await env.DB.prepare(`
       UPDATE water_tank_inspections SET
-        tank_id = ?,
+        inspector_id = ?,
         inspection_date = ?,
-        inspector_name = ?,
-        action_item_1 = ?,
-        action_item_2 = ?,
-        action_item_3 = ?,
-        notes = ?,
-        updated_at = ?
+        water_level = ?,
+        water_quality = ?,
+        lid_condition = ?,
+        image_urls = ?,
+        comment = ?
       WHERE id = ?
     `).bind(
-      data.tank_id,
+      data.inspector_id,
       data.inspection_date,
-      data.inspector_name,
-      toNullIfEmpty(data.action_item_1),
-      toNullIfEmpty(data.action_item_2),
-      toNullIfEmpty(data.action_item_3),
-      toNullIfEmpty(data.notes),
-      now,
+      data.water_level || null,
+      data.water_quality || null,
+      data.lid_condition || null,
+      imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
+      data.comment || null,
       id
     ).run()
     
@@ -4811,29 +4822,50 @@ app.get('/water-tank/:id', async (c) => {
 
                     <div>
                         <label class="block text-sm font-bold text-gray-700 mb-2">点検者 <span class="text-red-500">*</span></label>
-                        <select id="inspectorName" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        <select id="inspectorId" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
                             <option value="">選択してください</option>
                         </select>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">要対応事項 ①</label>
-                        <input type="text" id="actionItem1" placeholder="例: 蓋の腐食確認" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        <label class="block text-sm font-bold text-gray-700 mb-2">水位 <span class="text-red-500">*</span></label>
+                        <select id="waterLevel" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                            <option value="">選択してください</option>
+                            <option value="満水">満水</option>
+                            <option value="半分">半分</option>
+                            <option value="空">空</option>
+                        </select>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">要対応事項 ②</label>
-                        <input type="text" id="actionItem2" placeholder="例: 周辺の清掃" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        <label class="block text-sm font-bold text-gray-700 mb-2">水質 <span class="text-red-500">*</span></label>
+                        <select id="waterQuality" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                            <option value="">選択してください</option>
+                            <option value="良好">良好</option>
+                            <option value="濁り">濁り</option>
+                            <option value="異臭">異臭</option>
+                        </select>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">要対応事項 ③</label>
-                        <input type="text" id="actionItem3" placeholder="例: 標識の確認" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        <label class="block text-sm font-bold text-gray-700 mb-2">蓋の状態 <span class="text-red-500">*</span></label>
+                        <select id="lidCondition" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                            <option value="">選択してください</option>
+                            <option value="正常">正常</option>
+                            <option value="破損">破損</option>
+                            <option value="紛失">紛失</option>
+                        </select>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">点検メモ</label>
-                        <textarea id="inspectionNotes" rows="3" placeholder="その他気づいた点など" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">写真</label>
+                        <input type="file" id="inspectionImage" accept="image/*" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        <div id="imagePreview" class="mt-2"></div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">コメント</label>
+                        <textarea id="inspectionComment" rows="3" placeholder="その他気づいた点など" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
                     </div>
 
                     <div class="flex space-x-3 pt-4">
@@ -5026,14 +5058,14 @@ app.get('/water-tank/:id', async (c) => {
 
         async function loadMembers() {
             try {
-                const response = await fetch('/api/users');
+                const response = await fetch('/api/users?active_only=1');
                 const data = await response.json();
                 members = data.users || [];
                 
-                const select = document.getElementById('inspectorName');
+                const select = document.getElementById('inspectorId');
                 members.forEach(member => {
                     const option = document.createElement('option');
-                    option.value = member.name;
+                    option.value = member.id;
                     option.textContent = member.name;
                     select.appendChild(option);
                 });
@@ -5159,23 +5191,44 @@ app.get('/water-tank/:id', async (c) => {
         async function saveInspection() {
             const inspectionId = document.getElementById('inspectionId').value;
             const inspectionDate = document.getElementById('inspectionDate').value;
-            const inspectorName = document.getElementById('inspectorName').value;
+            const inspectorId = document.getElementById('inspectorId').value;
+            const waterLevel = document.getElementById('waterLevel').value;
+            const waterQuality = document.getElementById('waterQuality').value;
+            const lidCondition = document.getElementById('lidCondition').value;
 
-            if (!inspectionDate || !inspectorName) {
-                alert('点検日と点検者は必須です');
+            if (!inspectionDate || !inspectorId || !waterLevel || !waterQuality || !lidCondition) {
+                alert('必須項目を全て入力してください');
                 return;
             }
 
             const data = {
                 tank_id: tankId,
+                inspector_id: inspectorId,
                 inspection_date: inspectionDate,
-                inspector_name: inspectorName,
-                action_item_1: document.getElementById('actionItem1').value || null,
-                action_item_2: document.getElementById('actionItem2').value || null,
-                action_item_3: document.getElementById('actionItem3').value || null,
-                notes: document.getElementById('inspectionNotes').value || null
+                water_level: waterLevel,
+                water_quality: waterQuality,
+                lid_condition: lidCondition,
+                comment: document.getElementById('inspectionComment').value || null,
+                images: []
             };
 
+            // 画像があれば追加
+            const imageInput = document.getElementById('inspectionImage');
+            if (imageInput.files.length > 0) {
+                const file = imageInput.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = async function(event) {
+                    data.images.push(event.target.result);
+                    await submitInspectionData(data, inspectionId);
+                };
+                reader.readAsDataURL(file);
+            } else {
+                await submitInspectionData(data, inspectionId);
+            }
+        }
+        
+        async function submitInspectionData(data, inspectionId) {
             try {
                 const url = inspectionId ? \`/api/water-tank-inspections/\${inspectionId}\` : '/api/water-tank-inspections';
                 const method = inspectionId ? 'PUT' : 'POST';
