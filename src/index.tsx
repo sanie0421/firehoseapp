@@ -423,11 +423,21 @@ app.get('/api/members', async (c) => {
 app.get('/api/users', async (c) => {
   try {
     const env = c.env as { DB: D1Database }
-    const result = await env.DB.prepare(`
+    const activeOnly = c.req.query('active_only')
+    
+    let query = `
       SELECT id, name, birth_date, join_date, created_at, updated_at
       FROM users
-      ORDER BY join_date ASC, name ASC
-    `).all()
+    `
+    
+    // active_only=1 の場合は現役のみ（status=1 または is_active=1）
+    if (activeOnly === '1') {
+      query += ` WHERE (status = 1 OR is_active = 1)`
+    }
+    
+    query += ` ORDER BY join_date ASC, name ASC`
+    
+    const result = await env.DB.prepare(query).all()
     
     return c.json({ users: result.results })
   } catch (error) {
@@ -729,16 +739,18 @@ app.get('/api/water-tank-inspections', async (c) => {
     let query = `
       SELECT 
         wti.*,
-        wt.location as tank_location
+        wt.location as tank_name,
+        u.name as inspector_name
       FROM water_tank_inspections wti
       LEFT JOIN water_tanks wt ON wti.tank_id = wt.id
+      LEFT JOIN users u ON wti.inspector_id = u.id
     `
     
     if (tankId) {
       query += ` WHERE wti.tank_id = ?`
     }
     
-    query += ` ORDER BY wti.inspection_date DESC`
+    query += ` ORDER BY wti.inspection_date DESC LIMIT 100`
     
     const stmt = env.DB.prepare(query)
     const result = tankId ? await stmt.bind(tankId).all() : await stmt.all()
@@ -754,35 +766,47 @@ app.get('/api/water-tank-inspections', async (c) => {
 app.post('/api/water-tank-inspections', async (c) => {
   try {
     const data = await c.req.json()
-    const env = c.env as { DB: D1Database }
-    const id = crypto.randomUUID()
+    const env = c.env as { DB: D1Database, R2: R2Bucket }
     const now = new Date().toISOString()
     
-    const toNullIfEmpty = (val: any) => (val === '' || val === undefined || val === null) ? null : val
+    // R2画像アップロード処理
+    let imageUrls: string[] = []
+    if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+      for (const imageData of data.images) {
+        const key = `water-tank-inspections/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`
+        // Base64デコード
+        const base64Data = imageData.split(',')[1] || imageData
+        const binaryString = atob(base64Data)
+        const bytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i)
+        }
+        await env.R2.put(key, bytes, { httpMetadata: { contentType: 'image/jpeg' } })
+        imageUrls.push(key)
+      }
+    }
     
     await env.DB.prepare(`
       INSERT INTO water_tank_inspections (
-        id, tank_id, inspection_date, inspector_name,
-        action_item_1, action_item_2, action_item_3,
-        notes, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        tank_id, inspector_id, inspection_date, water_level, water_quality, 
+        lid_condition, image_urls, comment, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      id,
       data.tank_id,
+      data.inspector_id,
       data.inspection_date,
-      data.inspector_name,
-      toNullIfEmpty(data.action_item_1),
-      toNullIfEmpty(data.action_item_2),
-      toNullIfEmpty(data.action_item_3),
-      toNullIfEmpty(data.notes),
-      now,
+      data.water_level || null,
+      data.water_quality || null,
+      data.lid_condition || null,
+      imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
+      data.comment || null,
       now
     ).run()
     
-    return c.json({ success: true, id })
+    return c.json({ success: true })
   } catch (error) {
     console.error('Database error:', error)
-    return c.json({ success: false }, 500)
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, 500)
   }
 })
 
@@ -840,6 +864,31 @@ app.delete('/api/water-tank-inspections/:id', async (c) => {
   } catch (error) {
     console.error('Database error:', error)
     return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
+// API: R2画像取得
+// ==========================================
+app.get('/api/r2/:key{.*}', async (c) => {
+  try {
+    const env = c.env as { R2: R2Bucket }
+    const key = c.req.param('key')
+    
+    const object = await env.R2.get(key)
+    if (!object) {
+      return c.notFound()
+    }
+    
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': object.httpMetadata?.contentType || 'image/jpeg',
+        'Cache-Control': 'public, max-age=31536000'
+      }
+    })
+  } catch (error) {
+    console.error('R2 error:', error)
+    return c.notFound()
   }
 })
 
@@ -3062,6 +3111,81 @@ app.get('/water-tanks', (c) => {
         </div>
     </div>
 
+    <!-- 点検入力モーダル -->
+    <div id="inspectionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">💧 防火水槽点検記録</h2>
+                    <button onclick="closeInspectionModal()" class="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+                </div>
+
+                <form id="inspectionForm" class="space-y-4">
+                    <input type="hidden" id="inspectionTankId">
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">点検者 <span class="text-red-500">*</span></label>
+                        <select id="inspectionInspector" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                            <option value="">選択してください</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">点検日時 <span class="text-red-500">*</span></label>
+                        <input type="datetime-local" id="inspectionDate" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">水位 <span class="text-red-500">*</span></label>
+                        <select id="inspectionWaterLevel" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                            <option value="満水">満水</option>
+                            <option value="半分">半分</option>
+                            <option value="空">空</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">水質 <span class="text-red-500">*</span></label>
+                        <select id="inspectionWaterQuality" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                            <option value="良好">良好</option>
+                            <option value="濁り">濁り</option>
+                            <option value="異臭">異臭</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">蓋の状態 <span class="text-red-500">*</span></label>
+                        <select id="inspectionLidCondition" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                            <option value="正常">正常</option>
+                            <option value="破損">破損</option>
+                            <option value="紛失">紛失</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">写真</label>
+                        <input type="file" id="inspectionImage" accept="image/*" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        <div id="imagePreview" class="mt-2"></div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">コメント</label>
+                        <textarea id="inspectionComment" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="その他気づいた点など"></textarea>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-bold">
+                            💾 記録する
+                        </button>
+                        <button type="button" onclick="closeInspectionModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-6 py-3 rounded-lg font-bold">
+                            キャンセル
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         let tanks = [];
         let allInspections = [];
@@ -3201,8 +3325,8 @@ app.get('/water-tanks', (c) => {
                     inspectionDateHtml +
                     notesHtml +
                     '<div class="mt-4 pt-4 border-t border-gray-200">' +
-                        '<button onclick="event.stopPropagation(); goToTankDetail(\\'' + tank.id + '\\')" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg transition font-bold">' +
-                            '点検する' +
+                        '<button onclick="event.stopPropagation(); openInspectionModal(' + tank.id + ')" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg transition font-bold">' +
+                            '✏️ 点検する' +
                         '</button>' +
                     '</div>' +
                 '</div>';
@@ -3579,6 +3703,107 @@ app.get('/water-tanks', (c) => {
             } catch (error) {
                 console.error('Delete error:', error);
                 alert('削除中にエラーが発生しました');
+            }
+        }
+        
+        // ==========================================
+        // 点検モーダル関連関数
+        // ==========================================
+        
+        // 点検モーダルを開く
+        async function openInspectionModal(tankId) {
+            document.getElementById('inspectionTankId').value = tankId;
+            document.getElementById('inspectionDate').value = new Date().toISOString().slice(0, 16);
+            
+            // 現役団員のみ取得
+            try {
+                const response = await fetch('/api/users?active_only=1');
+                const data = await response.json();
+                
+                const select = document.getElementById('inspectionInspector');
+                select.innerHTML = '<option value="">選択してください</option>';
+                data.users.forEach(user => {
+                    select.innerHTML += '<option value="' + user.id + '">' + escapeHtml(user.name) + '</option>';
+                });
+            } catch (error) {
+                console.error('Failed to load users:', error);
+            }
+            
+            document.getElementById('inspectionModal').classList.remove('hidden');
+        }
+        
+        // 点検モーダルを閉じる
+        function closeInspectionModal() {
+            document.getElementById('inspectionModal').classList.add('hidden');
+            document.getElementById('inspectionForm').reset();
+            document.getElementById('imagePreview').innerHTML = '';
+        }
+        
+        // 画像プレビュー
+        document.getElementById('inspectionImage').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const preview = document.getElementById('imagePreview');
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    preview.innerHTML = '<img src="' + event.target.result + '" class="w-full rounded-lg mt-2" />';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                preview.innerHTML = '';
+            }
+        });
+        
+        // 点検フォーム送信
+        document.getElementById('inspectionForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                tank_id: parseInt(document.getElementById('inspectionTankId').value),
+                inspector_id: document.getElementById('inspectionInspector').value,
+                inspection_date: document.getElementById('inspectionDate').value,
+                water_level: document.getElementById('inspectionWaterLevel').value,
+                water_quality: document.getElementById('inspectionWaterQuality').value,
+                lid_condition: document.getElementById('inspectionLidCondition').value,
+                comment: document.getElementById('inspectionComment').value,
+                images: []
+            };
+            
+            // 画像があれば追加
+            const imageInput = document.getElementById('inspectionImage');
+            if (imageInput.files.length > 0) {
+                const file = imageInput.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = async function(event) {
+                    formData.images.push(event.target.result);
+                    await submitInspection(formData);
+                };
+                reader.readAsDataURL(file);
+            } else {
+                await submitInspection(formData);
+            }
+        });
+        
+        async function submitInspection(formData) {
+            try {
+                const response = await fetch('/api/water-tank-inspections', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (response.ok) {
+                    alert('点検記録を保存しました！');
+                    closeInspectionModal();
+                    loadTanks(); // リストを再読み込み
+                } else {
+                    alert('エラーが発生しました');
+                }
+            } catch (error) {
+                console.error('Submit error:', error);
+                alert('送信中にエラーが発生しました');
             }
         }
     </script>
