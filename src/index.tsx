@@ -6365,19 +6365,29 @@ app.get('/storage/:id', async (c) => {
         <!-- タブ切り替え -->
         <div class="bg-white rounded-2xl shadow-lg mb-6">
             <div class="flex border-b">
-                <button id="tabRecord" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-red-500 text-red-500">
+                <button type="button" id="tabRecord" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-red-500 text-red-500">
                     📝 点検記録
                 </button>
-                <button id="tabMap" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                <button type="button" id="tabMap" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
                     🗺️ 地図
                 </button>
-                <button id="tabHistory" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                <button type="button" id="tabHistory" class="tab-btn flex-1 py-4 px-6 font-bold text-lg transition border-b-4 border-transparent text-gray-500 hover:text-gray-700">
                     📋 全履歴
                 </button>
             </div>
 
             <!-- 点検記録タブ -->
-            <div id="recordTab" class="p-6"></div>
+            <div id="recordTab" class="p-6">
+                <div class="text-center py-12">
+                    <div class="text-6xl mb-4">📝</div>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">点検を記録する</h3>
+                    <p class="text-gray-600 mb-6">このホースの点検記録を登録できます</p>
+                    <button onclick="document.getElementById('inspectionModal').classList.remove('modal-closed'); document.getElementById('inspectionModal').classList.add('modal-open');" 
+                            class="bg-red-500 hover:bg-red-600 text-white px-8 py-4 rounded-xl transition font-bold text-lg shadow-lg">
+                        📝 点検を記録する
+                    </button>
+                </div>
+            </div>
 
             <!-- 地図タブ -->
             <div id="mapTab" class="p-6 hidden">
