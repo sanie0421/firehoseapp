@@ -9362,10 +9362,22 @@ app.get('/members', (c) => {
                     const joinMonth = member.join_date ? new Date(member.join_date).getMonth() + 1 : null;
                     const joinFiscalYear = joinMonth >= 4 ? joinYear : joinYear - 1;
                     
+                    // 退団年度を計算
+                    let retirementFiscalYear = null;
+                    if (member.retirement_date) {
+                        const retireYear = new Date(member.retirement_date).getFullYear();
+                        const retireMonth = new Date(member.retirement_date).getMonth() + 1;
+                        retirementFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
+                    }
+                    
                     let cellClass = 'border px-2 py-2 text-center text-xs';
                     let cellContent = '';
                     
-                    if (joinFiscalYear && year >= joinFiscalYear) {
+                    // 在籍期間のチェック（入団年度 ≤ 対象年度 ＜ 退団年度）
+                    const isActive = joinFiscalYear && year >= joinFiscalYear && 
+                                    (!retirementFiscalYear || year < retirementFiscalYear);
+                    
+                    if (isActive) {
                         const yearsOfService = year - joinFiscalYear + 1;
                         const age = currentAge ? (currentAge - (currentFiscalYear - year)) : null;
                         
@@ -9493,6 +9505,15 @@ app.get('/members', (c) => {
                 if (response.ok) {
                     alert('✅ ステータスを変更しました');
                     loadMembers();
+                    
+                    // ステータスに応じてタブを自動切り替え
+                    if (newStatus === 1) {
+                        switchTab('active');
+                    } else if (newStatus === 2) {
+                        switchTab('ob');
+                    } else if (newStatus === 3) {
+                        switchTab('retired');
+                    }
                     
                     // ステータスに応じてタブを自動切り替え
                     if (newStatus === 1) {
