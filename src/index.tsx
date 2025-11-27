@@ -5456,9 +5456,36 @@ app.get('/storage/:id', async (c) => {
                     </div>
                 </div>
 
+                <!-- ホース製造年月日（4本分） -->
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <h3 class="font-bold text-lg mb-3">📦 ホース製造年月日（4本分）</h3>
+                    <p class="text-sm text-gray-600 mb-3">
+                        ⚠️ 製造から10年経過後、3年ごとに耐圧点検が義務化されています
+                    </p>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-bold mb-1">ホース1 製造年月</label>
+                            <input type="month" id="hose1ManufactureDate" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-1">ホース2 製造年月</label>
+                            <input type="month" id="hose2ManufactureDate" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-1">ホース3 製造年月</label>
+                            <input type="month" id="hose3ManufactureDate" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-1">ホース4 製造年月</label>
+                            <input type="month" id="hose4ManufactureDate" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-2">📝 備考</label>
-                    <textarea id="remarks" rows="3" placeholder="例：ホース状態良好、格納庫周辺の清掃実施" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                    <textarea id="remarks" rows="3" placeholder="例：ホース状態良好、格納庫周辺の清掃実施。消火栓のみ点検した場合はここに記載" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
                 </div>
 
                 <div>
@@ -6070,6 +6097,12 @@ app.get('/storage/:id', async (c) => {
             const actionRequired3 = document.getElementById('actionRequired3').value;
             const remarks = document.getElementById('remarks').value;
             
+            // ホース製造年月日
+            const hose1MfgDate = document.getElementById('hose1ManufactureDate').value;
+            const hose2MfgDate = document.getElementById('hose2ManufactureDate').value;
+            const hose3MfgDate = document.getElementById('hose3ManufactureDate').value;
+            const hose4MfgDate = document.getElementById('hose4ManufactureDate').value;
+            
             if (!inspectorName || !date) {
                 alert('入力者と点検日は必須です');
                 return;
@@ -6106,7 +6139,11 @@ app.get('/storage/:id', async (c) => {
                 action_items: actionItemsWithPhotos,
                 remarks: remarks || null,
                 inspector_name: inspectorName,
-                photos: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null
+                photos: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
+                hose_1_manufacture_date: hose1MfgDate || null,
+                hose_2_manufacture_date: hose2MfgDate || null,
+                hose_3_manufacture_date: hose3MfgDate || null,
+                hose_4_manufacture_date: hose4MfgDate || null
             };
 
             try {
@@ -6265,14 +6302,35 @@ app.post('/api/inspection/record', async (c) => {
     const id = 'inspection_' + Date.now()
     const now = new Date().toISOString()
     
+    // 製造年月日から最古の日付と次回義務点検日を計算
+    const manufactureDates = [
+      data.hose_1_manufacture_date,
+      data.hose_2_manufacture_date,
+      data.hose_3_manufacture_date,
+      data.hose_4_manufacture_date
+    ].filter(d => d)
+    
+    let oldestDate = null
+    let nextMandatoryDate = null
+    
+    if (manufactureDates.length > 0) {
+      oldestDate = manufactureDates.sort()[0]
+      const mfgDate = new Date(oldestDate + '-01')
+      const tenYearsLater = new Date(mfgDate)
+      tenYearsLater.setFullYear(tenYearsLater.getFullYear() + 10)
+      nextMandatoryDate = tenYearsLater.toISOString().split('T')[0]
+    }
+    
     await env.DB.prepare(`
       INSERT INTO hose_inspections (
         id, storage_id, storage_number, inspection_date,
         hose_replaced_count, hose_damaged_count,
         action_required, remarks, photos,
         inspector_id, inspector_name,
+        hose_1_manufacture_date, hose_2_manufacture_date,
+        hose_3_manufacture_date, hose_4_manufacture_date,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       id,
       data.storage_id,
@@ -6285,9 +6343,23 @@ app.post('/api/inspection/record', async (c) => {
       data.photos || null,
       'user_001',
       data.inspector_name,
+      data.hose_1_manufacture_date || null,
+      data.hose_2_manufacture_date || null,
+      data.hose_3_manufacture_date || null,
+      data.hose_4_manufacture_date || null,
       now,
       now
     ).run()
+    
+    // hose_storagesテーブルを更新（最古製造年月日と次回義務点検日）
+    if (oldestDate && nextMandatoryDate) {
+      await env.DB.prepare(`
+        UPDATE hose_storages 
+        SET oldest_hose_manufacture_date = ?,
+            next_mandatory_inspection_date = ?
+        WHERE id = ?
+      `).bind(oldestDate, nextMandatoryDate, data.storage_id).run()
+    }
     
     // 要対応事項を個別に保存（action_itemsテーブル）
     if (data.action_items && Array.isArray(data.action_items)) {
@@ -6344,6 +6416,25 @@ app.put('/api/inspection/:id', async (c) => {
     
     const now = new Date().toISOString()
     
+    // 製造年月日から最古の日付と次回義務点検日を計算
+    const manufactureDates = [
+      data.hose_1_manufacture_date,
+      data.hose_2_manufacture_date,
+      data.hose_3_manufacture_date,
+      data.hose_4_manufacture_date
+    ].filter(d => d)
+    
+    let oldestDate = null
+    let nextMandatoryDate = null
+    
+    if (manufactureDates.length > 0) {
+      oldestDate = manufactureDates.sort()[0]
+      const mfgDate = new Date(oldestDate + '-01')
+      const tenYearsLater = new Date(mfgDate)
+      tenYearsLater.setFullYear(tenYearsLater.getFullYear() + 10)
+      nextMandatoryDate = tenYearsLater.toISOString().split('T')[0]
+    }
+    
     await env.DB.prepare(`
       UPDATE hose_inspections 
       SET inspection_date = ?,
@@ -6353,6 +6444,10 @@ app.put('/api/inspection/:id', async (c) => {
           remarks = ?,
           photos = ?,
           inspector_name = ?,
+          hose_1_manufacture_date = ?,
+          hose_2_manufacture_date = ?,
+          hose_3_manufacture_date = ?,
+          hose_4_manufacture_date = ?,
           updated_at = ?
       WHERE id = ?
     `).bind(
@@ -6363,9 +6458,23 @@ app.put('/api/inspection/:id', async (c) => {
       data.remarks || null,
       data.photos || null,
       data.inspector_name,
+      data.hose_1_manufacture_date || null,
+      data.hose_2_manufacture_date || null,
+      data.hose_3_manufacture_date || null,
+      data.hose_4_manufacture_date || null,
       now,
       id
     ).run()
+    
+    // hose_storagesテーブルを更新
+    if (oldestDate && nextMandatoryDate && data.storage_id) {
+      await env.DB.prepare(`
+        UPDATE hose_storages 
+        SET oldest_hose_manufacture_date = ?,
+            next_mandatory_inspection_date = ?
+        WHERE id = ?
+      `).bind(oldestDate, nextMandatoryDate, data.storage_id).run()
+    }
     
     return c.json({ success: true })
   } catch (error) {
