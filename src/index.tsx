@@ -9835,20 +9835,22 @@ app.get('/members', (c) => {
                     const joinMonth = member.join_date ? new Date(member.join_date).getMonth() + 1 : null;
                     const joinFiscalYear = joinMonth >= 4 ? joinYear : joinYear - 1;
                     
-                    // 退団年度を計算
+                    // 退団年度を計算（月単位で正確に）
                     let retirementFiscalYear = null;
-                    if (member.retirement_date) {
+                    if (member.retirement_date && member.retirement_date !== 'null') {
                         const retireYear = new Date(member.retirement_date).getFullYear();
                         const retireMonth = new Date(member.retirement_date).getMonth() + 1;
+                        // 退団月が3月以前なら前年度、4月以降なら当年度として計算
                         retirementFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
                     }
                     
                     let cellClass = 'border px-2 py-2 text-center text-xs';
                     let cellContent = '';
                     
-                    // 在籍期間のチェック（入団年度 ≤ 対象年度 ＜ 退団年度）
+                    // 在籍期間のチェック（入団年度 ≤ 対象年度 ≤ 退団年度）
+                    // 例: 2024/4/1入団、2025/3/31退団 → 2024年度のみ在籍（満1年）
                     const isActive = joinFiscalYear && year >= joinFiscalYear && 
-                                    (!retirementFiscalYear || year < retirementFiscalYear);
+                                    (!retirementFiscalYear || year <= retirementFiscalYear);
                     
                     if (isActive) {
                         const yearsOfService = year - joinFiscalYear + 1;
