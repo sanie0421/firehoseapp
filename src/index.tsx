@@ -1270,7 +1270,7 @@ const comingSoonPage = (title: string, icon: string) => {
         <div class="text-9xl mb-4">${icon}</div>
         <h1 class="text-4xl font-bold text-gray-800 mb-4">${title}</h1>
         <p class="text-xl text-gray-600 mb-8">準備中...</p>
-        <a href="/home" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition inline-block">
+        <a href="/" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition inline-block">
             ← ホームに戻る
         </a>
     </div>
@@ -1339,14 +1339,14 @@ app.get('/hose', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/home" class="flex items-center space-x-3">
+                <a href="/" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -2834,14 +2834,14 @@ app.get('/admin', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/home" class="flex items-center space-x-3">
+                <a href="/" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -3379,14 +3379,14 @@ app.get('/water-tanks', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/home" class="flex items-center space-x-3">
+                <a href="/" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -4258,14 +4258,14 @@ app.get('/inspection-priority', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/home" class="flex items-center space-x-3">
+                <a href="/" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -5047,6 +5047,80 @@ app.get('/api/inspection/priority', async (c) => {
 })
 
 // ==========================================
+// API: AI優先度分析（Claude API）
+// ==========================================
+app.post('/api/inspection/ai-priority', async (c) => {
+  try {
+    const env = c.env as { DB: D1Database; ANTHROPIC_API_KEY?: string }
+    const { storages } = await c.req.json()
+    
+    if (!env.ANTHROPIC_API_KEY) {
+      return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 500)
+    }
+    
+    // Claude APIに送信するプロンプト
+    const prompt = `あなたは消防団の点検優先度判定AIです。以下の格納庫データを分析し、点検が最も必要な順にランキングしてください。
+
+格納庫データ（JSON）:
+${JSON.stringify(storages, null, 2)}
+
+判定基準:
+1. 最終点検日が古い（未点検含む）
+2. 前回点検結果が異常・要注意
+3. 地区的に重要な拠点
+4. ホース破損・交換が多い
+
+各格納庫について、100点満点で優先度スコアを算出し、以下のJSON形式で返してください:
+{
+  "rankings": [
+    {
+      "storage_id": "格納庫ID",
+      "priority_score": 85,
+      "reason": "優先する理由（30文字以内）"
+    }
+  ]
+}`
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 2048,
+        messages: [{
+          role: 'user',
+          content: prompt
+        }]
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error('Claude API error: ' + response.statusText)
+    }
+    
+    const data = await response.json() as any
+    const aiResponse = data.content[0].text
+    
+    // JSONをパース
+    const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      return c.json({ error: 'Invalid AI response format' }, 500)
+    }
+    
+    const rankings = JSON.parse(jsonMatch[0])
+    return c.json(rankings)
+    
+  } catch (error) {
+    console.error('AI priority analysis error:', error)
+    return c.json({ error: 'AI analysis failed' }, 500)
+  }
+})
+
+// ==========================================
 // API: 全点検履歴取得（新しい順）
 // ==========================================
 app.get('/api/inspection/all-history', async (c) => {
@@ -5116,7 +5190,7 @@ app.get('/water-tank/:id', async (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/home" class="flex items-center space-x-3">
+                <a href="/" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
@@ -5715,7 +5789,7 @@ app.get('/storage/:id', async (c) => {
     <nav class="bg-white shadow-lg">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/home" class="flex items-center space-x-3">
+                <a href="/" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
@@ -6908,14 +6982,14 @@ app.get('/action-required', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/home" class="flex items-center space-x-3">
+                <a href="/" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -7996,14 +8070,14 @@ app.get('/logs', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/home" class="flex items-center space-x-3">
+                <a href="/" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -8814,14 +8888,14 @@ app.get('/members', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/home" class="flex items-center space-x-3">
+                <a href="/" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -9314,14 +9388,14 @@ app.get('/stats', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/home" class="flex items-center space-x-3">
+                <a href="/" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
