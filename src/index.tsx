@@ -9700,8 +9700,8 @@ app.get('/members', (c) => {
                 document.getElementById('tabTimeline').classList.remove('border-transparent', 'text-gray-500');
                 document.getElementById('tabTimeline').classList.add('border-blue-500', 'text-blue-500');
                 document.getElementById('timelineTab').classList.remove('hidden');
-                // 欠席期間データを読み込んでから年表を描画
-                loadAllAbsencePeriods().then(() => renderTimeline());
+                // 欠席期間データを読み込んでから、デフォルトソート（退団が早い順）して年表を描画
+                loadAllAbsencePeriods().then(() => sortByRetirementDate());
             }
             
             renderMembers();
@@ -9959,9 +9959,42 @@ app.get('/members', (c) => {
             container.innerHTML = rows.join('');
         }
         
-        // 指定年度の在籍者でソート（高速化版）
+        // デフォルトソート：退団が早い順（現役は最後）
+        function sortByRetirementDate() {
+            const memberData = members.map(member => {
+                let retirementFiscalYear = null;
+                
+                if (member.retirement_date && member.retirement_date !== 'null') {
+                    const retireDate = new Date(member.retirement_date);
+                    if (!isNaN(retireDate.getTime())) {
+                        const retireYear = retireDate.getFullYear();
+                        const retireMonth = retireDate.getMonth() + 1;
+                        retirementFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
+                    }
+                }
+                
+                return { 
+                    member: member,
+                    retirementFiscalYear: retirementFiscalYear
+                };
+            });
+            
+            // ソート：退団が早い順（nullは最後＝現役は最後）
+            memberData.sort((a, b) => {
+                if (a.retirementFiscalYear && b.retirementFiscalYear) {
+                    return a.retirementFiscalYear - b.retirementFiscalYear;
+                }
+                if (a.retirementFiscalYear && !b.retirementFiscalYear) return -1;
+                if (!a.retirementFiscalYear && b.retirementFiscalYear) return 1;
+                return a.member.name.localeCompare(b.member.name, 'ja');
+            });
+            
+            members = memberData.map(item => item.member);
+            renderTimeline();
+        }
+
+        // 指定年度の在籍者でソート：その年在籍者で退団が早い順
         function sortByYear(targetYear) {
-            // 事前計算：各メンバーの在籍状況と年度情報
             const activeStatus = members.map(member => {
                 let joinFiscalYear = null;
                 let retirementFiscalYear = null;
@@ -9988,23 +10021,18 @@ app.get('/members', (c) => {
                 return { 
                     member: member, 
                     wasActive: wasActive,
-                    joinFiscalYear: joinFiscalYear,
                     retirementFiscalYear: retirementFiscalYear
                 };
             });
             
-            // ソート：在籍者を上に、入団が早い順（年数長い順）→退団が早い順
+            // ソート：在籍者を上に、退団が早い順（現役は最後）
             activeStatus.sort((a, b) => {
                 // 在籍状態で分ける
                 if (a.wasActive && !b.wasActive) return -1;
                 if (!a.wasActive && b.wasActive) return 1;
                 
-                // 両方在籍者：入団年度が早い順（年数が長い順）
-                if (a.wasActive && b.wasActive && a.joinFiscalYear && b.joinFiscalYear) {
-                    if (a.joinFiscalYear !== b.joinFiscalYear) {
-                        return a.joinFiscalYear - b.joinFiscalYear;
-                    }
-                    // 入団年度同じ：退団年度が早い順（nullは最後＝現役は最後）
+                // 両方在籍者：退団が早い順（nullは最後＝現役は最後）
+                if (a.wasActive && b.wasActive) {
                     if (a.retirementFiscalYear && b.retirementFiscalYear) {
                         return a.retirementFiscalYear - b.retirementFiscalYear;
                     }
