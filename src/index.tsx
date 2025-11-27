@@ -292,26 +292,26 @@ app.get('/', (c) => {
                         card.style.animation = 'blink 1s infinite';
                         content.innerHTML = '<strong style="color: #d32f2f; font-size: 15px;">⚠️ ' + message + '</strong>';
                     } 
-                    // 他地域で火災（オレンジ）
+                    // 他地域で火災（色なし・グレー）
                     else {
                         icon.textContent = '🔥';
-                        card.style.background = '#fff3e0';
-                        card.style.borderLeft = '4px solid #f57c00';
+                        card.style.background = 'white';
+                        card.style.borderLeft = 'none';
                         card.style.animation = 'none';
-                        content.innerHTML = '<strong style="color: #f57c00;">' + message + '</strong>';
+                        content.innerHTML = '<span style="color: #666;">' + message + '</span>';
                     }
                     
                     if (data.timestamp) {
                         timestamp.textContent = '発生時刻: ' + data.timestamp;
-                        timestamp.style.color = '#d32f2f';
+                        timestamp.style.color = message.includes('大井町') || message.includes('大井') ? '#d32f2f' : '#999';
                     }
                 } else {
-                    // 平常時（緑）
+                    // 平常時（色なし・グレー）
                     icon.textContent = '✅';
-                    card.style.background = '#e8f5e9';
-                    card.style.borderLeft = '4px solid #43a047';
+                    card.style.background = 'white';
+                    card.style.borderLeft = 'none';
                     card.style.animation = 'none';
-                    content.innerHTML = '<span style="color: #43a047; font-weight: 600;">' + (data.message || '現在、災害は発生しておりません') + '</span>';
+                    content.innerHTML = '<span style="color: #666;">' + (data.message || '現在、災害は発生しておりません') + '</span>';
                     timestamp.textContent = '最終確認: ' + (data.lastUpdated || new Date().toLocaleString('ja-JP'));
                     timestamp.style.color = '#999';
                 }
