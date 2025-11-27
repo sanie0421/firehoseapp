@@ -4543,8 +4543,21 @@ app.get('/inspection-priority', (c) => {
             return colors[district] || '#6b7280';  // デフォルトはグレー
         }
         
-        function createColoredMarker(lat, lon, district) {
+        function createColoredMarker(lat, lon, district, isPinned) {
             const color = getDistrictColor(district);
+            
+            // ピン留めされている場合は★アイコン
+            if (isPinned) {
+                const icon = L.divIcon({
+                    className: 'custom-marker',
+                    html: '<div style="font-size: 30px; text-shadow: 0 2px 5px rgba(0,0,0,0.5);">⭐</div>',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30]
+                });
+                return L.marker([lat, lon], { icon: icon });
+            }
+            
+            // 通常のピンアイコン
             const icon = L.divIcon({
                 className: 'custom-marker',
                 html: '<div style="background-color: ' + color + '; width: 25px; height: 25px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
@@ -4918,7 +4931,8 @@ app.get('/inspection-priority', (c) => {
                 }
                 
                 if (lat && lon) {
-                    const marker = createColoredMarker(lat, lon, storage.district);
+                    const isPinned = pinnedToday.includes(storage.id);
+                    const marker = createColoredMarker(lat, lon, storage.district, isPinned);
                     marker.addTo(leafletMap);
                     marker.bindPopup('<b>' + storage.storage_number + '</b><br>' + (storage.district ? storage.district + ' - ' : '') + storage.location + '<br><a href="/storage/' + storage.id + '" class="text-blue-600 hover:underline">詳細を見る</a>');
                     bounds.push([lat, lon]);
@@ -4957,7 +4971,8 @@ app.get('/inspection-priority', (c) => {
                 }
                 
                 if (lat && lon) {
-                    const marker = createColoredMarker(lat, lon, storage.district);
+                    const isPinned = pinnedToday.includes(storage.id);
+                    const marker = createColoredMarker(lat, lon, storage.district, isPinned);
                     marker.addTo(leafletMap);
                     marker.bindPopup('<b>' + storage.storage_number + '</b><br>' + (storage.district ? storage.district + ' - ' : '') + storage.location + '<br><a href="/storage/' + storage.id + '" class="text-blue-600 hover:underline">詳細を見る</a>');
                     bounds.push([lat, lon]);
@@ -9478,6 +9493,15 @@ app.get('/members', (c) => {
                 if (response.ok) {
                     alert('✅ ステータスを変更しました');
                     loadMembers();
+                    
+                    // ステータスに応じてタブを自動切り替え
+                    if (newStatus === 1) {
+                        switchTab('active');
+                    } else if (newStatus === 2) {
+                        switchTab('ob');
+                    } else if (newStatus === 3) {
+                        switchTab('retired');
+                    }
                 } else {
                     alert('❌ ステータス変更中にエラーが発生しました');
                 }
