@@ -9787,7 +9787,15 @@ app.get('/members', (c) => {
         }
 
         function renderTimeline() {
+            console.log('renderTimeline called');
             const container = document.getElementById('timelineContent');
+            console.log('Container element:', container);
+            console.log('Members count:', members.length);
+            
+            if (!container) {
+                console.error('timelineContent element not found!');
+                return;
+            }
             
             if (members.length === 0) {
                 container.innerHTML = '<p class="text-gray-600 text-center py-8">まだ団員が登録されていません</p>';
@@ -9996,16 +10004,9 @@ app.get('/members', (c) => {
                 
                 if (response.ok) {
                     alert('✅ ステータスを変更しました');
-                    loadMembers();
                     
-                    // ステータスに応じてタブを自動切り替え
-                    if (newStatus === 1) {
-                        switchTab('active');
-                    } else if (newStatus === 2) {
-                        switchTab('ob');
-                    } else if (newStatus === 3) {
-                        switchTab('retired');
-                    }
+                    // データを再読み込みしてからタブを切り替え
+                    await loadMembers();
                     
                     // ステータスに応じてタブを自動切り替え
                     if (newStatus === 1) {
