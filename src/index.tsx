@@ -4935,6 +4935,22 @@ app.get('/inspection-priority', (c) => {
                     const marker = createColoredMarker(lat, lon, storage.district, isPinned);
                     marker.addTo(leafletMap);
                     marker.bindPopup('<b>' + storage.storage_number + '</b><br>' + (storage.district ? storage.district + ' - ' : '') + storage.location + '<br><a href="/storage/' + storage.id + '" class="text-blue-600 hover:underline">詳細を見る</a>');
+                    
+                    // マーカークリックでピン留めトグル
+                    marker.on('click', function(e) {
+                        e.originalEvent.stopPropagation();
+                        if (pinnedToday.includes(storage.id)) {
+                            // ピン解除
+                            pinnedToday = pinnedToday.filter(id => id !== storage.id);
+                        } else {
+                            // ピン留め追加
+                            pinnedToday.push(storage.id);
+                        }
+                        localStorage.setItem('pinnedTodayStorages', JSON.stringify(pinnedToday));
+                        // 地図を再描画
+                        applyFilters();
+                    });
+                    
                     bounds.push([lat, lon]);
                 }
             }
@@ -4975,6 +4991,22 @@ app.get('/inspection-priority', (c) => {
                     const marker = createColoredMarker(lat, lon, storage.district, isPinned);
                     marker.addTo(leafletMap);
                     marker.bindPopup('<b>' + storage.storage_number + '</b><br>' + (storage.district ? storage.district + ' - ' : '') + storage.location + '<br><a href="/storage/' + storage.id + '" class="text-blue-600 hover:underline">詳細を見る</a>');
+                    
+                    // マーカークリックでピン留めトグル
+                    marker.on('click', function(e) {
+                        e.originalEvent.stopPropagation();
+                        if (pinnedToday.includes(storage.id)) {
+                            // ピン解除
+                            pinnedToday = pinnedToday.filter(id => id !== storage.id);
+                        } else {
+                            // ピン留め追加
+                            pinnedToday.push(storage.id);
+                        }
+                        localStorage.setItem('pinnedTodayStorages', JSON.stringify(pinnedToday));
+                        // 地図を再描画
+                        applyFilters();
+                    });
+                    
                     bounds.push([lat, lon]);
                 }
             }
