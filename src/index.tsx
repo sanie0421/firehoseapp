@@ -9858,14 +9858,8 @@ app.get('/members', (c) => {
                     
                     // 在籍期間のチェック（入団年度 ≤ 対象年度 ≤ 退団年度）
                     // 例: 2024/4/1入団、2025/3/31退団 → 入団年度2024、退団年度2024 → 2024年度のみ在籍（満1年）
-                    // ただし、退団年度が未来の場合は現在年度で止める（まだ退団していない）
-                    let effectiveRetirementYear = retirementFiscalYear;
-                    if (retirementFiscalYear && retirementFiscalYear > currentFiscalYear) {
-                        effectiveRetirementYear = null; // まだ在籍中として扱う
-                    }
-                    
                     const isActive = joinFiscalYear && year >= joinFiscalYear && 
-                                    (!effectiveRetirementYear || year <= effectiveRetirementYear);
+                                    (!retirementFiscalYear || year <= retirementFiscalYear);
                     
                     if (isActive) {
                         const yearsOfService = year - joinFiscalYear + 1;
