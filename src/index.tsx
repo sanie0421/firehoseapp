@@ -9823,14 +9823,11 @@ app.get('/members', (c) => {
                     }
                 }
                 
-                // 満年数計算（退団済みなら退団日まで、現役なら現在まで）
-                let actualYears = null;
-                if (member.join_date) {
-                    const joinDate = new Date(member.join_date);
-                    const endDate = retireDate || today;
-                    const diffMs = endDate - joinDate;
-                    const diffYears = diffMs / (1000 * 60 * 60 * 24 * 365.25);
-                    actualYears = Math.floor(diffYears);
+                // 在籍年数計算（年度ベース：退団済みなら退団年度まで、現役なら現在年度まで）
+                let yearsOfService = null;
+                if (joinFiscalYear) {
+                    const endFiscalYear = retirementFiscalYear || currentFiscalYear;
+                    yearsOfService = endFiscalYear - joinFiscalYear + 1;
                 }
                 
                 // 欠席期間を年度範囲に変換
@@ -9850,11 +9847,11 @@ app.get('/members', (c) => {
                     return { start: startFiscalYear, end: endFiscalYear };
                 });
                 
-                // バッジ（満年数で判定）
+                // バッジ（年度ベースで満5年=5年度、満10年=10年度、満20年=20年度）
                 let badge = '';
-                if (actualYears >= 20) badge = '🏆';
-                else if (actualYears >= 10) badge = '🥈';
-                else if (actualYears >= 5) badge = '🥉';
+                if (yearsOfService >= 20) badge = '🏆';
+                else if (yearsOfService >= 10) badge = '🥈';
+                else if (yearsOfService >= 5) badge = '🥉';
                 
                 return {
                     name: member.name,
