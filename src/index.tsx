@@ -7359,21 +7359,42 @@ app.post('/api/inspection/record', async (c) => {
     }
     
     // 要対応事項を個別に保存（action_itemsテーブル）
+    // action_item_1/2/3フィールドからも自動的に保存
+    const actionItemsToSave = []
+    if (data.action_item_1 && data.action_item_1.trim() !== '') {
+      actionItemsToSave.push({ content: data.action_item_1.trim(), order: 1 })
+    }
+    if (data.action_item_2 && data.action_item_2.trim() !== '') {
+      actionItemsToSave.push({ content: data.action_item_2.trim(), order: 2 })
+    }
+    if (data.action_item_3 && data.action_item_3.trim() !== '') {
+      actionItemsToSave.push({ content: data.action_item_3.trim(), order: 3 })
+    }
+    
+    // action_items配列形式でも受け取る（互換性維持）
     if (data.action_items && Array.isArray(data.action_items)) {
       for (let i = 0; i < data.action_items.length; i++) {
         const item = data.action_items[i]
-        // オブジェクト形式 {description, photo_url} または文字列形式に対応
         const description = typeof item === 'string' ? item : item.description
         const photoUrl = typeof item === 'object' && item.photo_url ? item.photo_url : null
         
         if (description && description.trim() !== '') {
-          await env.DB.prepare(`
-            INSERT INTO action_items (
-              inspection_id, content, photo_url, item_order, created_at
-            ) VALUES (?, ?, ?, ?, ?)
-          `).bind(id, description.trim(), photoUrl, i + 1, now).run()
+          actionItemsToSave.push({ 
+            content: description.trim(), 
+            photo_url: photoUrl,
+            order: i + 1 
+          })
         }
       }
+    }
+    
+    // action_itemsテーブルに保存
+    for (const item of actionItemsToSave) {
+      await env.DB.prepare(`
+        INSERT INTO action_items (
+          inspection_id, content, photo_url, item_order, created_at
+        ) VALUES (?, ?, ?, ?, ?)
+      `).bind(id, item.content, item.photo_url || null, item.order, now).run()
     }
     
     return c.json({ success: true, id })
