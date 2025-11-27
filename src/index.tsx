@@ -74,13 +74,13 @@ app.get('/', (c) => {
             height: auto;
             display: block;
         }
-        /* iOS風グラデーション背景 */
-        .icon-hose-bg { background: linear-gradient(135deg, #FF3B30 0%, #FF453A 100%); }
-        .icon-tank-bg { background: linear-gradient(135deg, #007AFF 0%, #0A84FF 100%); }
-        .icon-action-bg { background: linear-gradient(135deg, #FF9500 0%, #FF9F0A 100%); }
-        .icon-stats-bg { background: linear-gradient(135deg, #34C759 0%, #30D158 100%); }
-        .icon-members-bg { background: linear-gradient(135deg, #FF2D55 0%, #FF6482 100%); }
-        .icon-admin-bg { background: linear-gradient(135deg, #5856D6 0%, #AF52DE 100%); }
+        /* iOS風グラデーション背景（スッキリした落ち着いたトーン） */
+        .icon-hose-bg { background: linear-gradient(135deg, #546E7A 0%, #607D8B 100%); }
+        .icon-tank-bg { background: linear-gradient(135deg, #455A64 0%, #546E7A 100%); }
+        .icon-action-bg { background: linear-gradient(135deg, #757575 0%, #9E9E9E 100%); }
+        .icon-stats-bg { background: linear-gradient(135deg, #66BB6A 0%, #81C784 100%); }
+        .icon-members-bg { background: linear-gradient(135deg, #7E57C2 0%, #9575CD 100%); }
+        .icon-admin-bg { background: linear-gradient(135deg, #5C6BC0 0%, #7986CB 100%); }
         
         .function-card h3 {
             font-size: 13px;
@@ -421,9 +421,11 @@ app.get('/api/fire-info', async (c) => {
 app.get('/api/members', async (c) => {
   try {
     const env = c.env as { DB: D1Database }
+    // 現役団員のみ（status=1）を返す
     const result = await env.DB.prepare(`
       SELECT id, name, birth_date, join_date, created_at, updated_at
       FROM users
+      WHERE status = 1
       ORDER BY join_date ASC, name ASC
     `).all()
     
@@ -455,6 +457,46 @@ app.get('/api/users', async (c) => {
   } catch (error) {
     console.error('Database error:', error)
     return c.json({ users: [] })
+  }
+})
+
+// ==========================================
+// API: 団員ステータス変更
+// ==========================================
+app.put('/api/users/:id/status', async (c) => {
+  try {
+    const userId = c.req.param('id')
+    const { status } = await c.req.json() as { status: number }
+    const env = c.env as { DB: D1Database }
+    
+    // status: 1=現役, 2=OB, 3=退団
+    if (![1, 2, 3].includes(status)) {
+      return c.json({ error: 'Invalid status value' }, 400)
+    }
+    
+    const now = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+    
+    // ステータスに応じて retirement_date を設定
+    if (status === 1) {
+      // 現役に戻す場合、retirement_date をクリア
+      await env.DB.prepare(`
+        UPDATE users
+        SET status = ?, retirement_date = NULL, updated_at = datetime('now', 'localtime')
+        WHERE id = ?
+      `).bind(status, userId).run()
+    } else {
+      // OBまたは退団の場合、retirement_date を記録
+      await env.DB.prepare(`
+        UPDATE users
+        SET status = ?, retirement_date = ?, updated_at = datetime('now', 'localtime')
+        WHERE id = ?
+      `).bind(status, now, userId).run()
+    }
+    
+    return c.json({ success: true, status, userId })
+  } catch (error) {
+    console.error('Status update error:', error)
+    return c.json({ error: 'Failed to update status' }, 500)
   }
 })
 
