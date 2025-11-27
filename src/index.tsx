@@ -9413,6 +9413,15 @@ app.get('/members', (c) => {
         input {
             font-size: 16px !important;
         }
+        .absence-period {
+            background: repeating-linear-gradient(
+                45deg,
+                #fed7aa,
+                #fed7aa 10px,
+                #fdba74 10px,
+                #fdba74 20px
+            );
+        }
     </style>
 </head>
 <body>
@@ -9534,9 +9543,61 @@ app.get('/members', (c) => {
         </div>
     </div>
 
+    <!-- 欠席期間管理モーダル -->
+    <div id="absenceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl p-8 max-w-3xl w-full shadow-2xl">
+                <h3 id="absenceModalTitle" class="text-2xl font-bold mb-6">🏝️ 欠席期間管理</h3>
+                
+                <!-- 新規登録フォーム -->
+                <div class="bg-blue-50 rounded-xl p-6 mb-6">
+                    <h4 class="text-lg font-bold mb-4">✚ 新規登録</h4>
+                    <form id="absenceForm" onsubmit="saveAbsence(event)" class="space-y-4">
+                        <input type="hidden" id="absenceUserId" />
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block font-bold mb-2">開始日 *</label>
+                                <input type="date" id="absenceStartDate" required class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block font-bold mb-2">終了日</label>
+                                <input type="date" id="absenceEndDate" class="w-full px-4 py-2 border rounded-lg">
+                                <p class="text-xs text-gray-600 mt-1">※空欄の場合は現在も欠席中</p>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block font-bold mb-2">理由</label>
+                            <input type="text" id="absenceReason" class="w-full px-4 py-2 border rounded-lg" placeholder="例: 留学、入院など">
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-bold">
+                            💾 追加
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- 既存の欠席期間リスト -->
+                <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                    <h4 class="text-lg font-bold mb-4">📋 登録済み欠席期間</h4>
+                    <div id="absenceList" class="space-y-2">
+                        <p class="text-gray-600 text-center py-4">読み込み中...</p>
+                    </div>
+                </div>
+                
+                <button onclick="closeAbsenceModal()" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-3 rounded-lg font-bold">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let members = [];
         let currentTab = 'active';
+        let currentAbsenceUserId = null;
+        let absencePeriods = {};
 
         window.onload = function() {
             loadMembers();
@@ -9595,7 +9656,8 @@ app.get('/members', (c) => {
                 document.getElementById('tabTimeline').classList.remove('border-transparent', 'text-gray-500');
                 document.getElementById('tabTimeline').classList.add('border-blue-500', 'text-blue-500');
                 document.getElementById('timelineTab').classList.remove('hidden');
-                renderTimeline();
+                // 欠席期間データを読み込んでから年表を描画
+                loadAllAbsencePeriods().then(() => renderTimeline());
             }
             
             renderMembers();
@@ -9659,11 +9721,14 @@ app.get('/members', (c) => {
                     '<div class="grid grid-cols-2 gap-2 mb-2">' +
                         statusButtons +
                     '</div>' +
-                    '<div class="grid grid-cols-2 gap-2">' +
-                        '<button onclick="editMember(\\'' + member.id + '\\')" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg transition shadow-md font-bold">' +
+                    '<div class="grid grid-cols-3 gap-2 mb-2">' +
+                        '<button onclick="manageAbsence(\\'' + member.id + '\\', \\'' + member.name + '\\')" class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg transition shadow-md font-bold text-sm">' +
+                            '🏝️ 欠席期間' +
+                        '</button>' +
+                        '<button onclick="editMember(\\'' + member.id + '\\')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition shadow-md font-bold text-sm">' +
                             '✏️ 編集' +
                         '</button>' +
-                        '<button onclick="deleteMember(\\'' + member.id + '\\', \\'' + member.name + '\\')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-lg transition shadow-md font-bold">' +
+                        '<button onclick="deleteMember(\\'' + member.id + '\\', \\'' + member.name + '\\')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition shadow-md font-bold text-sm">' +
                             '🗑️ 削除' +
                         '</button>' +
                     '</div>' +
@@ -9760,10 +9825,37 @@ app.get('/members', (c) => {
                         const yearsOfService = year - joinFiscalYear + 1;
                         const age = currentAge ? (currentAge - (currentFiscalYear - year)) : null;
                         
-                        cellClass += ' bg-green-100';
-                        cellContent = yearsOfService + '年';
-                        if (age) {
-                            cellContent += '<br>(' + age + '歳)';
+                        // 欠席期間チェック（該当年度が欠席期間に含まれるか）
+                        let isAbsent = false;
+                        const memberAbsences = absencePeriods[member.id] || [];
+                        for (const absence of memberAbsences) {
+                            const absenceStartYear = new Date(absence.start_date).getFullYear();
+                            const absenceStartMonth = new Date(absence.start_date).getMonth() + 1;
+                            const absenceStartFiscalYear = absenceStartMonth >= 4 ? absenceStartYear : absenceStartYear - 1;
+                            
+                            let absenceEndFiscalYear = currentFiscalYear; // デフォルトは現在
+                            if (absence.end_date) {
+                                const absenceEndYear = new Date(absence.end_date).getFullYear();
+                                const absenceEndMonth = new Date(absence.end_date).getMonth() + 1;
+                                absenceEndFiscalYear = absenceEndMonth >= 4 ? absenceEndYear : absenceEndYear - 1;
+                            }
+                            
+                            // 該当年度が欠席期間に含まれるか
+                            if (year >= absenceStartFiscalYear && year <= absenceEndFiscalYear) {
+                                isAbsent = true;
+                                break;
+                            }
+                        }
+                        
+                        if (isAbsent) {
+                            cellClass += ' absence-period';
+                            cellContent = '🏝️欠席';
+                        } else {
+                            cellClass += ' bg-green-100';
+                            cellContent = yearsOfService + '年';
+                            if (age) {
+                                cellContent += '<br>(' + age + '歳)';
+                            }
                         }
                     } else {
                         cellClass += ' bg-gray-50';
@@ -9908,6 +10000,133 @@ app.get('/members', (c) => {
             } catch (error) {
                 alert('❌ ステータス変更中にエラーが発生しました');
                 console.error(error);
+            }
+        }
+
+        // ===== 欠席期間管理 =====
+        async function manageAbsence(userId, userName) {
+            currentAbsenceUserId = userId;
+            document.getElementById('absenceModalTitle').textContent = '🏝️ ' + userName + ' の欠席期間管理';
+            document.getElementById('absenceUserId').value = userId;
+            document.getElementById('absenceForm').reset();
+            document.getElementById('absenceUserId').value = userId;
+            
+            // 既存の欠席期間を取得
+            await loadAbsencePeriods(userId);
+            
+            document.getElementById('absenceModal').classList.remove('hidden');
+        }
+
+        function closeAbsenceModal() {
+            document.getElementById('absenceModal').classList.add('hidden');
+            currentAbsenceUserId = null;
+        }
+
+        async function loadAbsencePeriods(userId) {
+            try {
+                const response = await fetch('/api/absence-periods/' + userId);
+                const data = await response.json();
+                const periods = data.periods || [];
+                
+                // メモリに保存（年表描画で使用）
+                absencePeriods[userId] = periods;
+                
+                const listEl = document.getElementById('absenceList');
+                
+                if (periods.length === 0) {
+                    listEl.innerHTML = '<p class="text-gray-600 text-center py-4">まだ欠席期間が登録されていません</p>';
+                    return;
+                }
+                
+                listEl.innerHTML = periods.map(p => {
+                    const start = new Date(p.start_date).toLocaleDateString('ja-JP');
+                    const end = p.end_date ? new Date(p.end_date).toLocaleDateString('ja-JP') : '現在';
+                    const reason = p.reason || '理由なし';
+                    
+                    return '<div class="bg-white rounded-lg p-4 flex justify-between items-center">' +
+                        '<div>' +
+                            '<p class="font-bold text-gray-800">' + start + ' 〜 ' + end + '</p>' +
+                            '<p class="text-sm text-gray-600">' + reason + '</p>' +
+                        '</div>' +
+                        '<button onclick="deleteAbsence(\\'' + p.id + '\\')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold">' +
+                            '🗑️ 削除' +
+                        '</button>' +
+                    '</div>';
+                }).join('');
+            } catch (error) {
+                console.error('Error loading absence periods:', error);
+                document.getElementById('absenceList').innerHTML = '<p class="text-red-600 text-center py-4">読み込みに失敗しました</p>';
+            }
+        }
+
+        async function saveAbsence(event) {
+            event.preventDefault();
+            
+            const userId = document.getElementById('absenceUserId').value;
+            const startDate = document.getElementById('absenceStartDate').value;
+            const endDate = document.getElementById('absenceEndDate').value;
+            const reason = document.getElementById('absenceReason').value;
+            
+            const data = {
+                user_id: userId,
+                start_date: startDate,
+                end_date: endDate || null,
+                reason: reason || null
+            };
+            
+            try {
+                const response = await fetch('/api/absence-periods', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    alert('✅ 欠席期間を登録しました！');
+                    document.getElementById('absenceForm').reset();
+                    document.getElementById('absenceUserId').value = userId;
+                    await loadAbsencePeriods(userId);
+                } else {
+                    alert('❌ 登録に失敗しました');
+                }
+            } catch (error) {
+                alert('❌ 登録中にエラーが発生しました');
+                console.error(error);
+            }
+        }
+
+        async function deleteAbsence(id) {
+            if (!confirm('この欠席期間を削除しますか？')) return;
+            
+            try {
+                const response = await fetch('/api/absence-periods/' + id, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('✅ 削除しました！');
+                    await loadAbsencePeriods(currentAbsenceUserId);
+                } else {
+                    alert('❌ 削除に失敗しました');
+                }
+            } catch (error) {
+                alert('❌ 削除中にエラーが発生しました');
+                console.error(error);
+            }
+        }
+
+        // 全団員の欠席期間を取得
+        async function loadAllAbsencePeriods() {
+            absencePeriods = {};
+            for (const member of members) {
+                try {
+                    const response = await fetch('/api/absence-periods/' + member.id);
+                    const data = await response.json();
+                    absencePeriods[member.id] = data.periods || [];
+                } catch (error) {
+                    console.error('Error loading absence periods for ' + member.id, error);
+                    absencePeriods[member.id] = [];
+                }
             }
         }
     </script>
