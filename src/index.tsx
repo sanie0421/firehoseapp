@@ -446,7 +446,7 @@ app.get('/api/users', async (c) => {
     // （usersテーブルにstatus/is_activeカラムが存在しないため）
     
     const query = `
-      SELECT id, name, birth_date, join_date, created_at, updated_at
+      SELECT id, name, birth_date, join_date, retirement_date, status, created_at, updated_at
       FROM users
       ORDER BY join_date ASC, name ASC
     `
