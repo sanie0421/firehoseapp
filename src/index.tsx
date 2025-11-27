@@ -1283,7 +1283,7 @@ const comingSoonPage = (title: string, icon: string) => {
 }
 
 // ==========================================
-// ホース格納庫管理画面
+// ホースホース管理画面
 // ==========================================
 app.get('/hose', (c) => {
   return c.html(`
@@ -1292,7 +1292,7 @@ app.get('/hose', (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ホース格納庫管理 - 活動記録</title>
+    <title>ホースホース管理 - 活動記録</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1361,12 +1361,12 @@ app.get('/hose', (c) => {
         <!-- ヘッダー -->
         <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
             <div class="mb-4">
-                <h1 class="text-3xl font-bold mb-2 text-gray-800">🔧 ホース格納庫管理 <span id="hoseStorageCount" class="text-xl text-gray-500">(読み込み中...)</span></h1>
-                <p class="text-base text-gray-600">ホース格納庫の登録・地図設定・点検記録</p>
+                <h1 class="text-3xl font-bold mb-2 text-gray-800">🔧 ホースホース管理 <span id="hoseStorageCount" class="text-xl text-gray-500">(読み込み中...)</span></h1>
+                <p class="text-base text-gray-600">ホースホースの登録・地図設定・点検記録</p>
             </div>
             <div class="flex flex-col space-y-3">
                 <button id="showAddModalBtn" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-xl transition shadow-lg font-bold text-lg">
-                    ➕ ホース格納庫を追加
+                    ➕ ホースホースを追加
                 </button>
                 <button id="showUploadModalBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition shadow-lg font-bold text-lg">
                     📥 Excel/CSV一括登録
@@ -1400,10 +1400,10 @@ app.get('/hose', (c) => {
                 </button>
             </div>
             
-            <p class="text-sm text-gray-600 mt-2">💡 格納庫番号、場所、地区名で絞り込みできます</p>
+            <p class="text-sm text-gray-600 mt-2">💡 ホース番号、場所、地区名で絞り込みできます</p>
         </div>
 
-        <!-- ホース格納庫一覧 -->
+        <!-- ホースホース一覧 -->
         <div id="storageList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- JavaScriptで動的に生成 -->
         </div>
@@ -1435,7 +1435,7 @@ app.get('/hose', (c) => {
                 <!-- 形式説明 -->
                 <div class="bg-gray-50 p-4 rounded">
                     <p class="font-bold mb-2">📝 必要な列:</p>
-                    <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">ホース格納庫番号 | 場所の目安 | 地区 | 備考
+                    <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">ホースホース番号 | 場所の目安 | 地区 | 備考
 No.01 | ◯◯公民館前 | 市場 | 2020年設置
 No.02 | △△集会所裏 | 馬場 | 
 No.03 | ××消防団詰所前 | 根岸下 | </pre>
@@ -1530,22 +1530,22 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
         </div>
     </div>
 
-    <!-- 格納庫追加/編集モーダル -->
+    <!-- ホース追加/編集モーダル -->
     <div id="addModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] overflow-y-auto">
         <div class="min-h-full flex items-start justify-center p-4 py-8">
             <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-6">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800" id="modalTitle">📦 ホース格納庫を追加</h2>
+                <h2 class="text-2xl font-bold text-gray-800" id="modalTitle">📦 ホースホースを追加</h2>
                 <button id="closeAddModalBtn" class="text-gray-500 hover:text-gray-700">✕</button>
             </div>
 
             <form id="storageForm" class="space-y-6">
                 <input type="hidden" id="storageId" value="">
 
-                <!-- 格納庫番号 -->
+                <!-- ホース番号 -->
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-2">
-                        🏷️ ホース格納庫番号 <span class="text-red-500">*</span>
+                        🏷️ ホースホース番号 <span class="text-red-500">*</span>
                     </label>
                     <input type="text" id="storageNumber" required
                         placeholder="No.01"
@@ -1624,12 +1624,12 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                 <!-- 画像アップロード -->
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-2">
-                        📷 格納庫の写真（任意）
+                        📷 ホースの写真（任意）
                     </label>
                     <input type="file" id="storageImage" accept="image/*"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
                     <p class="text-sm text-gray-600 mt-1">
-                        💡 格納庫の外観や破損状況の写真をアップロードできます
+                        💡 ホースの外観や破損状況の写真をアップロードできます
                     </p>
                     <input type="hidden" id="imageUrl" value="">
                     <div id="imagePreview" class="hidden mt-4">
@@ -1654,7 +1654,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
         </div>
     </div>
 
-    <!-- ホース格納庫詳細モーダル（地図表示） -->
+    <!-- ホースホース詳細モーダル（地図表示） -->
     <div id="detailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8">
             <div class="flex justify-between items-center mb-6">
@@ -1750,7 +1750,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             if (storageImageInput) storageImageInput.addEventListener('change', previewImage);
         };
 
-        // ホース格納庫一覧を読み込み
+        // ホースホース一覧を読み込み
         async function loadStorages() {
             try {
                 const response = await fetch('/api/hose/storages');
@@ -1762,7 +1762,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             }
         }
 
-        // ホース格納庫一覧を表示（検索対応 + フィルター対応）
+        // ホースホース一覧を表示（検索対応 + フィルター対応）
         function renderStorages() {
             const list = document.getElementById('storageList');
             const searchBox = document.getElementById('searchBox');
@@ -1808,7 +1808,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                     <div class="col-span-full text-center py-16">
                         <div class="bg-white rounded-2xl shadow-lg p-12">
                             <div class="text-8xl mb-6">🔍</div>
-                            <p class="text-2xl text-gray-800 font-bold mb-4">「\${searchTerm}」に一致する格納庫が見つかりません</p>
+                            <p class="text-2xl text-gray-800 font-bold mb-4">「\${searchTerm}」に一致するホースが見つかりません</p>
                             <p class="text-gray-600">別のキーワードで検索してみてください</p>
                         </div>
                     </div>
@@ -1821,13 +1821,13 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                     <div class="col-span-full text-center py-16">
                         <div class="bg-white rounded-2xl shadow-lg p-12">
                             <div class="text-8xl mb-6">📦</div>
-                            <p class="text-2xl text-gray-800 font-bold mb-4">まだホース格納庫が登録されていません</p>
-                            <p class="text-gray-600 mb-8">CSV一括登録または個別追加でホース格納庫を登録しましょう</p>
+                            <p class="text-2xl text-gray-800 font-bold mb-4">まだホースホースが登録されていません</p>
+                            <p class="text-gray-600 mb-8">CSV一括登録または個別追加でホースホースを登録しましょう</p>
                             <button onclick="showUploadModal()" class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-4 rounded-lg transition mr-2 shadow-lg font-bold">
                                 📥 CSV一括登録
                             </button>
                             <button onclick="showAddModal()" class="bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-lg transition shadow-lg font-bold">
-                                ➕ ホース格納庫を追加
+                                ➕ ホースホースを追加
                             </button>
                         </div>
                     </div>
@@ -1846,7 +1846,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                         '</div>' +
                         (storage.image_url ? 
                             '<div class="mb-4">' +
-                                '<img src="' + storage.image_url + '" alt="格納庫写真" class="w-full h-48 object-cover rounded-lg border-2 border-white border-opacity-50">' +
+                                '<img src="' + storage.image_url + '" alt="ホース写真" class="w-full h-48 object-cover rounded-lg border-2 border-white border-opacity-50">' +
                             '</div>' : ''
                         ) +
                         '<p class="text-lg mb-2 font-semibold">📍 ' + storage.location + '</p>' +
@@ -1890,7 +1890,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             document.getElementById('districtUploadModal').classList.add('hidden');
         }
 
-        // Excel/CSVファイルアップロード（格納庫）
+        // Excel/CSVファイルアップロード（ホース）
         async function uploadFile() {
             const fileInput = document.getElementById('csvFile');
             const file = fileInput.files[0];
@@ -1964,7 +1964,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                 });
 
                 const result = await response.json();
-                alert(\`\${result.count}件のホース格納庫を登録しました！\`);
+                alert(\`\${result.count}件のホースホースを登録しました！\`);
                 hideUploadModal();
                 loadStorages();
             } catch (error) {
@@ -2050,11 +2050,11 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             }
         }
 
-        // Excelテンプレートダウンロード（格納庫）
+        // Excelテンプレートダウンロード（ホース）
         function downloadExcelTemplate() {
             const wb = XLSX.utils.book_new();
             const data = [
-                ['ホース格納庫番号', '場所の目安', '地区', '備考'],
+                ['ホースホース番号', '場所の目安', '地区', '備考'],
                 ['No.01', '◯◯公民館前', '市場', '2020年設置'],
                 ['No.02', '△△集会所裏', '馬場', ''],
                 ['No.03', '××消防団詰所前', '根岸下', ''],
@@ -2069,13 +2069,13 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                 ['No.12', '', '', '']
             ];
             const ws = XLSX.utils.aoa_to_sheet(data);
-            XLSX.utils.book_append_sheet(wb, ws, 'ホース格納庫');
+            XLSX.utils.book_append_sheet(wb, ws, 'ホースホース');
             XLSX.writeFile(wb, 'hose_storages_template.xlsx');
         }
 
-        // CSVテンプレートダウンロード（格納庫）
+        // CSVテンプレートダウンロード（ホース）
         function downloadCSVTemplate() {
-            const csv = 'ホース格納庫番号,場所の目安,地区,備考\\n' +
+            const csv = 'ホースホース番号,場所の目安,地区,備考\\n' +
                         'No.01,◯◯公民館前,市場,2020年設置\\n' +
                         'No.02,△△集会所裏,馬場,\\n' +
                         'No.03,××消防団詰所前,根岸下,\\n' +
@@ -2122,9 +2122,9 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             link.click();
         }
 
-        // ホース格納庫追加モーダル表示
+        // ホースホース追加モーダル表示
         function showAddModal() {
-            document.getElementById('modalTitle').textContent = '📦 ホース格納庫を追加';
+            document.getElementById('modalTitle').textContent = '📦 ホースホースを追加';
             document.getElementById('storageForm').reset();
             document.getElementById('storageId').value = '';
             currentLat = null;
@@ -2206,7 +2206,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             }
         }
 
-        // ホース格納庫削除
+        // ホースホース削除
         async function deleteStorage(id, storageNumber) {
             if (!confirm('本当に「' + storageNumber + '」を削除しますか？\\n\\nこの操作は取り消せません。')) {
                 return;
@@ -2229,12 +2229,12 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             }
         }
 
-        // ホース格納庫編集
+        // ホースホース編集
         function editStorage(id) {
             const storage = storages.find(s => s.id === id);
             if (!storage) return;
 
-            document.getElementById('modalTitle').textContent = '✏️ 格納庫を編集';
+            document.getElementById('modalTitle').textContent = '✏️ ホースを編集';
             document.getElementById('storageId').value = storage.id;
             document.getElementById('storageNumber').value = storage.storage_number;
             document.getElementById('location').value = storage.location;
@@ -2322,7 +2322,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             }
         }
 
-        // ホース格納庫保存
+        // ホースホース保存
         async function saveStorage() {
             const id = document.getElementById('storageId').value;
             const storageNumber = document.getElementById('storageNumber').value;
@@ -2330,7 +2330,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             
             // 必須項目チェック
             if (!storageNumber || !location) {
-                alert('ホース格納庫番号と場所の目安は必須です');
+                alert('ホースホース番号と場所の目安は必須です');
                 return;
             }
 
@@ -2410,7 +2410,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
 })
 
 // ==========================================
-// API: ホース格納庫一覧取得
+// API: ホースホース一覧取得
 // ==========================================
 app.get('/api/hose/storages', async (c) => {
   try {
@@ -2428,7 +2428,7 @@ app.get('/api/hose/storages', async (c) => {
 })
 
 // ==========================================
-// API: ホース格納庫追加
+// API: ホースホース追加
 // ==========================================
 app.post('/api/hose/storages', async (c) => {
   try {
@@ -2504,7 +2504,7 @@ app.post('/api/hose/storages', async (c) => {
 })
 
 // ==========================================
-// API: ホース格納庫更新
+// API: ホースホース更新
 // ==========================================
 app.put('/api/hose/storages/:id', async (c) => {
   try {
@@ -2585,13 +2585,13 @@ app.put('/api/hose/storages/:id', async (c) => {
 })
 
 // ==========================================
-// API: 既存格納庫の座標を一括更新
+// API: 既存ホースの座標を一括更新
 // ==========================================
 app.post('/api/hose/storages/update-coordinates', async (c) => {
   try {
     const env = c.env as { DB: D1Database }
     
-    // latitude/longitudeがnullでgoogle_maps_urlがある格納庫を取得
+    // latitude/longitudeがnullでgoogle_maps_urlがあるホースを取得
     const result = await env.DB.prepare(`
       SELECT id, google_maps_url
       FROM hose_storages
@@ -2657,7 +2657,7 @@ app.post('/api/hose/storages/update-coordinates', async (c) => {
 })
 
 // ==========================================
-// API: ホース格納庫削除
+// API: ホースホース削除
 // ==========================================
 app.delete('/api/hose/storages/:id', async (c) => {
   try {
@@ -2669,7 +2669,7 @@ app.delete('/api/hose/storages/:id', async (c) => {
       DELETE FROM hose_inspections WHERE storage_id = ?
     `).bind(id).run()
     
-    // 格納庫を削除
+    // ホースを削除
     await env.DB.prepare(`
       DELETE FROM hose_storages WHERE id = ?
     `).bind(id).run()
@@ -2783,7 +2783,7 @@ app.post('/api/hose/storages/bulk', async (c) => {
 // CSVテンプレート配信
 // ==========================================
 app.get('/templates/hose_storages_template.csv', (c) => {
-  const csvContent = `ホース格納庫番号,場所の目安,地区,備考
+  const csvContent = `ホースホース番号,場所の目安,地区,備考
 No.01,大井町公民館前,市場,2020年設置
 No.02,馬場集会所裏,馬場,扉に破損あり
 No.03,根岸下消防団詰所,根岸下,
@@ -2899,9 +2899,9 @@ app.get('/admin', (c) => {
         <!-- ホース管理タブ -->
         <div id="hoseTab" class="tab-content hidden">
             <div class="bg-white rounded-2xl shadow-lg p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">📦 ホース格納庫管理</h2>
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">📦 ホースホース管理</h2>
                 <a href="/hose" class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition font-bold mb-4">
-                    🔧 格納庫管理ページへ
+                    🔧 ホース管理ページへ
                 </a>
                 
                 <div class="overflow-x-auto">
@@ -3083,7 +3083,7 @@ app.get('/admin', (c) => {
                 const storages = data.storages || [];
                 
                 const html = '<table class="w-full border-collapse"><thead><tr>' +
-                    '<th class="border px-4 py-2 bg-gray-100">格納庫番号</th>' +
+                    '<th class="border px-4 py-2 bg-gray-100">ホース番号</th>' +
                     '<th class="border px-4 py-2 bg-gray-100">場所</th>' +
                     '<th class="border px-4 py-2 bg-gray-100">地区</th>' +
                     '</tr></thead><tbody>' +
@@ -4281,11 +4281,11 @@ app.get('/inspection-priority', (c) => {
         <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
             <div class="text-gray-800">
                 <h1 class="text-3xl font-bold mb-2">⚠️ 点検優先度</h1>
-                <p class="text-base text-gray-600 mb-4">点検が必要なホース格納庫を確認しましょう</p>
+                <p class="text-base text-gray-600 mb-4">点検が必要なホースホースを確認しましょう</p>
                 
                 <!-- 検索バー -->
                 <div class="mt-4">
-                    <input type="text" id="searchInput" placeholder="🔍 格納庫番号、場所、地区で検索..." 
+                    <input type="text" id="searchInput" placeholder="🔍 ホース番号、場所、地区で検索..." 
                         class="w-full px-4 py-3 rounded-xl border-2 border-gray-300 bg-gray-50 text-gray-800 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" 
                         style="font-size: 16px;"
                         oninput="applyFilters()">
@@ -4348,10 +4348,10 @@ app.get('/inspection-priority', (c) => {
                     </div>
                 </div>
 
-                <!-- 今日点検する格納庫（固定表示） -->
+                <!-- 今日点検するホース（固定表示） -->
                 <div id="todayPinnedList" class="mb-6"></div>
 
-                <!-- 格納庫一覧 -->
+                <!-- ホース一覧 -->
                 <div id="allStoragesList" class="space-y-4">
                     <div class="bg-gray-50 rounded-xl p-8 text-center"><p class="text-gray-800">読み込み中...</p></div>
                 </div>
@@ -4560,7 +4560,7 @@ app.get('/inspection-priority', (c) => {
             const spinner = document.getElementById('aiAnalyzeSpinner');
             
             if (allStorages.length === 0) {
-                alert('格納庫データがありません');
+                alert('ホースデータがありません');
                 return;
             }
             
@@ -4601,7 +4601,7 @@ app.get('/inspection-priority', (c) => {
                     allStorages.sort((a, b) => (b.ai_priority_score || 0) - (a.ai_priority_score || 0));
                     
                     applyFilters();
-                    alert('✅ AI優先度判定が完了しました！\\n\\n上位の格納庫から順に表示されます。');
+                    alert('✅ AI優先度判定が完了しました！\\n\\n上位のホースから順に表示されます。');
                 } else {
                     alert('❌ AI判定結果が取得できませんでした');
                 }
@@ -4682,7 +4682,7 @@ app.get('/inspection-priority', (c) => {
                 updateMap(filtered);
             }
             
-            // 履歴も更新（格納庫IDで絞り込み）
+            // 履歴も更新（ホースIDで絞り込み）
             if (allInspections.length > 0) {
                 const filteredStorageIds = filtered.map(s => s.id);
                 const filteredInspections = allInspections.filter(insp => 
@@ -4727,7 +4727,7 @@ app.get('/inspection-priority', (c) => {
             const list = document.getElementById('allStoragesList');
             
             if (unpinnedStorages.length === 0) {
-                list.innerHTML = '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800 text-xl">該当する格納庫がありません</p></div>';
+                list.innerHTML = '<div class="bg-white rounded-2xl shadow-lg p-12 text-center"><p class="text-gray-800 text-xl">該当するホースがありません</p></div>';
                 return;
             }
 
@@ -4866,14 +4866,14 @@ app.get('/inspection-priority', (c) => {
             const mapContainer = document.getElementById('allMap');
             
             if (allStorages.length === 0) {
-                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">格納庫データがありません</p>';
+                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">ホースデータがありません</p>';
                 return;
             }
 
             leafletMap = L.map('allMap').setView([35.325, 139.157], 14);
             L.tileLayer('https://\{s\}.tile.openstreetmap.org/\{z\}/\{x\}/\{y\}.png').addTo(leafletMap);
 
-            // フィルタ適用した格納庫のみ表示
+            // フィルタ適用したホースのみ表示
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             let filtered = allStorages.filter(storage => {
                 if (searchTerm) {
@@ -4931,7 +4931,7 @@ app.get('/inspection-priority', (c) => {
             
             const bounds = [];
             
-            // フィルタされた格納庫のマーカーを再追加
+            // フィルタされたホースのマーカーを再追加
             for (const storage of filteredStorages) {
                 let lat = storage.latitude;
                 let lon = storage.longitude;
@@ -5019,7 +5019,7 @@ app.get('/inspection-priority', (c) => {
 })
 
 // ==========================================
-// API: 全格納庫取得（点検が古い順）
+// API: 全ホース取得（点検が古い順）
 // ==========================================
 app.get('/api/inspection/priority-all', async (c) => {
   try {
@@ -5064,7 +5064,7 @@ app.get('/api/inspection/priority', async (c) => {
   try {
     const env = c.env as { DB: D1Database }
     
-    // 1. 全格納庫の最終点検日と結果を取得して、最優先のものを1件取得
+    // 1. 全ホースの最終点検日と結果を取得して、最優先のものを1件取得
     const topPriorityResult = await env.DB.prepare(`
       SELECT 
         s.*,
@@ -5095,7 +5095,7 @@ app.get('/api/inspection/priority', async (c) => {
       return c.json({ storages: [] })
     }
     
-    // 2. 同じ地区の格納庫で点検が古い順に3件取得（最優先のものは除く）
+    // 2. 同じ地区のホースで点検が古い順に3件取得（最優先のものは除く）
     const sameDistrictResult = await env.DB.prepare(`
       SELECT 
         s.*,
@@ -5146,9 +5146,9 @@ app.post('/api/inspection/ai-priority', async (c) => {
     }
     
     // Claude APIに送信するプロンプト
-    const prompt = `あなたは消防団の点検優先度判定AIです。以下の格納庫データを分析し、点検が最も必要な順にランキングしてください。
+    const prompt = `あなたは消防団の点検優先度判定AIです。以下のホースデータを分析し、点検が最も必要な順にランキングしてください。
 
-格納庫データ（JSON）:
+ホースデータ（JSON）:
 ${JSON.stringify(storages, null, 2)}
 
 【重要】判定基準（優先度順）:
@@ -5167,11 +5167,11 @@ ${JSON.stringify(storages, null, 2)}
 4. **地区的重要性**
    - 人口密集地域、重要施設近辺
 
-各格納庫について、100点満点で優先度スコアを算出し、以下のJSON形式で返してください:
+各ホースについて、100点満点で優先度スコアを算出し、以下のJSON形式で返してください:
 {
   "rankings": [
     {
-      "storage_id": "格納庫ID",
+      "storage_id": "ホースID",
       "priority_score": 95,
       "reason": "ホース製造12年経過、要点検",
       "oldest_hose_age_years": 12
@@ -5836,7 +5836,7 @@ app.get('/water-tank/:id', async (c) => {
 })
 
 // ==========================================
-// ホース格納庫詳細・点検ページ（完全書き直し版）
+// ホースホース詳細・点検ページ（完全書き直し版）
 // ==========================================
 app.get('/storage/:id', async (c) => {
   const id = c.req.param('id')
@@ -5847,7 +5847,7 @@ app.get('/storage/:id', async (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>格納庫詳細 - 活動記録</title>
+    <title>ホース詳細 - 活動記録</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Leaflet CSS -->
@@ -5898,7 +5898,7 @@ app.get('/storage/:id', async (c) => {
                 </a>
                 <div class="flex gap-2">
                     <a href="/hose" class="text-green-600 hover:text-green-800 hover:underline text-sm bg-green-50 px-4 py-2 rounded-lg font-bold">
-                        🔧 格納庫管理
+                        🔧 ホース管理
                     </a>
                     <a href="/inspection-priority" class="text-blue-600 hover:text-blue-800 hover:underline text-sm bg-blue-50 px-4 py-2 rounded-lg font-bold">
                         ← 優先度一覧
@@ -6043,7 +6043,7 @@ app.get('/storage/:id', async (c) => {
 
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-2">📝 備考</label>
-                    <textarea id="remarks" rows="3" placeholder="例：ホース状態良好、格納庫周辺の清掃実施。消火栓のみ点検した場合はここに記載" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
+                    <textarea id="remarks" rows="3" placeholder="例：ホース状態良好、ホース周辺の清掃実施。消火栓のみ点検した場合はここに記載" class="w-full px-4 py-3 border border-gray-300 rounded-lg"></textarea>
                 </div>
 
                 <div>
@@ -6051,7 +6051,7 @@ app.get('/storage/:id', async (c) => {
                     <div class="space-y-4">
                         <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
                             <label class="block text-sm font-bold text-gray-700 mb-2">要対応事項 1</label>
-                            <textarea id="actionRequired1" rows="3" placeholder="例：格納庫扉の破損" class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-2"></textarea>
+                            <textarea id="actionRequired1" rows="3" placeholder="例：ホース扉の破損" class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-2"></textarea>
                             <label class="block text-xs text-gray-600 mb-1">📷 写真（任意）</label>
                             <input type="file" id="actionImage1" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                         </div>
@@ -6201,7 +6201,7 @@ app.get('/storage/:id', async (c) => {
             }
             
             if (!lat || !lon) {
-                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">位置情報が登録されていません。格納庫編集でGoogle Maps URLを追加してください。</p>';
+                mapContainer.innerHTML = '<p class="text-gray-600 text-center py-8">位置情報が登録されていません。ホース編集でGoogle Maps URLを追加してください。</p>';
                 return;
             }
 
@@ -6214,7 +6214,7 @@ app.get('/storage/:id', async (c) => {
                 }).addTo(map);
                 
                 const marker = L.marker([lat, lon]).addTo(map);
-                marker.bindPopup('<b>' + (storageData ? storageData.storage_number : '格納庫') + '</b><br>' + (storageData ? storageData.location : '')).openPopup();
+                marker.bindPopup('<b>' + (storageData ? storageData.storage_number : 'ホース') + '</b><br>' + (storageData ? storageData.location : '')).openPopup();
             }, 100);
         }
 
@@ -6284,7 +6284,7 @@ app.get('/storage/:id', async (c) => {
             }
         }
 
-        // 格納庫詳細読み込み
+        // ホース詳細読み込み
         async function loadStorageDetail() {
             try {
                 const response = await fetch('/api/hose/storages');
@@ -6303,7 +6303,7 @@ app.get('/storage/:id', async (c) => {
                             '</div>' +
                             (storageData.image_url ? 
                                 '<div class="mb-4">' +
-                                    '<img src="' + storageData.image_url + '" alt="格納庫写真" class="w-full h-64 object-cover rounded-lg">' +
+                                    '<img src="' + storageData.image_url + '" alt="ホース写真" class="w-full h-64 object-cover rounded-lg">' +
                                 '</div>' : ''
                             ) +
                             '<p class="text-xl text-gray-700 mb-2">📍 ' + storageData.location + '</p>' +
@@ -6875,7 +6875,7 @@ app.post('/api/inspection/record', async (c) => {
     const id = 'inspection_' + Date.now()
     const now = new Date().toISOString()
     
-    // storage_numberを格納庫テーブルから取得
+    // storage_numberをホーステーブルから取得
     const storageResult = await env.DB.prepare(`
       SELECT storage_number FROM hose_storages WHERE id = ?
     `).bind(data.storage_id).first()
@@ -7674,7 +7674,7 @@ app.get('/api/inspection/action-required', async (c) => {
 })
 
 // ==========================================
-// API: 対応履歴取得（特定の格納庫）
+// API: 対応履歴取得（特定のホース）
 // ==========================================
 app.get('/api/inspection/action-history/:storageId', async (c) => {
   try {
@@ -7807,7 +7807,7 @@ app.get('/api/hose-stats', async (c) => {
       })
     }
     
-    // 格納庫別集計 (破損数の多い順)
+    // ホース別集計 (破損数の多い順)
     const storageResult = await env.DB.prepare(`
       SELECT 
         s.district,
@@ -7823,12 +7823,12 @@ app.get('/api/hose-stats', async (c) => {
       ORDER BY damaged DESC, replaced DESC
     `).bind(startDate, endDate).all()
     
-    // 総格納庫数
+    // 総ホース数
     const totalStoragesResult = await env.DB.prepare(`
       SELECT COUNT(*) as total FROM hose_storages
     `).first()
     
-    // 年度内に点検実施した格納庫数
+    // 年度内に点検実施したホース数
     const inspectedStoragesResult = await env.DB.prepare(`
       SELECT COUNT(DISTINCT storage_id) as inspected
       FROM hose_inspections
@@ -9628,9 +9628,9 @@ app.get('/stats', (c) => {
                 <canvas id="hoseMonthlyChart"></canvas>
             </div>
 
-            <!-- 格納庫別ランキング -->
+            <!-- ホース別ランキング -->
             <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
-                <h2 class="text-xl font-bold text-gray-800 mb-4">🏆 格納庫別ランキング</h2>
+                <h2 class="text-xl font-bold text-gray-800 mb-4">🏆 ホース別ランキング</h2>
                 <div id="storageRanking" class="space-y-3">
                     <!-- JavaScriptで動的に生成 -->
                 </div>
@@ -10124,15 +10124,15 @@ app.get('/stats', (c) => {
                 const ws2 = XLSX.utils.aoa_to_sheet(monthlyData);
                 XLSX.utils.book_append_sheet(wb, ws2, '月別推移');
                 
-                // 格納庫別シート
+                // ホース別シート
                 const storageData = [
-                    ['地区', '格納庫番号', '住所', '交換数', '破損数']
+                    ['地区', 'ホース番号', '住所', '交換数', '破損数']
                 ];
                 data.by_storage.forEach(s => {
                     storageData.push([s.district, s.storage_number, s.location || '', s.replaced, s.damaged]);
                 });
                 const ws3 = XLSX.utils.aoa_to_sheet(storageData);
-                XLSX.utils.book_append_sheet(wb, ws3, '格納庫別');
+                XLSX.utils.book_append_sheet(wb, ws3, 'ホース別');
                 
                 // ダウンロード
                 XLSX.writeFile(wb, 'ホース集計_' + fiscalYear + '年度.xlsx');
