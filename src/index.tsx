@@ -423,19 +423,14 @@ app.get('/api/members', async (c) => {
 app.get('/api/users', async (c) => {
   try {
     const env = c.env as { DB: D1Database }
-    const activeOnly = c.req.query('active_only')
+    // active_only パラメータは将来のために残すが、今はすべてのユーザーを返す
+    // （usersテーブルにstatus/is_activeカラムが存在しないため）
     
-    let query = `
+    const query = `
       SELECT id, name, birth_date, join_date, created_at, updated_at
       FROM users
+      ORDER BY join_date ASC, name ASC
     `
-    
-    // active_only=1 の場合は現役のみ（status=1 または is_active=1）
-    if (activeOnly === '1') {
-      query += ` WHERE (status = 1 OR is_active = 1)`
-    }
-    
-    query += ` ORDER BY join_date ASC, name ASC`
     
     const result = await env.DB.prepare(query).all()
     
@@ -766,7 +761,7 @@ app.get('/api/water-tank-inspections', async (c) => {
 app.post('/api/water-tank-inspections', async (c) => {
   try {
     const data = await c.req.json()
-    const env = c.env as { DB: D1Database, R2: R2Bucket }
+    const env = c.env as { DB: D1Database, IMAGES: R2Bucket }
     const now = new Date().toISOString()
     
     // R2画像アップロード処理
@@ -781,7 +776,7 @@ app.post('/api/water-tank-inspections', async (c) => {
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i)
         }
-        await env.R2.put(key, bytes, { httpMetadata: { contentType: 'image/jpeg' } })
+        await env.IMAGES.put(key, bytes, { httpMetadata: { contentType: 'image/jpeg' } })
         imageUrls.push(key)
       }
     }
@@ -815,7 +810,7 @@ app.put('/api/water-tank-inspections/:id', async (c) => {
   try {
     const id = c.req.param('id')
     const data = await c.req.json()
-    const env = c.env as { DB: D1Database, R2: R2Bucket }
+    const env = c.env as { DB: D1Database, IMAGES: R2Bucket }
     
     // R2画像アップロード処理
     let imageUrls: string[] = []
@@ -828,7 +823,7 @@ app.put('/api/water-tank-inspections/:id', async (c) => {
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i)
         }
-        await env.R2.put(key, bytes, { httpMetadata: { contentType: 'image/jpeg' } })
+        await env.IMAGES.put(key, bytes, { httpMetadata: { contentType: 'image/jpeg' } })
         imageUrls.push(key)
       }
     }
@@ -883,10 +878,10 @@ app.delete('/api/water-tank-inspections/:id', async (c) => {
 // ==========================================
 app.get('/api/r2/:key{.*}', async (c) => {
   try {
-    const env = c.env as { R2: R2Bucket }
+    const env = c.env as { IMAGES: R2Bucket }
     const key = c.req.param('key')
     
-    const object = await env.R2.get(key)
+    const object = await env.IMAGES.get(key)
     if (!object) {
       return c.notFound()
     }
@@ -6302,6 +6297,12 @@ app.post('/api/inspection/record', async (c) => {
     const id = 'inspection_' + Date.now()
     const now = new Date().toISOString()
     
+    // storage_numberを格納庫テーブルから取得
+    const storageResult = await env.DB.prepare(`
+      SELECT storage_number FROM hose_storages WHERE id = ?
+    `).bind(data.storage_id).first()
+    const storageNumber = storageResult?.storage_number || null
+    
     // 製造年月日から最古の日付と次回義務点検日を計算
     const manufactureDates = [
       data.hose_1_manufacture_date,
@@ -6315,7 +6316,8 @@ app.post('/api/inspection/record', async (c) => {
     
     if (manufactureDates.length > 0) {
       oldestDate = manufactureDates.sort()[0]
-      const mfgDate = new Date(oldestDate + '-01')
+      // 製造年月日はYYYY-MM-DD形式なのでそのまま使う
+      const mfgDate = new Date(oldestDate)
       const tenYearsLater = new Date(mfgDate)
       tenYearsLater.setFullYear(tenYearsLater.getFullYear() + 10)
       nextMandatoryDate = tenYearsLater.toISOString().split('T')[0]
@@ -6334,7 +6336,7 @@ app.post('/api/inspection/record', async (c) => {
     `).bind(
       id,
       data.storage_id,
-      data.storage_number,
+      storageNumber,
       data.inspection_date,
       data.hose_replaced_count || 0,
       data.hose_damaged_count || 0,
@@ -6429,7 +6431,8 @@ app.put('/api/inspection/:id', async (c) => {
     
     if (manufactureDates.length > 0) {
       oldestDate = manufactureDates.sort()[0]
-      const mfgDate = new Date(oldestDate + '-01')
+      // 製造年月日はYYYY-MM-DD形式なのでそのまま使う
+      const mfgDate = new Date(oldestDate)
       const tenYearsLater = new Date(mfgDate)
       tenYearsLater.setFullYear(tenYearsLater.getFullYear() + 10)
       nextMandatoryDate = tenYearsLater.toISOString().split('T')[0]
