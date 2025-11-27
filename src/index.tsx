@@ -4290,6 +4290,18 @@ app.get('/inspection-priority', (c) => {
                         style="font-size: 16px;"
                         oninput="applyFilters()">
                 </div>
+                
+                <!-- AI優先度判定ボタン -->
+                <div class="mt-4 flex gap-2">
+                    <button id="aiAnalyzeBtn" onclick="analyzeWithAI()" 
+                        class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-xl transition font-bold shadow-lg">
+                        🤖 AIで優先度を判断
+                    </button>
+                    <button id="resetPriorityBtn" onclick="loadStorages()" 
+                        class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-xl transition font-bold shadow-lg">
+                        🔄 リセット
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -5189,7 +5201,7 @@ ${JSON.stringify(storages, null, 2)}
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-3-5-haiku-20241022',
         max_tokens: 2048,
         messages: [{
           role: 'user',
