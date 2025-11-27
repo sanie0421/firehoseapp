@@ -353,24 +353,41 @@ app.get('/api/fire-info', async (c) => {
     const decoder = new TextDecoder('shift-jis')
     const html = decoder.decode(buffer)
 
-    // タイトル部分から災害情報を抽出
-    const titleMatch = html.match(/<span class="TITLE">(.*?)<\/span>/i)
+    // 時刻情報を抽出
     const timeMatch = html.match(/<font class="TIME">(.*?)<\/font>/i)
-    
-    if (!titleMatch) {
-      return c.json({
-        success: true,
-        hasData: false,
-        message: '災害情報を取得できませんでした',
-        lastUpdated: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
-      })
-    }
-
-    const message = titleMatch[1].trim()
     const timestamp = timeMatch ? timeMatch[1].trim() : ''
     
-    // 災害が発生していない場合
-    const hasDisaster = !message.includes('災害は発生しておりません') && !message.includes('災害は発生していません')
+    // 本文（災害情報の詳細）を抽出
+    // class="SGINFO" テーブル内の本文を探す
+    const contentMatch = html.match(/<table[^>]*class="SGINFO"[^>]*>([\s\S]*?)<\/table>/i)
+    
+    let message = ''
+    let hasDisaster = false
+    
+    if (contentMatch && contentMatch[1]) {
+      // <td width="830" ...> の中身を抽出
+      const tdMatch = contentMatch[1].match(/<td[^>]*width="830"[^>]*>(.*?)<\/td>/i)
+      
+      if (tdMatch && tdMatch[1]) {
+        // テキストを抽出（HTMLタグを除去）
+        const content = tdMatch[1]
+          .replace(/<[^>]*>/g, '') // HTMLタグ除去
+          .replace(/&nbsp;/g, ' ') // &nbsp;をスペースに
+          .replace(/\r?\n/g, '') // 改行削除
+          .trim()
+        
+        // 実際の災害情報があるか確認（10文字以上）
+        if (content && content.length > 10 && !content.includes('&nbsp;')) {
+          message = content
+          hasDisaster = true
+        }
+      }
+    }
+    
+    // 本文が見つからない場合は「災害は発生しておりません」
+    if (!hasDisaster) {
+      message = '現在、災害は発生しておりません。'
+    }
 
     return c.json({
       success: true,
@@ -1149,7 +1166,7 @@ const comingSoonPage = (title: string, icon: string) => {
         <div class="text-9xl mb-4">${icon}</div>
         <h1 class="text-4xl font-bold text-gray-800 mb-4">${title}</h1>
         <p class="text-xl text-gray-600 mb-8">準備中...</p>
-        <a href="/" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition inline-block">
+        <a href="/home" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition inline-block">
             ← ホームに戻る
         </a>
     </div>
@@ -1218,14 +1235,14 @@ app.get('/hose', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
+                <a href="/home" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -2713,14 +2730,14 @@ app.get('/admin', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
+                <a href="/home" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -2999,14 +3016,14 @@ app.get('/water-tanks', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
+                <a href="/home" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -3878,14 +3895,14 @@ app.get('/inspection-priority', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
+                <a href="/home" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -4736,7 +4753,7 @@ app.get('/water-tank/:id', async (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
+                <a href="/home" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
@@ -5335,7 +5352,7 @@ app.get('/storage/:id', async (c) => {
     <nav class="bg-white shadow-lg">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
+                <a href="/home" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
@@ -6518,14 +6535,14 @@ app.get('/action-required', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
+                <a href="/home" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -7606,14 +7623,14 @@ app.get('/logs', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
+                <a href="/home" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -8424,14 +8441,14 @@ app.get('/members', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
+                <a href="/home" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
@@ -8718,14 +8735,14 @@ app.get('/stats', (c) => {
     <nav class="bg-white shadow-md">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
+                <a href="/home" class="flex items-center space-x-3">
                     <span class="text-4xl float-animation">🔥</span>
                     <div class="text-gray-800">
                         <div class="font-bold text-xl">活動記録</div>
                         <div class="text-sm text-gray-600">大井町消防団第一分団</div>
                     </div>
                 </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
+                <a href="/home" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
                     ← ホームに戻る
                 </a>
             </div>
