@@ -530,6 +530,25 @@ app.get('/api/absence-periods/:userId', async (c) => {
 })
 
 // ==========================================
+// API: 全メンバーの不在期間を一括取得
+// ==========================================
+app.get('/api/absence-periods-all', async (c) => {
+  try {
+    const env = c.env as { DB: D1Database }
+    
+    const result = await env.DB.prepare(`
+      SELECT * FROM absence_periods
+      ORDER BY user_id, start_date DESC
+    `).all()
+    
+    return c.json({ periods: result.results })
+  } catch (error) {
+    console.error('Get all absence periods error:', error)
+    return c.json({ periods: [] })
+  }
+})
+
+// ==========================================
 // API: 不在期間追加
 // ==========================================
 app.post('/api/absence-periods', async (c) => {
@@ -10392,13 +10411,29 @@ app.get('/members', (c) => {
         // 全団員の欠席期間を取得
         async function loadAllAbsencePeriods() {
             absencePeriods = {};
-            for (const member of members) {
-                try {
-                    const response = await fetch('/api/absence-periods/' + member.id);
-                    const data = await response.json();
-                    absencePeriods[member.id] = data.periods || [];
-                } catch (error) {
-                    console.error('Error loading absence periods for ' + member.id, error);
+            try {
+                const response = await fetch('/api/absence-periods-all');
+                const data = await response.json();
+                const periods = data.periods || [];
+                
+                // メンバーごとにグループ化
+                for (const period of periods) {
+                    if (!absencePeriods[period.user_id]) {
+                        absencePeriods[period.user_id] = [];
+                    }
+                    absencePeriods[period.user_id].push(period);
+                }
+                
+                // データがないメンバーには空配列を設定
+                for (const member of members) {
+                    if (!absencePeriods[member.id]) {
+                        absencePeriods[member.id] = [];
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading all absence periods', error);
+                // エラー時は全メンバーに空配列を設定
+                for (const member of members) {
                     absencePeriods[member.id] = [];
                 }
             }
