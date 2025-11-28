@@ -5410,9 +5410,14 @@ app.get('/inspection-priority', (c) => {
                 }
                 
                 html += '</div>' +
-                        '<button onclick="deleteInspection(\\'' + inspection.id + '\\')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-bold transition ml-2">' +
-                            '🗑️ 削除' +
-                        '</button>' +
+                        '<div class="flex gap-2">' +
+                            '<button onclick="editInspection(\\'' + inspection.id + '\\')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm font-bold transition">' +
+                                '✏️ 編集' +
+                            '</button>' +
+                            '<button onclick="deleteInspection(\\'' + inspection.id + '\\')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-bold transition">' +
+                                '🗑️ 削除' +
+                            '</button>' +
+                        '</div>' +
                     '</div>';
                 
                 if (hasActionItems) {
@@ -5450,6 +5455,26 @@ app.get('/inspection-priority', (c) => {
             } catch (error) {
                 console.error('Error:', error);
                 alert('削除に失敗しました');
+            }
+        }
+
+        async function editInspection(inspectionId) {
+            // 点検記録の詳細を取得
+            try {
+                const response = await fetch('/api/inspection/detail/' + inspectionId);
+                const data = await response.json();
+                const inspection = data.inspection;
+                
+                if (!inspection) {
+                    alert('点検記録が見つかりません');
+                    return;
+                }
+                
+                // そのホースの詳細ページに遷移して編集モーダルを開く
+                location.href = '/storage/' + inspection.storage_id + '?edit=' + inspectionId;
+            } catch (error) {
+                console.error('Error:', error);
+                alert('点検記録の取得に失敗しました');
             }
         }
     </script>
