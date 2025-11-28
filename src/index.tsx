@@ -5410,7 +5410,7 @@ app.get('/inspection-priority', (c) => {
                 }
                 
                 html += '</div>' +
-                        '<button onclick="deleteInspection(\'' + inspection.id + '\')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-bold transition ml-2">' +
+                        '<button onclick="deleteInspection(\\'' + inspection.id + '\\')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-bold transition ml-2">' +
                             '🗑️ 削除' +
                         '</button>' +
                     '</div>';
