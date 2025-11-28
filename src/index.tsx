@@ -1890,7 +1890,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                         '</div>' +
                         (storage.image_url ? 
                             '<div class="mb-4">' +
-                                '<img src="' + storage.image_url + '" alt="ホース写真" class="w-full h-48 object-cover rounded-lg border-2 border-white border-opacity-50">' +
+                                '<img src="' + storage.image_url + '" alt="ホース写真" class="w-full h-48 object-cover rounded-lg border-2 border-white border-opacity-50" onerror="this.parentElement.style.display=\'none\'">' +
                             '</div>' : ''
                         ) +
                         '<p class="text-lg mb-2 font-semibold">📍 ' + storage.location + '</p>' +
@@ -5165,7 +5165,7 @@ app.get('/inspection-priority', (c) => {
             
             // 画像表示
             if (storage.image_url) {
-                html += '<div class="mb-4"><img src="' + storage.image_url + '" alt="' + storage.location + '" class="w-full h-48 object-cover rounded-xl"></div>';
+                html += '<div class="mb-4"><img src="' + storage.image_url + '" alt="' + storage.location + '" class="w-full h-48 object-cover rounded-xl" onerror="this.parentElement.style.display=\'none\'"></div>';
             }
             
             // 小地図表示
@@ -6802,7 +6802,7 @@ app.get('/storage/:id', async (c) => {
                             '</div>' +
                             (storageData.image_url ? 
                                 '<div class="mb-4">' +
-                                    '<img src="' + storageData.image_url + '" alt="ホース写真" class="w-full h-64 object-cover rounded-lg">' +
+                                    '<img src="' + storageData.image_url + '" alt="ホース写真" class="w-full h-64 object-cover rounded-lg" onerror="this.parentElement.style.display=\'none\'">' +
                                 '</div>' : ''
                             ) +
                             '<p class="text-xl text-gray-700 mb-2">📍 ' + storageData.location + '</p>' +
