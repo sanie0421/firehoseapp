@@ -7,7 +7,9 @@ export default defineConfig({
   publicDir: 'public',
   plugins: [
     build({
-      exclude: ['/*.png', '/*.jpg', '/*.gif', '/*.svg', '/static/*', '/templates/*']
+      // Only exclude static files in root and specific directories
+      // API routes like /api/images/* should go through the Worker
+      exclude: ['/static/*', '/templates/*', '/icon.png', '/favicon.svg', '/*.png', '/kanagawa-logo.png', '/hose-icon.png', '/suisou-icon.png', '/task-icon.png', '/statistics-icon.png', '/members-icon.png', '/database-icon.png']
     }),
     devServer({
       adapter,

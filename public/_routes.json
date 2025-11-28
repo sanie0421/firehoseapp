@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": ["/static/*", "/templates/*", "/icon.png", "/favicon.svg", "/kanagawa-logo.png", "/hose-icon.png", "/suisou-icon.png", "/task-icon.png", "/statistics-icon.png", "/members-icon.png", "/database-icon.png"]
+}
