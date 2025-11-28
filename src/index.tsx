@@ -7585,12 +7585,26 @@ app.put('/api/inspection/:id', async (c) => {
       nextMandatoryDate = tenYearsLater.toISOString().split('T')[0]
     }
     
+    // action_items配列を個別フィールドに分解
+    const actionItems = data.action_items || []
+    const actionItem1 = actionItems[0]?.description || null
+    const actionItem2 = actionItems[1]?.description || null
+    const actionItem3 = actionItems[2]?.description || null
+    const actionPhoto1 = actionItems[0]?.photo_url || null
+    const actionPhoto2 = actionItems[1]?.photo_url || null
+    const actionPhoto3 = actionItems[2]?.photo_url || null
+    
     await env.DB.prepare(`
       UPDATE hose_inspections 
       SET inspection_date = ?,
           hose_replaced_count = ?,
           hose_damaged_count = ?,
-          action_required = ?,
+          action_item_1 = ?,
+          action_item_2 = ?,
+          action_item_3 = ?,
+          action_photo_1 = ?,
+          action_photo_2 = ?,
+          action_photo_3 = ?,
           remarks = ?,
           photos = ?,
           inspector_name = ?,
@@ -7604,7 +7618,12 @@ app.put('/api/inspection/:id', async (c) => {
       data.inspection_date,
       data.hose_replaced_count || 0,
       data.hose_damaged_count || 0,
-      data.action_required || null,
+      actionItem1,
+      actionItem2,
+      actionItem3,
+      actionPhoto1,
+      actionPhoto2,
+      actionPhoto3,
       data.remarks || null,
       data.photos || null,
       data.inspector_name,
