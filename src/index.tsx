@@ -6522,29 +6522,29 @@ app.get('/storage/:id', async (c) => {
                     </div>
                 </div>
 
-                <!-- ホース製造年月日（4本分） -->
+                <!-- ホース製造年（4本分） -->
                 <div class="bg-blue-50 p-4 rounded-lg">
-                    <h3 class="font-bold text-lg mb-3">📦 ホース製造年月日（4本分）</h3>
+                    <h3 class="font-bold text-lg mb-3">📦 ホース製造年（4本分）</h3>
                     <p class="text-sm text-gray-600 mb-3">
                         ⚠️ 製造から10年経過後、3年ごとに耐圧点検が義務化されています
                     </p>
                     
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-sm font-bold mb-1">ホース1 製造年月</label>
-                            <input type="month" id="hose1ManufactureDate" class="w-full px-3 py-2 border rounded-lg">
+                            <label class="block text-sm font-bold mb-1">ホース1 製造年</label>
+                            <input type="number" id="hose1ManufactureDate" min="1990" max="2030" placeholder="例: 2020" class="w-full px-3 py-2 border rounded-lg">
                         </div>
                         <div>
-                            <label class="block text-sm font-bold mb-1">ホース2 製造年月</label>
-                            <input type="month" id="hose2ManufactureDate" class="w-full px-3 py-2 border rounded-lg">
+                            <label class="block text-sm font-bold mb-1">ホース2 製造年</label>
+                            <input type="number" id="hose2ManufactureDate" min="1990" max="2030" placeholder="例: 2020" class="w-full px-3 py-2 border rounded-lg">
                         </div>
                         <div>
-                            <label class="block text-sm font-bold mb-1">ホース3 製造年月</label>
-                            <input type="month" id="hose3ManufactureDate" class="w-full px-3 py-2 border rounded-lg">
+                            <label class="block text-sm font-bold mb-1">ホース3 製造年</label>
+                            <input type="number" id="hose3ManufactureDate" min="1990" max="2030" placeholder="例: 2020" class="w-full px-3 py-2 border rounded-lg">
                         </div>
                         <div>
-                            <label class="block text-sm font-bold mb-1">ホース4 製造年月</label>
-                            <input type="month" id="hose4ManufactureDate" class="w-full px-3 py-2 border rounded-lg">
+                            <label class="block text-sm font-bold mb-1">ホース4 製造年</label>
+                            <input type="number" id="hose4ManufactureDate" min="1990" max="2030" placeholder="例: 2020" class="w-full px-3 py-2 border rounded-lg">
                         </div>
                     </div>
                 </div>
@@ -7213,11 +7213,16 @@ app.get('/storage/:id', async (c) => {
                 remarks = '【消火栓点検のみ】' + (remarks ? ' ' + remarks : '');
             }
             
-            // ホース製造年月日
-            const hose1MfgDate = document.getElementById('hose1ManufactureDate').value;
-            const hose2MfgDate = document.getElementById('hose2ManufactureDate').value;
-            const hose3MfgDate = document.getElementById('hose3ManufactureDate').value;
-            const hose4MfgDate = document.getElementById('hose4ManufactureDate').value;
+            // ホース製造年（年のみ入力 → YYYY-01-01形式に変換）
+            const hose1Year = document.getElementById('hose1ManufactureDate').value;
+            const hose2Year = document.getElementById('hose2ManufactureDate').value;
+            const hose3Year = document.getElementById('hose3ManufactureDate').value;
+            const hose4Year = document.getElementById('hose4ManufactureDate').value;
+            
+            const hose1MfgDate = hose1Year ? hose1Year + '-01-01' : null;
+            const hose2MfgDate = hose2Year ? hose2Year + '-01-01' : null;
+            const hose3MfgDate = hose3Year ? hose3Year + '-01-01' : null;
+            const hose4MfgDate = hose4Year ? hose4Year + '-01-01' : null;
             
             if (!inspectorName || !date) {
                 alert('入力者と点検日は必須です');
@@ -7256,10 +7261,10 @@ app.get('/storage/:id', async (c) => {
                 remarks: remarks || null,
                 inspector_name: inspectorName,
                 photos: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
-                hose_1_manufacture_date: hose1MfgDate || null,
-                hose_2_manufacture_date: hose2MfgDate || null,
-                hose_3_manufacture_date: hose3MfgDate || null,
-                hose_4_manufacture_date: hose4MfgDate || null
+                hose_1_manufacture_date: hose1MfgDate,
+                hose_2_manufacture_date: hose2MfgDate,
+                hose_3_manufacture_date: hose3MfgDate,
+                hose_4_manufacture_date: hose4MfgDate
             };
 
             try {
@@ -7346,6 +7351,12 @@ app.get('/storage/:id', async (c) => {
                 document.getElementById('actionRequired3').value = actionItems[2] || '';
                 
                 document.getElementById('remarks').value = insp.remarks || '';
+                
+                // ホース製造年（YYYY-MM-DD → YYYY）
+                document.getElementById('hose1ManufactureDate').value = insp.hose_1_manufacture_date ? insp.hose_1_manufacture_date.substring(0, 4) : '';
+                document.getElementById('hose2ManufactureDate').value = insp.hose_2_manufacture_date ? insp.hose_2_manufacture_date.substring(0, 4) : '';
+                document.getElementById('hose3ManufactureDate').value = insp.hose_3_manufacture_date ? insp.hose_3_manufacture_date.substring(0, 4) : '';
+                document.getElementById('hose4ManufactureDate').value = insp.hose_4_manufacture_date ? insp.hose_4_manufacture_date.substring(0, 4) : '';
                 
                 // モーダル表示
                 showModal();
