@@ -637,16 +637,18 @@ app.put('/api/members/:id', async (c) => {
     const now = new Date().toISOString()
     
     await env.DB.prepare(`
-      UPDATE users 
+      UPDATE users
       SET name = ?,
           birth_date = ?,
           join_date = ?,
+          retirement_date = COALESCE(?, retirement_date),
           updated_at = ?
       WHERE id = ?
     `).bind(
       data.name,
       data.birth_date,
       data.join_date,
+      data.retirement_date || null,
       now,
       id
     ).run()
@@ -9656,6 +9658,14 @@ app.get('/members', (c) => {
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                     </div>
 
+                    <div id="retirementDateField" class="hidden">
+                        <label class="block text-sm font-bold text-gray-700 mb-2">
+                            🚪 退団日 / OB日
+                        </label>
+                        <input type="date" id="retirementDate"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                    </div>
+
                     <div class="flex flex-col space-y-3 pt-4">
                         <button onclick="saveMember()" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg">
                             ✅ 保存する
@@ -10163,6 +10173,18 @@ app.get('/members', (c) => {
             document.getElementById('memberName').value = member.name;
             document.getElementById('birthDate').value = member.birth_date || '';
             document.getElementById('joinDate').value = member.join_date || '';
+
+            // 退団日フィールド表示
+            const retField = document.getElementById('retirementDateField');
+            const retInput = document.getElementById('retirementDate');
+            if (member.status === 2 || member.status === 3) {
+                retField.classList.remove('hidden');
+                retInput.value = member.retirement_date || '';
+            } else {
+                retField.classList.add('hidden');
+                retInput.value = '';
+            }
+
             document.getElementById('memberModal').classList.remove('hidden');
         }
 
@@ -10181,10 +10203,12 @@ app.get('/members', (c) => {
                 return;
             }
 
+            const retirementDate = document.getElementById('retirementDate').value;
             const data = {
                 name: name,
                 birth_date: birthDate,
-                join_date: joinDate
+                join_date: joinDate,
+                retirement_date: retirementDate || null
             };
 
             try {
