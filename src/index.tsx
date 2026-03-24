@@ -471,17 +471,14 @@ app.get('/api/users', async (c) => {
 app.put('/api/users/:id/status', async (c) => {
   try {
     const userId = c.req.param('id')
-    const { status } = await c.req.json() as { status: number }
+    const { status, retirement_date } = await c.req.json() as { status: number; retirement_date?: string }
     const env = c.env as { DB: D1Database }
-    
+
     // status: 1=現役, 2=OB, 3=退団
     if (![1, 2, 3].includes(status)) {
       return c.json({ error: 'Invalid status value' }, 400)
     }
-    
-    const now = new Date().toISOString().split('T')[0] // YYYY-MM-DD
-    
-    // ステータスに応じて retirement_date を設定
+
     if (status === 1) {
       // 現役に戻す場合、retirement_date をクリア
       await env.DB.prepare(`
@@ -490,15 +487,15 @@ app.put('/api/users/:id/status', async (c) => {
         WHERE id = ?
       `).bind(status, userId).run()
     } else {
-      // OBまたは退団の場合
-      // 既存のretirement_dateがあれば保持、なければ今日の日付を設定
+      // OBまたは退団の場合 — フロントから指定された日付を使用
+      const retDate = retirement_date || new Date().toISOString().split('T')[0]
       await env.DB.prepare(`
         UPDATE users
-        SET status = ?, 
-            retirement_date = COALESCE(retirement_date, ?),
+        SET status = ?,
+            retirement_date = ?,
             updated_at = datetime('now', 'localtime')
         WHERE id = ?
-      `).bind(status, now, userId).run()
+      `).bind(status, retDate, userId).run()
     }
     
     return c.json({ success: true, status, userId })
@@ -10237,17 +10234,29 @@ app.get('/members', (c) => {
         
         async function changeStatus(userId, newStatus) {
             const statusNames = { 1: '現役', 2: 'OB', 3: '退団' };
-            const confirmMsg = 'ステータスを「' + statusNames[newStatus] + '」に変更しますか？';
-            
-            if (!confirm(confirmMsg)) {
-                return;
+
+            let retirementDate = null;
+            if (newStatus === 2 || newStatus === 3) {
+                const today = new Date().toISOString().split('T')[0];
+                const dateInput = prompt(statusNames[newStatus] + '年月日を入力してください（例: 2026-03-31）', today);
+                if (dateInput === null) return; // キャンセル
+                if (dateInput && !/^\\d{4}-\\d{2}-\\d{2}$/.test(dateInput)) {
+                    alert('❌ 日付の形式が正しくありません（YYYY-MM-DD）');
+                    return;
+                }
+                retirementDate = dateInput || today;
+            } else {
+                if (!confirm('ステータスを「現役」に変更しますか？')) return;
             }
-            
+
             try {
+                const body = { status: newStatus };
+                if (retirementDate) body.retirement_date = retirementDate;
+
                 const response = await fetch('/api/users/' + userId + '/status', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus })
+                    body: JSON.stringify(body)
                 });
                 
                 if (response.ok) {
