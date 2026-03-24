@@ -590,42 +590,6 @@ app.delete('/api/absence-periods/:id', async (c) => {
 })
 
 // ==========================================
-// API: 団員追加
-// ==========================================
-app.post('/api/members', async (c) => {
-  try {
-    const data = await c.req.json()
-    const env = c.env as { DB: D1Database }
-    
-    const id = 'member_' + Date.now()
-    const now = new Date().toISOString()
-    
-    await env.DB.prepare(`
-      INSERT INTO users (
-        id, name, birth_date, join_date,
-        email, password_hash, role,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      id,
-      data.name,
-      data.birth_date,
-      data.join_date,
-      '',  // email (不要だが必須カラム)
-      '',  // password_hash (不要だが必須カラム)
-      'member',  // デフォルトrole
-      now,
-      now
-    ).run()
-    
-    return c.json({ success: true, id })
-  } catch (error) {
-    console.error('Database error:', error)
-    return c.json({ success: false }, 500)
-  }
-})
-
-// ==========================================
 // API: 団員新規登録
 // ==========================================
 app.post('/api/members', async (c) => {
@@ -1092,13 +1056,13 @@ app.get('/api/activity-logs', async (c) => {
   try {
     const env = c.env as { DB: D1Database }
     const limitParam = c.req.query('limit')
-    const limit = limitParam ? parseInt(limitParam) : null
-    
+    const limit = limitParam ? parseInt(limitParam, 10) : null
+
     let query = `SELECT * FROM activity_logs ORDER BY activity_date DESC, created_at DESC`
-    if (limit) {
-      query += ` LIMIT ${limit}`
+    if (limit && !isNaN(limit) && limit > 0) {
+      query += ` LIMIT ${Math.min(limit, 1000)}`
     }
-    
+
     const result = await env.DB.prepare(query).all()
     
     return c.json({ logs: result.results })
@@ -3360,28 +3324,8 @@ app.get('/admin', (c) => {
             alert('設定を保存しました');
         }
         
-        // 旧関数（互換性のため残す）
         function loadTable() {
             loadMembersData();
-        }
-
-        // テーブルデータ読み込み
-        async function loadTable() {
-            const select = document.getElementById('tableSelect');
-            currentTable = select.value;
-            const tableName = select.options[select.selectedIndex].text;
-            document.getElementById('tableName').textContent = tableName;
-
-            try {
-                const response = await fetch('/api/admin/table/' + currentTable);
-                const data = await response.json();
-                currentData = data.rows || [];
-                renderTable(currentData);
-            } catch (error) {
-                document.getElementById('dataContainer').innerHTML = 
-                    '<p class="text-center py-8 text-red-600">データの読み込みに失敗しました</p>';
-                console.error(error);
-            }
         }
 
         // テーブル表示
@@ -3533,7 +3477,7 @@ app.get('/admin', (c) => {
         async function editHose(id) {
             const response = await fetch('/api/hose/storages');
             const data = await response.json();
-            const hose = data.storages.find(s => s.id === parseInt(id));
+            const hose = data.storages.find(s => s.id === id || s.id === String(id));
             
             if (hose) {
                 document.getElementById('hoseModalTitle').textContent = '✏️ ホース編集';
@@ -3590,7 +3534,7 @@ app.get('/admin', (c) => {
         async function editTank(id) {
             const response = await fetch('/api/water-tanks');
             const data = await response.json();
-            const tank = data.tanks.find(t => t.id === parseInt(id));
+            const tank = data.tanks.find(t => t.id === id || t.id === String(id));
             
             if (tank) {
                 document.getElementById('tankModalTitle').textContent = '✏️ 防火水槽編集';
@@ -8558,9 +8502,11 @@ app.put('/api/action-items/:id/uncomplete', async (c) => {
 })
 
 // ==========================================
-// API: データ移行 (一時的) - 既存のaction_requiredをaction_itemsに移行
+// API: データ移行 (一時的) - 無効化済み
 // ==========================================
 app.post('/api/migrate-action-items', async (c) => {
+  return c.json({ success: false, error: 'This migration endpoint has been disabled.' }, 403)
+  /* --- 以下は無効化 ---
   try {
     const env = c.env as { DB: D1Database }
     
@@ -8620,8 +8566,8 @@ app.post('/api/migrate-action-items', async (c) => {
       migratedInspections++;
     }
     
-    return c.json({ 
-      success: true, 
+    return c.json({
+      success: true,
       migratedInspections,
       totalItems,
       message: `${migratedInspections}件の点検記録から${totalItems}件のアイテムを移行しました`
@@ -8630,6 +8576,7 @@ app.post('/api/migrate-action-items', async (c) => {
     console.error('Migration error:', error)
     return c.json({ success: false, error: String(error) }, 500)
   }
+  --- 無効化ここまで --- */
 })
 
 // ==========================================
@@ -10944,29 +10891,34 @@ app.get('/stats', (c) => {
         const tabHose = document.getElementById('tabHose');
         const activityTab = document.getElementById('activityTab');
         const hoseTab = document.getElementById('hoseTab');
-        
-        tabActivity.addEventListener('click', () => {
-            tabActivity.classList.add('active');
-            tabActivity.classList.remove('text-gray-500');
-            tabHose.classList.remove('active');
-            tabHose.classList.add('text-gray-500');
-            activityTab.classList.remove('hidden');
-            hoseTab.classList.add('hidden');
-        });
-        
-        tabHose.addEventListener('click', () => {
-            tabHose.classList.add('active');
-            tabHose.classList.remove('text-gray-500');
-            tabActivity.classList.remove('active');
-            tabActivity.classList.add('text-gray-500');
-            hoseTab.classList.remove('hidden');
-            activityTab.classList.add('hidden');
-            
-            // ホース集計タブに切り替えた時に初期化
-            if (!hoseChart) {
-                initHoseStats();
-            }
-        });
+
+        if (tabActivity && tabHose && activityTab && hoseTab) {
+            tabActivity.addEventListener('click', () => {
+                tabActivity.classList.add('active');
+                tabActivity.classList.remove('text-gray-500');
+                tabHose.classList.remove('active');
+                tabHose.classList.add('text-gray-500');
+                activityTab.classList.remove('hidden');
+                hoseTab.classList.add('hidden');
+            });
+
+            tabHose.addEventListener('click', () => {
+                tabHose.classList.add('active');
+                tabHose.classList.remove('text-gray-500');
+                tabActivity.classList.remove('active');
+                tabActivity.classList.add('text-gray-500');
+                hoseTab.classList.remove('hidden');
+                activityTab.classList.add('hidden');
+
+                // ホース集計タブに切り替えた時に初期化
+                if (!hoseChart) {
+                    initHoseStats();
+                }
+            });
+        } else {
+            // タブが存在しない場合はホース統計を直接初期化
+            initHoseStats();
+        }
 
         // ==========================================
         // ホース集計機能
