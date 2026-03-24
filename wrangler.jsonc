@@ -5,7 +5,18 @@
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "webapp-production",
+      "database_id": "fcab2e99-79f4-43ec-af35-ffc45a4c0f2b"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "oifire1-images"
+    }
   ]
-  // D1・R2のバインディングはCloudflareダッシュボード側で設定済み
-  // wrangler pages deploy時はダッシュボードの設定が優先される
 }

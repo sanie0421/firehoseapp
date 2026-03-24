@@ -9879,6 +9879,7 @@ app.get('/members', (c) => {
                     '<div class="space-y-2 mb-4">' +
                         '<p class="text-gray-700 text-base">🎂 生年月日: ' + birthDateDisplay + ' (' + age + '歳)</p>' +
                         '<p class="text-gray-700 text-base">📅 入団: ' + joinDateDisplay + ' (' + years + '年目)</p>' +
+                        (member.retirement_date && member.retirement_date !== 'null' ? '<p class="text-gray-700 text-base">🚪 ' + (member.status === 2 ? 'OB' : '退団') + ': ' + new Date(member.retirement_date).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'}) + '</p>' : '') +
                     '</div>' +
                     '<div class="grid grid-cols-2 gap-2 mb-2">' +
                         statusButtons +
