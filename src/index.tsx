@@ -5,6 +5,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 type Bindings = {
   DB: D1Database
   IMAGES: R2Bucket
+  APP_PASSWORD?: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -21,7 +22,99 @@ app.use('/*.gif', serveStatic({ root: './' }))
 app.use('/*.svg', serveStatic({ root: './' }))
 
 // ==========================================
-// ホーム画面（ログイン不要）
+// 認証ミドルウェア
+// ==========================================
+const AUTH_COOKIE = 'oifire1_auth'
+
+function isAuthenticated(c: any): boolean {
+  const cookie = c.req.header('cookie') || ''
+  const token = cookie.split(';').find((s: string) => s.trim().startsWith(AUTH_COOKIE + '='))
+  if (!token) return false
+  const value = token.split('=')[1]?.trim()
+  const expected = c.env?.APP_PASSWORD ? btoa(c.env.APP_PASSWORD) : btoa('oifire1')
+  return value === expected
+}
+
+// ページルート認証ミドルウェア（APIは除外）
+app.use('*', async (c, next) => {
+  const path = new URL(c.req.url).pathname
+  // APIルート・静的ファイル・ログインページは認証スキップ
+  if (path.startsWith('/api/') || path.startsWith('/static/') || path === '/login' ||
+      path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.gif') || path.endsWith('.svg')) {
+    return next()
+  }
+  if (!isAuthenticated(c)) {
+    return c.redirect('/login')
+  }
+  return next()
+})
+
+// ==========================================
+// ログインページ
+// ==========================================
+app.get('/login', (c) => {
+  const failed = c.req.query('error') === '1'
+  return c.html(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン — 活動記録</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background: #f0f2f5; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .card { background: white; border-radius: 20px; padding: 40px 32px; width: 100%; max-width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .logo img { width: 48px; height: 48px; border-radius: 12px; }
+    .logo-title { font-size: 20px; font-weight: 800; color: #1a1a1a; }
+    .logo-sub { font-size: 12px; color: #888; margin-top: 2px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; }
+    input[type=password] { width: 100%; padding: 12px 16px; border: 1.5px solid #e0e0e0; border-radius: 10px; font-size: 16px; outline: none; transition: border-color 0.2s; }
+    input[type=password]:focus { border-color: #c0392b; }
+    .btn { width: 100%; background: linear-gradient(135deg, #c0392b, #96281b); color: white; border: none; padding: 14px; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 20px; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.9; }
+    .error { background: #fff0f0; color: #c0392b; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <img src="/kanagawa-logo.png" alt="">
+      <div>
+        <div class="logo-title">活動記録</div>
+        <div class="logo-sub">大井町消防団 第一分団</div>
+      </div>
+    </div>
+    ${failed ? '<div class="error">パスワードが違います</div>' : ''}
+    <form method="POST" action="/login">
+      <label for="pw">パスワード</label>
+      <input type="password" id="pw" name="password" placeholder="パスワードを入力" autofocus>
+      <button type="submit" class="btn">ログイン</button>
+    </form>
+  </div>
+</body>
+</html>`)
+})
+
+app.post('/login', async (c) => {
+  const body = await c.req.parseBody()
+  const password = body['password'] as string
+  const correct = c.env?.APP_PASSWORD || 'oifire1'
+  if (password === correct) {
+    const token = btoa(correct)
+    c.header('Set-Cookie', `${AUTH_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000`)
+    return c.redirect('/')
+  }
+  return c.redirect('/login?error=1')
+})
+
+app.get('/logout', (c) => {
+  c.header('Set-Cookie', `${AUTH_COOKIE}=; Path=/; HttpOnly; Max-Age=0`)
+  return c.redirect('/login')
+})
+
+// ==========================================
+// ホーム画面
 // ==========================================
 app.get('/', (c) => {
   return c.html(`
@@ -30,315 +123,297 @@ app.get('/', (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>活動記録</title>
-    
-    <!-- PWA用メタタグ -->
+    <title>活動記録 — 大井町消防団第一分団</title>
     <link rel="apple-touch-icon" href="/icon.png">
     <link rel="icon" type="image/png" href="/icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="活動記録">
-    <meta name="theme-color" content="#ef5350">
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <meta name="theme-color" content="#c0392b">
     <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            background: #f0f2f5;
             min-height: 100vh;
-            margin: 0;
-            padding: 0;
         }
-        
-        /* ヘッダー赤背景 */
-        .header-red {
-            background: linear-gradient(135deg, #dc143c 0%, #b91c2e 100%);
+
+        /* ヘッダー */
+        .site-header {
+            background: linear-gradient(135deg, #c0392b 0%, #96281b 100%);
+            padding: 0 20px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.25);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        
-        /* iOS風アイコンスタイル */
-        .function-card {
-            text-align: center;
-            text-decoration: none;
-            display: block;
+        .site-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
-        .ios-icon-wrapper {
-            position: relative;
-            border-radius: 22%;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
-            transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
-            padding: 12px;
+        .site-header img {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+        }
+        .site-header-title {
+            color: white;
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+        .site-header-sub {
+            color: rgba(255,255,255,0.75);
+            font-size: 11px;
+            margin-top: 1px;
+        }
+
+        /* メインレイアウト */
+        .main-wrap {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 16px 14px 40px;
+        }
+
+        /* 火災情報バナー */
+        .fire-banner {
+            background: white;
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border-left: 4px solid #e0e0e0;
+            transition: border-color 0.3s, background 0.3s;
+        }
+        .fire-banner.active {
+            background: #fff5f5;
+            border-left-color: #c0392b;
+            animation: pulse-border 1.5s infinite;
+        }
+        @keyframes pulse-border {
+            0%, 100% { border-left-color: #c0392b; }
+            50% { border-left-color: #e74c3c; }
+        }
+        .fire-banner-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             margin-bottom: 8px;
         }
-        .ios-icon-wrapper:active {
-            transform: scale(0.92);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        .fire-banner-label {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #333;
         }
-        .ios-icon-wrapper img {
+        .fire-banner-label span { font-size: 16px; }
+        .fire-banner-reload {
+            background: none;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 5px 10px;
+            font-size: 11px;
+            color: #666;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s;
+        }
+        .fire-banner-reload:hover { background: #f5f5f5; border-color: #bbb; }
+        .fire-banner-body {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.5;
+        }
+        .fire-banner-time {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 6px;
+        }
+
+        /* セクションラベル */
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            margin-left: 2px;
+        }
+
+        /* メニューグリッド */
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .menu-card {
+            background: white;
+            border-radius: 16px;
+            padding: 14px 8px 12px;
+            text-align: center;
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            border: 1px solid rgba(0,0,0,0.04);
+            transition: transform 0.15s, box-shadow 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .menu-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+        .menu-card:active { transform: scale(0.96); }
+        .menu-icon-wrap {
+            width: 62px;
+            height: 62px;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+        }
+        .menu-icon-wrap img {
             width: 100%;
             height: auto;
             display: block;
         }
-        /* iOS風グラデーション背景（スッキリした落ち着いたトーン） */
-        .icon-hose-bg { background: linear-gradient(135deg, #546E7A 0%, #607D8B 100%); }
-        .icon-tank-bg { background: linear-gradient(135deg, #455A64 0%, #546E7A 100%); }
-        .icon-action-bg { background: linear-gradient(135deg, #757575 0%, #9E9E9E 100%); }
-        .icon-stats-bg { background: linear-gradient(135deg, #66BB6A 0%, #81C784 100%); }
-        .icon-members-bg { background: linear-gradient(135deg, #7E57C2 0%, #9575CD 100%); }
-        .icon-admin-bg { background: linear-gradient(135deg, #5C6BC0 0%, #7986CB 100%); }
-        
-        .function-card h3 {
-            font-size: 13px;
+        .icon-hose  { background: linear-gradient(145deg, #37474f, #546e7a); }
+        .icon-tank  { background: linear-gradient(145deg, #1a237e, #283593); }
+        .icon-task  { background: linear-gradient(145deg, #4e342e, #6d4c41); }
+        .icon-stats { background: linear-gradient(145deg, #1b5e20, #2e7d32); }
+        .icon-members { background: linear-gradient(145deg, #4a148c, #6a1b9a); }
+        .icon-admin { background: linear-gradient(145deg, #0d47a1, #1565c0); }
+        .menu-label {
+            font-size: 12px;
             font-weight: 700;
-            color: #333;
-            margin: 0;
-            text-shadow: 0 1px 3px rgba(255,255,255,0.8);
+            color: #2c2c2c;
+            letter-spacing: 0.01em;
         }
-        
-        /* 火災情報カード */
-        .fire-info-card {
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            margin-bottom: 16px;
-        }
-        
-        /* Fire Safety Tips */
-        .fire-tips {
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            margin-top: 20px;
-        }
-        .fire-tips-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-        .fire-tips-content {
-            font-size: 13px;
-            line-height: 1.6;
-            color: #555;
-        }
-        .fire-tips-source {
-            font-size: 11px;
-            color: #999;
-            margin-top: 8px;
-        }
-        
-        /* 火災時の点滅アニメーション */
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-        
+
+        /* スピナー */
         @keyframes spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+        .spin { animation: spin 0.8s linear infinite; }
     </style>
 </head>
 <body>
-    <!-- ヘッダー -->
-    <div class="header-red" style="box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-        <div style="max-width: 1200px; margin: 0 auto; padding: 12px 16px;">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <img src="/kanagawa-logo.png" alt="Logo" style="width: 48px; height: 48px;">
-                    <div>
-                        <h1 style="color: white; font-size: 18px; font-weight: 600; margin: 0;">活動記録</h1>
-                        <p style="color: rgba(255,255,255,0.9); font-size: 13px; margin: 0;">大井町消防団第一分団</p>
-                    </div>
-                </div>
+
+    <header class="site-header">
+        <div class="site-header-left">
+            <img src="/kanagawa-logo.png" alt="Logo">
+            <div>
+                <div class="site-header-title">活動記録</div>
+                <div class="site-header-sub">大井町消防団 第一分団</div>
             </div>
         </div>
-    </div>
+    </header>
 
-    <!-- メインコンテンツ -->
-    <div style="max-width: 1200px; margin: 0 auto; padding: 16px;">
-        <!-- 火災情報カード -->
-        <div class="fire-info-card">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span id="fireInfoIcon" style="font-size: 20px;">🔥</span>
-                    <span style="font-size: 14px; font-weight: 600; color: #333;">火災情報</span>
+    <main class="main-wrap">
+
+        <!-- 火災情報 -->
+        <div class="fire-banner" id="fireBanner">
+            <div class="fire-banner-header">
+                <div class="fire-banner-label">
+                    <span id="fireIcon">🔥</span>管轄火災情報
                 </div>
-                <button onclick="loadFireInfo()" id="fireInfoReloadBtn" style="background: #2196f3; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                    <i class="fas fa-sync-alt" id="fireInfoReloadIcon" style="font-size: 11px;"></i>
+                <button class="fire-banner-reload" onclick="loadFireInfo()">
+                    <svg id="reloadSvg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.36"/></svg>
                     更新
                 </button>
             </div>
-            <div id="fireInfoContent" style="font-size: 13px; line-height: 1.6; color: #555;">
-                <i class="fas fa-spinner fa-spin"></i> 読み込み中...
-            </div>
-            <div id="fireInfoTimestamp" style="font-size: 11px; color: #999; margin-top: 8px;"></div>
+            <div class="fire-banner-body" id="fireBody">読み込み中...</div>
+            <div class="fire-banner-time" id="fireTime"></div>
         </div>
-        
-        <!-- 機能メニュー - iOS風アイコン -->
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
-            <!-- ホース点検 -->
-            <a href="/inspection-priority" class="function-card">
-                <div class="ios-icon-wrapper icon-hose-bg">
-                    <img src="/hose-icon.png" alt="ホース点検">
-                </div>
-                <h3>ホース点検</h3>
+
+        <!-- メニュー -->
+        <div class="section-label">メニュー</div>
+        <div class="menu-grid">
+            <a href="/inspection-priority" class="menu-card">
+                <div class="menu-icon-wrap icon-hose"><img src="/hose-icon.png" alt=""></div>
+                <span class="menu-label">ホース点検</span>
             </a>
-            
-            <!-- 防火水槽点検 -->
-            <a href="/water-tanks" class="function-card">
-                <div class="ios-icon-wrapper icon-tank-bg">
-                    <img src="/suisou-icon.png" alt="防火水槽点検">
-                </div>
-                <h3>防火水槽点検</h3>
+            <a href="/water-tanks" class="menu-card">
+                <div class="menu-icon-wrap icon-tank"><img src="/suisou-icon.png" alt=""></div>
+                <span class="menu-label">防火水槽点検</span>
             </a>
-            
-            <!-- 要対応事項 -->
-            <a href="/action-required" class="function-card">
-                <div class="ios-icon-wrapper icon-action-bg">
-                    <img src="/task-icon.png" alt="要対応事項">
-                </div>
-                <h3>要対応事項</h3>
+            <a href="/action-required" class="menu-card">
+                <div class="menu-icon-wrap icon-task"><img src="/task-icon.png" alt=""></div>
+                <span class="menu-label">要対応事項</span>
             </a>
-            
-            <!-- 活動集計 -->
-            <a href="/stats" class="function-card">
-                <div class="ios-icon-wrapper icon-stats-bg">
-                    <img src="/statistics-icon.png" alt="活動集計">
-                </div>
-                <h3>活動集計</h3>
+            <a href="/stats" class="menu-card">
+                <div class="menu-icon-wrap icon-stats"><img src="/statistics-icon.png" alt=""></div>
+                <span class="menu-label">活動集計</span>
             </a>
-            
-            <!-- 団員名簿 -->
-            <a href="/members" class="function-card">
-                <div class="ios-icon-wrapper icon-members-bg">
-                    <img src="/members-icon.png" alt="団員名簿">
-                </div>
-                <h3>団員名簿</h3>
+            <a href="/members" class="menu-card">
+                <div class="menu-icon-wrap icon-members"><img src="/members-icon.png" alt=""></div>
+                <span class="menu-label">団員名簿</span>
             </a>
-            
-            <!-- データ管理 -->
-            <a href="/admin" class="function-card">
-                <div class="ios-icon-wrapper icon-admin-bg">
-                    <img src="/database-icon.png" alt="データ管理">
-                </div>
-                <h3>データ管理</h3>
+            <a href="/admin" class="menu-card">
+                <div class="menu-icon-wrap icon-admin"><img src="/database-icon.png" alt=""></div>
+                <span class="menu-label">データ管理</span>
             </a>
         </div>
-        
-        <!-- Fire Safety Tips -->
-        <div class="fire-tips">
-            <div class="fire-tips-header">
-                <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
-                    <span style="font-size: 18px;">🔥</span>
-                    <span style="font-size: 14px; font-weight: 600; color: #333;">Fire Safety Tips</span>
-                </div>
-                <button onclick="refreshTip()" style="background: #f5f5f5; border: none; padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
-                    <i class="fas fa-sync-alt" id="tipRefreshIcon" style="font-size: 14px; color: #666;"></i>
-                </button>
-            </div>
-            <div class="fire-tips-content">
-                <p id="fireTip" style="margin: 0;"></p>
-                <p id="fireTipSource" class="fire-tips-source" style="margin: 0;"></p>
-            </div>
-        </div>
-    </div>
+
+    </main>
 
     <script>
-        // 防災豆知識データ（50以上の豊富な情報）
-        const fireSafetyTips = [
-            { tip: '消火器の使い方は「ピン・ポン・パン」で覚えよう！ピン（安全ピンを抜く）、ポン（ホースを火元に向ける）、パン（レバーを握る）の順番です。', source: '総務省消防庁「消火器の使い方」' },
-            { tip: '火災発生時は、煙を吸わないよう姿勢を低くして避難しましょう。煙は天井付近に溜まるため、床に近いほど安全です。', source: '東京消防庁「火災時の避難方法」' },
-            { tip: '住宅用火災警報器の電池寿命は約10年です。定期的に動作確認を行い、古くなったら交換しましょう。', source: '総務省消防庁「住宅用火災警報器の維持管理」' },
-            { tip: '天ぷら油火災には絶対に水をかけてはいけません！消火器を使うか、濡れたシーツで覆って酸素を遮断しましょう。', source: '東京消防庁「天ぷら油火災への対応」' },
-            { tip: '地震後の通電火災を防ぐため、避難時はブレーカーを落としましょう。', source: '総務省消防庁「地震火災対策」' },
-            { tip: '119番通報では、場所・火災か救急か・状況を落ち着いて伝えましょう。', source: '総務省消防庁「119番通報のポイント」' },
-            { tip: '消防団員は全国に約81万人います（2023年4月時点）。年々減少傾向にあるため、地域の消防力維持が課題となっています。', source: '総務省消防庁「消防団員数の現状」令和5年版消防白書' },
-            { tip: '消防団の出動手当は自治体により異なりますが、5,000円以下が大半です。', source: '総務省消防庁「消防団員の処遇等に関する調査結果」令和4年度' },
-            { tip: '機能別消防団員制度により、特定の活動（予防広報、大規模災害対応など）に限定した活動が可能です。', source: '総務省消防庁「機能別団員・分団制度」' },
-            { tip: '消防団協力事業所表示制度により、従業員の消防団活動に協力する事業所を表彰・PRできます。', source: '総務省消防庁「消防団協力事業所表示制度」' },
-            { tip: '消防団は「自らの地域は自らで守る」という精神に基づく、地域防災の要です。', source: '総務省消防庁「消防団の役割」' }
-        ];
-
-        function refreshTip() {
-            const randomIndex = Math.floor(Math.random() * fireSafetyTips.length);
-            const tip = fireSafetyTips[randomIndex];
-            document.getElementById('fireTip').textContent = tip.tip;
-            document.getElementById('fireTipSource').textContent = '出典: ' + tip.source;
-            
-            const icon = document.getElementById('tipRefreshIcon');
-            icon.style.transform = 'rotate(360deg)';
-            setTimeout(() => { icon.style.transform = 'rotate(0deg)'; }, 300);
-        }
-
         async function loadFireInfo() {
-            const content = document.getElementById('fireInfoContent');
-            const timestamp = document.getElementById('fireInfoTimestamp');
-            const icon = document.getElementById('fireInfoIcon');
-            const card = document.querySelector('.fire-info-card');
-            const reloadIcon = document.getElementById('fireInfoReloadIcon');
-            
-            reloadIcon.style.animation = 'spin 1s linear infinite';
-            
+            const banner = document.getElementById('fireBanner');
+            const icon   = document.getElementById('fireIcon');
+            const body   = document.getElementById('fireBody');
+            const time   = document.getElementById('fireTime');
+            const svg    = document.getElementById('reloadSvg');
+
+            svg.classList.add('spin');
+
             try {
-                const response = await fetch('/api/fire-info');
-                const data = await response.json();
-                
+                const res  = await fetch('/api/fire-info');
+                const data = await res.json();
+
                 if (data.success && data.hasData) {
-                    const message = data.message || '';
-                    
-                    // 大井町で火災発生の場合（赤・点滅）
-                    if (message.includes('大井町') || message.includes('大井')) {
+                    const msg = data.message || '';
+                    if (msg.includes('大井町') || msg.includes('大井')) {
                         icon.textContent = '🚨';
-                        card.style.background = '#ffebee';
-                        card.style.borderLeft = '4px solid #d32f2f';
-                        card.style.animation = 'blink 1s infinite';
-                        content.innerHTML = '<strong style="color: #d32f2f; font-size: 15px;">⚠️ ' + message + '</strong>';
-                    } 
-                    // 他地域で火災（色なし・グレー）
-                    else {
+                        banner.classList.add('active');
+                        body.innerHTML = '<strong style="color:#c0392b">' + msg + '</strong>';
+                    } else {
                         icon.textContent = '🔥';
-                        card.style.background = 'white';
-                        card.style.borderLeft = 'none';
-                        card.style.animation = 'none';
-                        content.innerHTML = '<span style="color: #666;">' + message + '</span>';
+                        banner.classList.remove('active');
+                        body.textContent = msg;
                     }
-                    
                     if (data.timestamp) {
-                        timestamp.textContent = '発生時刻: ' + data.timestamp;
-                        timestamp.style.color = message.includes('大井町') || message.includes('大井') ? '#d32f2f' : '#999';
+                        time.textContent = '発生時刻: ' + data.timestamp;
                     }
                 } else {
-                    // 平常時（色なし・グレー）
                     icon.textContent = '✅';
-                    card.style.background = 'white';
-                    card.style.borderLeft = 'none';
-                    card.style.animation = 'none';
-                    content.innerHTML = '<span style="color: #666;">' + (data.message || '現在、災害は発生しておりません') + '</span>';
-                    timestamp.textContent = '最終確認: ' + (data.lastUpdated || new Date().toLocaleString('ja-JP'));
-                    timestamp.style.color = '#999';
+                    banner.classList.remove('active');
+                    body.textContent = data.message || '現在、管内では火災は発生しておりません。';
+                    time.textContent = '確認時刻: ' + new Date().toLocaleString('ja-JP');
                 }
-            } catch (error) {
-                console.error('Fire info error:', error);
-                // エラー時（オレンジ）
+            } catch (e) {
                 icon.textContent = '⚠️';
-                card.style.background = '#fff3e0';
-                card.style.borderLeft = '4px solid #f57c00';
-                card.style.animation = 'none';
-                content.innerHTML = '<span style="color: #f57c00;">火災情報の取得に失敗しました</span>';
-                timestamp.textContent = '';
+                banner.classList.remove('active');
+                body.textContent = '火災情報の取得に失敗しました';
             }
-            
-            reloadIcon.style.animation = '';
+
+            svg.classList.remove('spin');
         }
 
-        // 初期化
-        refreshTip();
         loadFireInfo();
-        
-        // 5分ごとに火災情報を自動更新
         setInterval(loadFireInfo, 5 * 60 * 1000);
     </script>
 </body>
@@ -557,7 +632,7 @@ app.post('/api/absence-periods', async (c) => {
     
     await env.DB.prepare(`
       INSERT INTO absence_periods (id, user_id, start_date, end_date, reason, created_at, updated_at)
-      VALUES (?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
+      VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
     `).bind(id, user_id, start_date, end_date, reason).run()
     
     return c.json({ success: true, id })
@@ -1309,7 +1384,7 @@ const comingSoonPage = (title: string, icon: string) => {
 }
 
 // ==========================================
-// ホースホース管理画面
+// ホース保管庫管理画面
 // ==========================================
 app.get('/hose', (c) => {
   return c.html(`
@@ -1318,7 +1393,7 @@ app.get('/hose', (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ホースホース管理 - 活動記録</title>
+    <title>ホース保管庫管理 - 活動記録</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1365,34 +1440,30 @@ app.get('/hose', (c) => {
 </head>
 <body>
     <!-- ナビゲーションバー -->
-    <nav class="bg-white shadow-md">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
-                    <span class="text-4xl float-animation">🔥</span>
-                    <div class="text-gray-800">
-                        <div class="font-bold text-xl">活動記録</div>
-                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
-                    </div>
-                </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
-                    ← ホームに戻る
-                </a>
-            </div>
+    <header style="background:linear-gradient(135deg,#c0392b 0%,#96281b 100%);height:54px;display:flex;align-items:center;padding:0 16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin:0 auto;">
+            <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+                <img src="/kanagawa-logo.png" alt="" style="width:32px;height:32px;border-radius:6px;">
+                <div>
+                    <div style="color:white;font-size:16px;font-weight:700;letter-spacing:0.02em;line-height:1.2;">活動記録</div>
+                    <div style="color:rgba(255,255,255,0.75);font-size:10px;line-height:1.2;">大井町消防団 第一分団</div>
+                </div>
+            </a>
+            <a href="/" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;">← ホーム</a>
         </div>
-    </nav>
+    </header>
 
     <!-- メインコンテンツ -->
     <div class="container mx-auto px-4 py-8">
         <!-- ヘッダー -->
         <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
             <div class="mb-4">
-                <h1 class="text-3xl font-bold mb-2 text-gray-800">🔧 ホースホース管理 <span id="hoseStorageCount" class="text-xl text-gray-500">(読み込み中...)</span></h1>
-                <p class="text-base text-gray-600">ホースホースの登録・地図設定・点検記録</p>
+                <h1 class="text-3xl font-bold mb-2 text-gray-800">🔧 ホース保管庫管理 <span id="hoseStorageCount" class="text-xl text-gray-500">(読み込み中...)</span></h1>
+                <p class="text-base text-gray-600">ホース保管庫の登録・地図設定・点検記録</p>
             </div>
             <div class="flex flex-col space-y-3">
                 <button id="showAddModalBtn" class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-xl transition shadow-lg font-bold text-lg">
-                    ➕ ホースホースを追加
+                    ➕ ホース保管庫を追加
                 </button>
                 <button id="showUploadModalBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-xl transition shadow-lg font-bold text-lg">
                     📥 Excel/CSV一括登録
@@ -1429,7 +1500,7 @@ app.get('/hose', (c) => {
             <p class="text-sm text-gray-600 mt-2">💡 ホース番号、場所、地区名で絞り込みできます</p>
         </div>
 
-        <!-- ホースホース一覧 -->
+        <!-- ホース保管庫一覧 -->
         <div id="storageList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- JavaScriptで動的に生成 -->
         </div>
@@ -1461,7 +1532,7 @@ app.get('/hose', (c) => {
                 <!-- 形式説明 -->
                 <div class="bg-gray-50 p-4 rounded">
                     <p class="font-bold mb-2">📝 必要な列:</p>
-                    <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">ホースホース番号 | 場所の目安 | 地区 | 備考
+                    <pre class="text-sm bg-white p-3 rounded border overflow-x-auto">ホース保管庫番号 | 場所の目安 | 地区 | 備考
 No.01 | ◯◯公民館前 | 市場 | 2020年設置
 No.02 | △△集会所裏 | 馬場 | 
 No.03 | ××消防団詰所前 | 根岸下 | </pre>
@@ -1561,7 +1632,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
         <div class="min-h-full flex items-start justify-center p-4 py-8">
             <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-6">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800" id="modalTitle">📦 ホースホースを追加</h2>
+                <h2 class="text-2xl font-bold text-gray-800" id="modalTitle">📦 ホース保管庫を追加</h2>
                 <button id="closeAddModalBtn" class="text-gray-500 hover:text-gray-700">✕</button>
             </div>
 
@@ -1571,7 +1642,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                 <!-- ホース番号 -->
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-2">
-                        🏷️ ホースホース番号 <span class="text-red-500">*</span>
+                        🏷️ ホース保管庫番号 <span class="text-red-500">*</span>
                     </label>
                     <input type="text" id="storageNumber" required
                         placeholder="No.01"
@@ -1680,7 +1751,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
         </div>
     </div>
 
-    <!-- ホースホース詳細モーダル（地図表示） -->
+    <!-- ホース保管庫詳細モーダル（地図表示） -->
     <div id="detailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8">
             <div class="flex justify-between items-center mb-6">
@@ -1776,7 +1847,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             if (storageImageInput) storageImageInput.addEventListener('change', previewImage);
         };
 
-        // ホースホース一覧を読み込み
+        // ホース保管庫一覧を読み込み
         async function loadStorages() {
             try {
                 const response = await fetch('/api/hose/storages');
@@ -1788,7 +1859,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             }
         }
 
-        // ホースホース一覧を表示（検索対応 + フィルター対応）
+        // ホース保管庫一覧を表示（検索対応 + フィルター対応）
         function renderStorages() {
             const list = document.getElementById('storageList');
             const searchBox = document.getElementById('searchBox');
@@ -1847,13 +1918,13 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                     <div class="col-span-full text-center py-16">
                         <div class="bg-white rounded-2xl shadow-lg p-12">
                             <div class="text-8xl mb-6">📦</div>
-                            <p class="text-2xl text-gray-800 font-bold mb-4">まだホースホースが登録されていません</p>
-                            <p class="text-gray-600 mb-8">CSV一括登録または個別追加でホースホースを登録しましょう</p>
+                            <p class="text-2xl text-gray-800 font-bold mb-4">まだホース保管庫が登録されていません</p>
+                            <p class="text-gray-600 mb-8">CSV一括登録または個別追加でホース保管庫を登録しましょう</p>
                             <button onclick="showUploadModal()" class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-4 rounded-lg transition mr-2 shadow-lg font-bold">
                                 📥 CSV一括登録
                             </button>
                             <button onclick="showAddModal()" class="bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-lg transition shadow-lg font-bold">
-                                ➕ ホースホースを追加
+                                ➕ ホース保管庫を追加
                             </button>
                         </div>
                     </div>
@@ -1990,7 +2061,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                 });
 
                 const result = await response.json();
-                alert(\`\${result.count}件のホースホースを登録しました！\`);
+                alert(\`\${result.count}件のホース保管庫を登録しました！\`);
                 hideUploadModal();
                 loadStorages();
             } catch (error) {
@@ -2080,7 +2151,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
         function downloadExcelTemplate() {
             const wb = XLSX.utils.book_new();
             const data = [
-                ['ホースホース番号', '場所の目安', '地区', '備考'],
+                ['ホース保管庫番号', '場所の目安', '地区', '備考'],
                 ['No.01', '◯◯公民館前', '市場', '2020年設置'],
                 ['No.02', '△△集会所裏', '馬場', ''],
                 ['No.03', '××消防団詰所前', '根岸下', ''],
@@ -2095,13 +2166,13 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
                 ['No.12', '', '', '']
             ];
             const ws = XLSX.utils.aoa_to_sheet(data);
-            XLSX.utils.book_append_sheet(wb, ws, 'ホースホース');
+            XLSX.utils.book_append_sheet(wb, ws, 'ホース保管庫');
             XLSX.writeFile(wb, 'hose_storages_template.xlsx');
         }
 
         // CSVテンプレートダウンロード（ホース）
         function downloadCSVTemplate() {
-            const csv = 'ホースホース番号,場所の目安,地区,備考\\n' +
+            const csv = 'ホース保管庫番号,場所の目安,地区,備考\\n' +
                         'No.01,◯◯公民館前,市場,2020年設置\\n' +
                         'No.02,△△集会所裏,馬場,\\n' +
                         'No.03,××消防団詰所前,根岸下,\\n' +
@@ -2148,9 +2219,9 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             link.click();
         }
 
-        // ホースホース追加モーダル表示
+        // ホース保管庫追加モーダル表示
         function showAddModal() {
-            document.getElementById('modalTitle').textContent = '📦 ホースホースを追加';
+            document.getElementById('modalTitle').textContent = '📦 ホース保管庫を追加';
             document.getElementById('storageForm').reset();
             document.getElementById('storageId').value = '';
             currentLat = null;
@@ -2232,7 +2303,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             }
         }
 
-        // ホースホース削除
+        // ホース保管庫削除
         async function deleteStorage(id, storageNumber) {
             if (!confirm('本当に「' + storageNumber + '」を削除しますか？\\n\\nこの操作は取り消せません。')) {
                 return;
@@ -2255,7 +2326,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             }
         }
 
-        // ホースホース編集
+        // ホース保管庫編集
         function editStorage(id) {
             const storage = storages.find(s => s.id === id);
             if (!storage) return;
@@ -2348,7 +2419,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             }
         }
 
-        // ホースホース保存
+        // ホース保管庫保存
         async function saveStorage() {
             const id = document.getElementById('storageId').value;
             const storageNumber = document.getElementById('storageNumber').value;
@@ -2356,7 +2427,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
             
             // 必須項目チェック
             if (!storageNumber || !location) {
-                alert('ホースホース番号と場所の目安は必須です');
+                alert('ホース保管庫番号と場所の目安は必須です');
                 return;
             }
 
@@ -2436,7 +2507,7 @@ No.03 | ××消防団詰所前 | 根岸下 | </pre>
 })
 
 // ==========================================
-// API: ホースホース一覧取得
+// API: ホース保管庫一覧取得
 // ==========================================
 app.get('/api/hose/storages', async (c) => {
   try {
@@ -2454,7 +2525,7 @@ app.get('/api/hose/storages', async (c) => {
 })
 
 // ==========================================
-// API: ホースホース追加
+// API: ホース保管庫追加
 // ==========================================
 app.post('/api/hose/storages', async (c) => {
   try {
@@ -2530,7 +2601,7 @@ app.post('/api/hose/storages', async (c) => {
 })
 
 // ==========================================
-// API: ホースホース更新
+// API: ホース保管庫更新
 // ==========================================
 app.put('/api/hose/storages/:id', async (c) => {
   try {
@@ -2683,7 +2754,7 @@ app.post('/api/hose/storages/update-coordinates', async (c) => {
 })
 
 // ==========================================
-// API: ホースホース削除
+// API: ホース保管庫削除
 // ==========================================
 app.delete('/api/hose/storages/:id', async (c) => {
   try {
@@ -2809,7 +2880,7 @@ app.post('/api/hose/storages/bulk', async (c) => {
 // CSVテンプレート配信
 // ==========================================
 app.get('/templates/hose_storages_template.csv', (c) => {
-  const csvContent = `ホースホース番号,場所の目安,地区,備考
+  const csvContent = `ホース保管庫番号,場所の目安,地区,備考
 No.01,大井町公民館前,市場,2020年設置
 No.02,馬場集会所裏,馬場,扉に破損あり
 No.03,根岸下消防団詰所,根岸下,
@@ -2860,22 +2931,18 @@ app.get('/admin', (c) => {
 </head>
 <body>
     <!-- ナビゲーションバー -->
-    <nav class="bg-white shadow-md">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
-                    <span class="text-4xl float-animation">🔥</span>
-                    <div class="text-gray-800">
-                        <div class="font-bold text-xl">活動記録</div>
-                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
-                    </div>
-                </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
-                    ← ホームに戻る
-                </a>
-            </div>
+    <header style="background:linear-gradient(135deg,#c0392b 0%,#96281b 100%);height:54px;display:flex;align-items:center;padding:0 16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin:0 auto;">
+            <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+                <img src="/kanagawa-logo.png" alt="" style="width:32px;height:32px;border-radius:6px;">
+                <div>
+                    <div style="color:white;font-size:16px;font-weight:700;letter-spacing:0.02em;line-height:1.2;">活動記録</div>
+                    <div style="color:rgba(255,255,255,0.75);font-size:10px;line-height:1.2;">大井町消防団 第一分団</div>
+                </div>
+            </a>
+            <a href="/" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;">← ホーム</a>
         </div>
-    </nav>
+    </header>
 
     <!-- メインコンテンツ -->
     <div class="container mx-auto px-4 py-8">
@@ -3693,22 +3760,18 @@ app.get('/water-tanks', (c) => {
     </style>
 </head>
 <body>
-    <nav class="bg-white shadow-md">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
-                    <span class="text-4xl float-animation">🔥</span>
-                    <div class="text-gray-800">
-                        <div class="font-bold text-xl">活動記録</div>
-                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
-                    </div>
-                </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
-                    ← ホームに戻る
-                </a>
-            </div>
+    <header style="background:linear-gradient(135deg,#c0392b 0%,#96281b 100%);height:54px;display:flex;align-items:center;padding:0 16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin:0 auto;">
+            <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+                <img src="/kanagawa-logo.png" alt="" style="width:32px;height:32px;border-radius:6px;">
+                <div>
+                    <div style="color:white;font-size:16px;font-weight:700;letter-spacing:0.02em;line-height:1.2;">活動記録</div>
+                    <div style="color:rgba(255,255,255,0.75);font-size:10px;line-height:1.2;">大井町消防団 第一分団</div>
+                </div>
+            </a>
+            <a href="/" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;">← ホーム</a>
         </div>
-    </nav>
+    </header>
 
     <div class="container mx-auto px-4 py-6">
         <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
@@ -4572,22 +4635,18 @@ app.get('/inspection-priority', (c) => {
 </head>
 <body>
     <!-- ナビゲーションバー -->
-    <nav class="bg-white shadow-md">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
-                    <span class="text-4xl float-animation">🔥</span>
-                    <div class="text-gray-800">
-                        <div class="font-bold text-xl">活動記録</div>
-                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
-                    </div>
-                </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
-                    ← ホームに戻る
-                </a>
-            </div>
+    <header style="background:linear-gradient(135deg,#c0392b 0%,#96281b 100%);height:54px;display:flex;align-items:center;padding:0 16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin:0 auto;">
+            <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+                <img src="/kanagawa-logo.png" alt="" style="width:32px;height:32px;border-radius:6px;">
+                <div>
+                    <div style="color:white;font-size:16px;font-weight:700;letter-spacing:0.02em;line-height:1.2;">活動記録</div>
+                    <div style="color:rgba(255,255,255,0.75);font-size:10px;line-height:1.2;">大井町消防団 第一分団</div>
+                </div>
+            </a>
+            <a href="/" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;">← ホーム</a>
         </div>
-    </nav>
+    </header>
 
     <!-- メインコンテンツ -->
     <div class="container mx-auto px-4 py-6">
@@ -4595,7 +4654,7 @@ app.get('/inspection-priority', (c) => {
         <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
             <div class="text-gray-800">
                 <h1 class="text-3xl font-bold mb-2">⚠️ 点検優先度</h1>
-                <p class="text-base text-gray-600 mb-4">点検が必要なホースホースを確認しましょう</p>
+                <p class="text-base text-gray-600 mb-4">点検が必要なホース保管庫を確認しましょう</p>
                 
                 <!-- 検索バー -->
                 <div class="mt-4">
@@ -5714,22 +5773,18 @@ app.get('/water-tank/:id', async (c) => {
     </style>
 </head>
 <body>
-    <nav class="bg-white shadow-md">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
-                    <span class="text-4xl float-animation">🔥</span>
-                    <div class="text-gray-800">
-                        <div class="font-bold text-xl">活動記録</div>
-                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
-                    </div>
-                </a>
-                <a href="/water-tanks" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
-                    ← 一覧に戻る
-                </a>
-            </div>
+    <header style="background:linear-gradient(135deg,#c0392b 0%,#96281b 100%);height:54px;display:flex;align-items:center;padding:0 16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin:0 auto;">
+            <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+                <img src="/kanagawa-logo.png" alt="" style="width:32px;height:32px;border-radius:6px;">
+                <div>
+                    <div style="color:white;font-size:16px;font-weight:700;letter-spacing:0.02em;line-height:1.2;">活動記録</div>
+                    <div style="color:rgba(255,255,255,0.75);font-size:10px;line-height:1.2;">大井町消防団 第一分団</div>
+                </div>
+            </a>
+            <a href="/water-tanks" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;">← 一覧に戻る</a>
         </div>
-    </nav>
+    </header>
 
     <div class="container mx-auto px-4 py-6">
         <div id="tankInfo" class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
@@ -6263,7 +6318,7 @@ app.get('/water-tank/:id', async (c) => {
 })
 
 // ==========================================
-// ホースホース詳細・点検ページ（完全書き直し版）
+// ホース保管庫詳細・点検ページ（完全書き直し版）
 // ==========================================
 app.get('/storage/:id', async (c) => {
   const id = c.req.param('id')
@@ -6327,24 +6382,18 @@ app.get('/storage/:id', async (c) => {
     </style>
 </head>
 <body>
-    <nav class="bg-white shadow-lg">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
-                    <span class="text-4xl float-animation">🔥</span>
-                    <div class="text-gray-800">
-                        <div class="font-bold text-xl">活動記録</div>
-                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
-                    </div>
-                </a>
-                <div class="flex gap-2">
-                    <a href="/hose" class="text-green-600 hover:text-green-800 hover:underline text-sm bg-green-50 px-4 py-2 rounded-lg font-bold">
-                        🔧 ホース管理
-                    </a>
-                    <a href="/inspection-priority" class="text-blue-600 hover:text-blue-800 hover:underline text-sm bg-blue-50 px-4 py-2 rounded-lg font-bold">
-                        ← 優先度一覧
-                    </a>
+    <header style="background:linear-gradient(135deg,#c0392b 0%,#96281b 100%);height:54px;display:flex;align-items:center;padding:0 16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin:0 auto;">
+            <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+                <img src="/kanagawa-logo.png" alt="" style="width:32px;height:32px;border-radius:6px;">
+                <div>
+                    <div style="color:white;font-size:16px;font-weight:700;letter-spacing:0.02em;line-height:1.2;">活動記録</div>
+                    <div style="color:rgba(255,255,255,0.75);font-size:10px;line-height:1.2;">大井町消防団 第一分団</div>
                 </div>
+            </a>
+            <div style="display:flex;gap:8px;">
+                <a href="/hose" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;">🔧 ホース管理</a>
+                <a href="/inspection-priority" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;">← 優先度一覧</a>
             </div>
         </div>
     </nav>
@@ -7635,22 +7684,18 @@ app.get('/action-required', (c) => {
     </style>
 </head>
 <body>
-    <nav class="bg-white shadow-md">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
-                    <span class="text-4xl float-animation">🔥</span>
-                    <div class="text-gray-800">
-                        <div class="font-bold text-xl">活動記録</div>
-                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
-                    </div>
-                </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
-                    ← ホームに戻る
-                </a>
-            </div>
+    <header style="background:linear-gradient(135deg,#c0392b 0%,#96281b 100%);height:54px;display:flex;align-items:center;padding:0 16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin:0 auto;">
+            <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+                <img src="/kanagawa-logo.png" alt="" style="width:32px;height:32px;border-radius:6px;">
+                <div>
+                    <div style="color:white;font-size:16px;font-weight:700;letter-spacing:0.02em;line-height:1.2;">活動記録</div>
+                    <div style="color:rgba(255,255,255,0.75);font-size:10px;line-height:1.2;">大井町消防団 第一分団</div>
+                </div>
+            </a>
+            <a href="/" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;">← ホーム</a>
         </div>
-    </nav>
+    </header>
 
     <div class="container mx-auto px-4 py-6">
         <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
@@ -7864,8 +7909,11 @@ app.get('/action-required', (c) => {
                     '</div>' +
                     (function() {
                         if (currentTab === 'pending') {
-                            return '<button onclick="markInProgress(\\'' + item.id + '\\')" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
+                            return '<button onclick="markInProgress(\\'' + item.id + '\\')" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded-xl transition font-bold text-base mb-2">' +
                                 '🔧 対応中にする' +
+                            '</button>' +
+                            '<button onclick="deleteActionItem(\\'' + item.id + '\\')" class="w-full bg-red-100 hover:bg-red-200 text-red-700 px-6 py-2 rounded-xl transition font-bold text-sm">' +
+                                '🗑️ 削除' +
                             '</button>';
                         } else if (currentTab === 'in_progress') {
                             let html = '';
@@ -7896,14 +7944,17 @@ app.get('/action-required', (c) => {
                                 '</div>';
                             }
                             html += '<p class="text-gray-600 text-center mb-4">対応完了日: ' + new Date(item.completed_at).toLocaleDateString('ja-JP') + '</p>' +
-                            '<div class="flex gap-3">' +
+                            '<div class="flex gap-3 mb-2">' +
                                 '<button onclick="editCompleted(\\'' + item.id + '\\')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
                                     '✏️ 編集' +
                                 '</button>' +
                                 '<button onclick="markInProgress(\\'' + item.id + '\\')" class="flex-1 bg-gray-400 hover:bg-gray-500 text-white px-6 py-3 rounded-xl transition font-bold text-base">' +
                                     '⬅️ 対応中に戻す' +
                                 '</button>' +
-                            '</div>';
+                            '</div>' +
+                            '<button onclick="deleteActionItem(\\'' + item.id + '\\')" class="w-full bg-red-100 hover:bg-red-200 text-red-700 px-6 py-2 rounded-xl transition font-bold text-sm">' +
+                                '🗑️ 削除' +
+                            '</button>';
                             return html;
                         }
                     })() +
@@ -8026,6 +8077,21 @@ app.get('/action-required', (c) => {
             const item = allItems.find(i => i.id === actionItemId);
             document.getElementById('completeContent').value = item && item.action_content ? item.action_content : '';
             document.getElementById('completeModal').classList.remove('hidden');
+        }
+
+        async function deleteActionItem(actionItemId) {
+            if (!confirm('この要対応事項を削除しますか？\nこの操作は取り消せません。')) return;
+            try {
+                const response = await fetch('/api/action-items/' + actionItemId, { method: 'DELETE' });
+                if (response.ok) {
+                    loadActionRequired();
+                } else {
+                    alert('削除に失敗しました');
+                }
+            } catch (error) {
+                alert('エラーが発生しました');
+                console.error(error);
+            }
         }
 
         let currentEditInspectionId = null;
@@ -8501,6 +8567,21 @@ app.put('/api/action-items/:id/uncomplete', async (c) => {
 })
 
 // ==========================================
+// API: 要対応事項 削除
+// ==========================================
+app.delete('/api/action-items/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const env = c.env as { DB: D1Database }
+    await env.DB.prepare(`DELETE FROM action_items WHERE id = ?`).bind(id).run()
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Database error:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
+// ==========================================
 // API: データ移行 (一時的) - 無効化済み
 // ==========================================
 app.post('/api/migrate-action-items', async (c) => {
@@ -8726,22 +8807,18 @@ app.get('/logs', (c) => {
     </style>
 </head>
 <body>
-    <nav class="bg-white shadow-md">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
-                    <span class="text-4xl float-animation">🔥</span>
-                    <div class="text-gray-800">
-                        <div class="font-bold text-xl">活動記録</div>
-                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
-                    </div>
-                </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
-                    ← ホームに戻る
-                </a>
-            </div>
+    <header style="background:linear-gradient(135deg,#c0392b 0%,#96281b 100%);height:54px;display:flex;align-items:center;padding:0 16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin:0 auto;">
+            <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+                <img src="/kanagawa-logo.png" alt="" style="width:32px;height:32px;border-radius:6px;">
+                <div>
+                    <div style="color:white;font-size:16px;font-weight:700;letter-spacing:0.02em;line-height:1.2;">活動記録</div>
+                    <div style="color:rgba(255,255,255,0.75);font-size:10px;line-height:1.2;">大井町消防団 第一分団</div>
+                </div>
+            </a>
+            <a href="/" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;">← ホーム</a>
         </div>
-    </nav>
+    </header>
 
     <div class="container mx-auto px-4 py-6">
         <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
@@ -9553,22 +9630,18 @@ app.get('/members', (c) => {
     </style>
 </head>
 <body>
-    <nav class="bg-white shadow-md">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
-                    <span class="text-4xl float-animation">🔥</span>
-                    <div class="text-gray-800">
-                        <div class="font-bold text-xl">活動記録</div>
-                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
-                    </div>
-                </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
-                    ← ホームに戻る
-                </a>
-            </div>
+    <header style="background:linear-gradient(135deg,#c0392b 0%,#96281b 100%);height:54px;display:flex;align-items:center;padding:0 16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin:0 auto;">
+            <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+                <img src="/kanagawa-logo.png" alt="" style="width:32px;height:32px;border-radius:6px;">
+                <div>
+                    <div style="color:white;font-size:16px;font-weight:700;letter-spacing:0.02em;line-height:1.2;">活動記録</div>
+                    <div style="color:rgba(255,255,255,0.75);font-size:10px;line-height:1.2;">大井町消防団 第一分団</div>
+                </div>
+            </a>
+            <a href="/" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;">← ホーム</a>
         </div>
-    </nav>
+    </header>
 
     <div class="container mx-auto px-4 py-6">
         <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
@@ -10000,24 +10073,26 @@ app.get('/members', (c) => {
                     badge: badge,
                     joinFiscalYear: joinFiscalYear,
                     retirementFiscalYear: retirementFiscalYear,
+                    yearsOfService: yearsOfService,
                     currentAge: currentAge,
                     absenceRanges: absenceRanges
                 };
             });
             
             // HTML生成（高速化：配列結合）
-            const rows = ['<table class="min-w-full border-collapse"><thead><tr><th class="border px-4 py-2 bg-gray-100 sticky left-0 z-10">氏名</th>'];
-            
-            for (let i = 20; i >= 0; i--) {
+            const rows = ['<table class="min-w-full border-collapse"><thead><tr><th class="border px-4 py-2 bg-gray-100 sticky left-0 z-10">氏名</th><th class="border px-3 py-2 bg-blue-50 text-xs cursor-pointer hover:bg-blue-200 transition whitespace-nowrap font-bold text-blue-700" onclick="sortByTenure()" title="在籍年数の多い順に並べ替え">在籍年数 ▼</th>'];
+
+            for (let i = 20; i >= -1; i--) {
                 const year = currentFiscalYear - i;
                 rows.push('<th class="border px-2 py-2 bg-gray-100 text-xs cursor-pointer hover:bg-blue-100 transition" onclick="sortByYear(' + year + ')" title="クリックして' + year + '年度在籍者でソート">' + year + '</th>');
             }
             rows.push('</tr></thead><tbody>');
-            
+
             memberData.forEach(data => {
-                rows.push('<tr><td class="border px-4 py-2 font-bold bg-white sticky left-0 z-10">' + data.badge + ' ' + data.name + '</td>');
+                const tenureDisplay = data.yearsOfService ? data.yearsOfService + '年' : '-';
+                rows.push('<tr><td class="border px-4 py-2 font-bold bg-white sticky left-0 z-10">' + data.badge + ' ' + data.name + '</td><td class="border px-3 py-2 text-center text-sm font-bold text-blue-700 bg-blue-50">' + tenureDisplay + '</td>');
                 
-                for (let i = 20; i >= 0; i--) {
+                for (let i = 20; i >= -1; i--) {
                     const year = currentFiscalYear - i;
                     const isActive = data.joinFiscalYear && year >= data.joinFiscalYear && 
                                     (!data.retirementFiscalYear || year <= data.retirementFiscalYear);
@@ -10053,6 +10128,31 @@ app.get('/members', (c) => {
         }
         
         // デフォルトソート：年数が長い順（入団が早い順）
+        function sortByTenure() {
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth() + 1;
+            const currentFiscalYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+
+            members.sort((a, b) => {
+                const getYears = m => {
+                    if (!m.join_date) return 0;
+                    const joinDate = new Date(m.join_date);
+                    const joinFY = (joinDate.getMonth() + 1) >= 4 ? joinDate.getFullYear() : joinDate.getFullYear() - 1;
+                    let retireFY = currentFiscalYear;
+                    if (m.retirement_date && m.retirement_date !== 'null') {
+                        const retireDate = new Date(m.retirement_date);
+                        if (!isNaN(retireDate.getTime())) {
+                            retireFY = (retireDate.getMonth() + 1) >= 4 ? retireDate.getFullYear() : retireDate.getFullYear() - 1;
+                        }
+                    }
+                    return retireFY - joinFY + 1;
+                };
+                return getYears(b) - getYears(a);
+            });
+            renderTimeline();
+        }
+
         function sortByRetirementDate() {
             const today = new Date();
             const currentYear = today.getFullYear();
@@ -10485,22 +10585,18 @@ app.get('/stats', (c) => {
     </style>
 </head>
 <body>
-    <nav class="bg-white shadow-md">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-3">
-                    <span class="text-4xl float-animation">🔥</span>
-                    <div class="text-gray-800">
-                        <div class="font-bold text-xl">活動記録</div>
-                        <div class="text-sm text-gray-600">大井町消防団第一分団</div>
-                    </div>
-                </a>
-                <a href="/" class="text-blue-600 hover:text-blue-800 text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition">
-                    ← ホームに戻る
-                </a>
-            </div>
+    <header style="background:linear-gradient(135deg,#c0392b 0%,#96281b 100%);height:54px;display:flex;align-items:center;padding:0 16px;box-shadow:0 3px 10px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:960px;margin:0 auto;">
+            <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+                <img src="/kanagawa-logo.png" alt="" style="width:32px;height:32px;border-radius:6px;">
+                <div>
+                    <div style="color:white;font-size:16px;font-weight:700;letter-spacing:0.02em;line-height:1.2;">活動記録</div>
+                    <div style="color:rgba(255,255,255,0.75);font-size:10px;line-height:1.2;">大井町消防団 第一分団</div>
+                </div>
+            </a>
+            <a href="/" style="color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;text-decoration:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px 12px;">← ホーム</a>
         </div>
-    </nav>
+    </header>
 
     <div class="container mx-auto px-4 py-6">
         <div class="bg-white rounded-2xl p-6 mb-6 shadow-lg">
@@ -10916,42 +11012,6 @@ app.get('/stats', (c) => {
                     '</div>' +
                 '</div>';
             }).join('');
-        }
-
-        // ==========================================
-        // タブ切り替え機能
-        // ==========================================
-        const tabActivity = document.getElementById('tabActivity');
-        const tabHose = document.getElementById('tabHose');
-        const activityTab = document.getElementById('activityTab');
-        const hoseTab = document.getElementById('hoseTab');
-
-        if (tabActivity && tabHose && activityTab && hoseTab) {
-            tabActivity.addEventListener('click', () => {
-                tabActivity.classList.add('active');
-                tabActivity.classList.remove('text-gray-500');
-                tabHose.classList.remove('active');
-                tabHose.classList.add('text-gray-500');
-                activityTab.classList.remove('hidden');
-                hoseTab.classList.add('hidden');
-            });
-
-            tabHose.addEventListener('click', () => {
-                tabHose.classList.add('active');
-                tabHose.classList.remove('text-gray-500');
-                tabActivity.classList.remove('active');
-                tabActivity.classList.add('text-gray-500');
-                hoseTab.classList.remove('hidden');
-                activityTab.classList.add('hidden');
-
-                // ホース集計タブに切り替えた時に初期化
-                if (!hoseChart) {
-                    initHoseStats();
-                }
-            });
-        } else {
-            // タブが存在しない場合はホース統計を直接初期化
-            initHoseStats();
         }
 
         // ==========================================
