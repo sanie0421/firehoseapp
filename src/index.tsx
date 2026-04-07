@@ -5,7 +5,6 @@ import { serveStatic } from 'hono/cloudflare-workers'
 type Bindings = {
   DB: D1Database
   IMAGES: R2Bucket
-  APP_PASSWORD?: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -21,97 +20,6 @@ app.use('/*.jpg', serveStatic({ root: './' }))
 app.use('/*.gif', serveStatic({ root: './' }))
 app.use('/*.svg', serveStatic({ root: './' }))
 
-// ==========================================
-// 認証ミドルウェア
-// ==========================================
-const AUTH_COOKIE = 'oifire1_auth'
-
-function isAuthenticated(c: any): boolean {
-  const cookie = c.req.header('cookie') || ''
-  const token = cookie.split(';').find((s: string) => s.trim().startsWith(AUTH_COOKIE + '='))
-  if (!token) return false
-  const value = token.split('=')[1]?.trim()
-  const expected = c.env?.APP_PASSWORD ? btoa(c.env.APP_PASSWORD) : btoa('oifire1')
-  return value === expected
-}
-
-// ページルート認証ミドルウェア（APIは除外）
-app.use('*', async (c, next) => {
-  const path = new URL(c.req.url).pathname
-  // APIルート・静的ファイル・ログインページは認証スキップ
-  if (path.startsWith('/api/') || path.startsWith('/static/') || path === '/login' ||
-      path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.gif') || path.endsWith('.svg')) {
-    return next()
-  }
-  if (!isAuthenticated(c)) {
-    return c.redirect('/login')
-  }
-  return next()
-})
-
-// ==========================================
-// ログインページ
-// ==========================================
-app.get('/login', (c) => {
-  const failed = c.req.query('error') === '1'
-  return c.html(`<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ログイン — 活動記録</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background: #f0f2f5; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .card { background: white; border-radius: 20px; padding: 40px 32px; width: 100%; max-width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
-    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-    .logo img { width: 48px; height: 48px; border-radius: 12px; }
-    .logo-title { font-size: 20px; font-weight: 800; color: #1a1a1a; }
-    .logo-sub { font-size: 12px; color: #888; margin-top: 2px; }
-    label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; }
-    input[type=password] { width: 100%; padding: 12px 16px; border: 1.5px solid #e0e0e0; border-radius: 10px; font-size: 16px; outline: none; transition: border-color 0.2s; }
-    input[type=password]:focus { border-color: #c0392b; }
-    .btn { width: 100%; background: linear-gradient(135deg, #c0392b, #96281b); color: white; border: none; padding: 14px; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 20px; transition: opacity 0.2s; }
-    .btn:hover { opacity: 0.9; }
-    .error { background: #fff0f0; color: #c0392b; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="logo">
-      <img src="/kanagawa-logo.png" alt="">
-      <div>
-        <div class="logo-title">活動記録</div>
-        <div class="logo-sub">大井町消防団 第一分団</div>
-      </div>
-    </div>
-    ${failed ? '<div class="error">パスワードが違います</div>' : ''}
-    <form method="POST" action="/login">
-      <label for="pw">パスワード</label>
-      <input type="password" id="pw" name="password" placeholder="パスワードを入力" autofocus>
-      <button type="submit" class="btn">ログイン</button>
-    </form>
-  </div>
-</body>
-</html>`)
-})
-
-app.post('/login', async (c) => {
-  const body = await c.req.parseBody()
-  const password = body['password'] as string
-  const correct = c.env?.APP_PASSWORD || 'oifire1'
-  if (password === correct) {
-    const token = btoa(correct)
-    c.header('Set-Cookie', `${AUTH_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000`)
-    return c.redirect('/')
-  }
-  return c.redirect('/login?error=1')
-})
-
-app.get('/logout', (c) => {
-  c.header('Set-Cookie', `${AUTH_COOKIE}=; Path=/; HttpOnly; Max-Age=0`)
-  return c.redirect('/login')
-})
 
 // ==========================================
 // ホーム画面
@@ -590,7 +498,7 @@ app.get('/api/absence-periods/:userId', async (c) => {
     
     const result = await env.DB.prepare(`
       SELECT * FROM absence_periods
-      WHERE user_id = ?
+      WHERE member_id = ?
       ORDER BY start_date DESC
     `).bind(userId).all()
     
@@ -610,7 +518,7 @@ app.get('/api/absence-periods-all', async (c) => {
     
     const result = await env.DB.prepare(`
       SELECT * FROM absence_periods
-      ORDER BY user_id, start_date DESC
+      ORDER BY member_id, start_date DESC
     `).all()
     
     return c.json({ periods: result.results })
@@ -627,13 +535,14 @@ app.post('/api/absence-periods', async (c) => {
   try {
     const { user_id, start_date, end_date, reason } = await c.req.json()
     const env = c.env as { DB: D1Database }
-    
+
     const id = 'absence_' + Date.now()
-    
+    const endDateValue = end_date || '9999-12-31'
+
     await env.DB.prepare(`
-      INSERT INTO absence_periods (id, user_id, start_date, end_date, reason, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
-    `).bind(id, user_id, start_date, end_date, reason).run()
+      INSERT INTO absence_periods (id, member_id, start_date, end_date, reason, dan_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 1, datetime('now', 'localtime'), datetime('now', 'localtime'))
+    `).bind(id, user_id, start_date, endDateValue, reason || '').run()
     
     return c.json({ success: true, id })
   } catch (error) {
@@ -4664,17 +4573,6 @@ app.get('/inspection-priority', (c) => {
                         oninput="applyFilters()">
                 </div>
                 
-                <!-- AI優先度判定ボタン -->
-                <div class="mt-4 flex gap-2">
-                    <button id="aiAnalyzeBtn" onclick="analyzeWithAI()" 
-                        class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-xl transition font-bold shadow-lg">
-                        🤖 AIで優先度を判断
-                    </button>
-                    <button id="resetPriorityBtn" onclick="loadStorages()" 
-                        class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-xl transition font-bold shadow-lg">
-                        🔄 リセット
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -4694,16 +4592,6 @@ app.get('/inspection-priority', (c) => {
 
             <!-- 優先度タブ -->
             <div id="priorityTab" class="p-6">
-                <!-- AI優先度判断ボタン -->
-                <div class="mb-6">
-                    <button onclick="analyzeWithAI()" id="aiAnalyzeBtn" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-4 rounded-xl transition font-bold text-lg shadow-lg flex items-center justify-center gap-2">
-                        <span>🤖</span>
-                        <span>AIで優先度を判断</span>
-                        <span id="aiAnalyzeSpinner" class="hidden">⏳</span>
-                    </button>
-                    <p class="text-xs text-gray-600 mt-2 text-center">※ Claude AIがホース製造年月・点検履歴を総合的に分析します</p>
-                </div>
-                
                 <!-- フィルタボタン群 -->
                 <div class="mb-6">
                     <!-- 時間フィルタ -->
@@ -4953,68 +4841,6 @@ app.get('/inspection-priority', (c) => {
             }
         }
 
-        async function analyzeWithAI() {
-            const btn = document.getElementById('aiAnalyzeBtn');
-            const spinner = document.getElementById('aiAnalyzeSpinner');
-            
-            if (allStorages.length === 0) {
-                alert('ホースデータがありません');
-                return;
-            }
-            
-            // ボタンを無効化
-            btn.disabled = true;
-            spinner.classList.remove('hidden');
-            btn.innerHTML = '<span>🤖</span><span>AI分析中...</span><span>⏳</span>';
-            
-            try {
-                const response = await fetch('/api/inspection/ai-priority', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ storages: allStorages })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('AI分析に失敗しました');
-                }
-                
-                const result = await response.json();
-                
-                if (result.rankings && result.rankings.length > 0) {
-                    // AI判定結果をallStoragesに反映
-                    allStorages = allStorages.map(storage => {
-                        const ranking = result.rankings.find(r => r.storage_id === storage.id);
-                        if (ranking) {
-                            return {
-                                ...storage,
-                                ai_priority_score: ranking.priority_score,
-                                ai_reason: ranking.reason,
-                                oldest_hose_age_years: ranking.oldest_hose_age_years
-                            };
-                        }
-                        return storage;
-                    });
-                    
-                    // AIスコア順にソート
-                    allStorages.sort((a, b) => (b.ai_priority_score || 0) - (a.ai_priority_score || 0));
-                    
-                    applyFilters();
-                    alert('✅ AI優先度判定が完了しました！\\n\\n上位のホースから順に表示されます。');
-                } else {
-                    alert('❌ AI判定結果が取得できませんでした');
-                }
-                
-            } catch (error) {
-                console.error('AI analysis error:', error);
-                alert('❌ AI分析中にエラーが発生しました\\n\\n' + error.message);
-            } finally {
-                // ボタンを元に戻す
-                btn.disabled = false;
-                spinner.classList.add('hidden');
-                btn.innerHTML = '<span>🤖</span><span>AIで優先度を判断</span>';
-            }
-        }
-
         function setTimeFilter(filter) {
             currentTimeFilter = filter;
             // 全タブのフィルタボタンを更新
@@ -5202,17 +5028,6 @@ app.get('/inspection-priority', (c) => {
                         '<span class="bg-white bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full text-base font-bold border border-white border-opacity-50 ml-2">' + priorityIcon + ' ' + priorityText + '</span>' +
                     '</div>' +
                     '<p class="text-base opacity-90 mb-2">最終点検: ' + lastInspection + (daysAgo !== null ? ' (' + daysAgo + '日前)' : '') + '</p>';
-            
-            // AIスコアと理由表示
-            if (storage.ai_priority_score) {
-                html += '<div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg p-3 mb-4 border border-white border-opacity-30">' +
-                           '<p class="text-sm font-bold mb-1">🤖 AI優先度: ' + storage.ai_priority_score + '点/100点</p>' +
-                           '<p class="text-xs opacity-90">' + (storage.ai_reason || '') + '</p>';
-                if (storage.oldest_hose_age_years) {
-                    html += '<p class="text-xs opacity-90 mt-1">最古ホース: ' + storage.oldest_hose_age_years + '年経過</p>';
-                }
-                html += '</div>';
-            }
             
             html += pinButton +
                     '<button class="w-full bg-white bg-opacity-30 hover:bg-opacity-40 backdrop-blur-sm px-4 py-3 rounded-xl text-base font-semibold transition border border-white border-opacity-50">📝 点検する</button>' +
@@ -5616,93 +5431,6 @@ app.get('/api/inspection/priority', async (c) => {
   } catch (error) {
     console.error('Database error:', error)
     return c.json({ storages: [] })
-  }
-})
-
-// ==========================================
-// API: AI優先度分析（Claude API）
-// ==========================================
-app.post('/api/inspection/ai-priority', async (c) => {
-  try {
-    const env = c.env as { DB: D1Database; ANTHROPIC_API_KEY?: string }
-    const { storages } = await c.req.json()
-    
-    if (!env.ANTHROPIC_API_KEY) {
-      return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 500)
-    }
-    
-    // Claude APIに送信するプロンプト
-    const prompt = `あなたは消防団の点検優先度判定AIです。以下のホースデータを分析し、点検が最も必要な順にランキングしてください。
-
-ホースデータ（JSON）:
-${JSON.stringify(storages, null, 2)}
-
-【重要】判定基準（優先度順）:
-1. **ホース製造年月（最重要）**
-   - 製造から10年以上経過したホースがある場合は最優先
-   - ホースは新しければ10年は使用可能
-   - hose_1_manufacture_date～hose_4_manufacture_date の最古のものを基準に判定
-   
-2. **点検履歴**
-   - 最終点検日が古い（未点検含む）
-   - 備考に「【消火栓点検のみ】」と記載されている場合、ホース点検はカウントしない
-   
-3. **前回点検結果**
-   - 異常・要注意・ホース破損/交換が多い
-   
-4. **地区的重要性**
-   - 人口密集地域、重要施設近辺
-
-各ホースについて、100点満点で優先度スコアを算出し、以下のJSON形式で返してください:
-{
-  "rankings": [
-    {
-      "storage_id": "ホースID",
-      "priority_score": 95,
-      "reason": "ホース製造12年経過、要点検",
-      "oldest_hose_age_years": 12
-    }
-  ]
-}
-
-必ず上記JSON形式のみで回答してください。説明文は不要です。`
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-haiku-20241022',
-        max_tokens: 2048,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
-      })
-    })
-    
-    if (!response.ok) {
-      throw new Error('Claude API error: ' + response.statusText)
-    }
-    
-    const data = await response.json() as any
-    const aiResponse = data.content[0].text
-    
-    // JSONをパース
-    const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      return c.json({ error: 'Invalid AI response format' }, 500)
-    }
-    
-    const rankings = JSON.parse(jsonMatch[0])
-    return c.json(rankings)
-    
-  } catch (error) {
-    console.error('AI priority analysis error:', error)
-    return c.json({ error: 'AI analysis failed' }, 500)
   }
 })
 
@@ -9619,13 +9347,8 @@ app.get('/members', (c) => {
             font-size: 16px !important;
         }
         .absence-period {
-            background: repeating-linear-gradient(
-                45deg,
-                #fed7aa,
-                #fed7aa 10px,
-                #fdba74 10px,
-                #fdba74 20px
-            );
+            background: #d1d5db;
+            color: #6b7280;
         }
     </style>
 </head>
@@ -9823,6 +9546,8 @@ app.get('/members', (c) => {
                 members = data.users || [];
                 console.log('Members loaded:', members.length);
                 renderMembers();
+                await loadAllAbsencePeriods();
+                renderMembers();
             } catch (error) {
                 console.error('Load members error:', error);
                 document.getElementById('activeMemberList').innerHTML = 
@@ -9866,7 +9591,11 @@ app.get('/members', (c) => {
                 document.getElementById('tabTimeline').classList.add('border-blue-500', 'text-blue-500');
                 document.getElementById('timelineTab').classList.remove('hidden');
                 // 欠席期間データを読み込んでから、デフォルトソート（退団が早い順）して年表を描画
-                loadAllAbsencePeriods().then(() => sortByRetirementDate());
+                loadAllAbsencePeriods().then(() => {
+                    const now = new Date();
+                    const currentFY = (now.getMonth() + 1) >= 4 ? now.getFullYear() : now.getFullYear() - 1;
+                    sortByYear(currentFY + 1);
+                });
             }
             
             renderMembers();
@@ -9947,12 +9676,20 @@ app.get('/members', (c) => {
                     '</button>';
                 }
                 
+                const memberAbsences = absencePeriods[member.id] || [];
+                const absenceHtml = memberAbsences.length > 0
+                    ? memberAbsences.map(a => {
+                        const end = a.end_date === '9999-12-31' ? '現在' : a.end_date;
+                        return '<p class="text-gray-500 text-sm">🏖️ 欠席: ' + a.start_date + ' 〜 ' + end + (a.reason ? ' (' + a.reason + ')' : '') + '</p>';
+                    }).join('')
+                    : '';
                 return '<div class="bg-white rounded-2xl p-6 shadow-lg border-2 border-gray-200 hover:border-blue-400 transition">' +
                     '<h3 class="text-2xl font-bold text-gray-800 mb-4">👤 ' + member.name + '</h3>' +
                     '<div class="space-y-2 mb-4">' +
                         '<p class="text-gray-700 text-base">🎂 生年月日: ' + birthDateDisplay + ' (' + age + '歳)</p>' +
                         '<p class="text-gray-700 text-base">📅 入団: ' + joinDateDisplay + ' (' + years + '年目)</p>' +
                         (member.retirement_date && member.retirement_date !== 'null' ? '<p class="text-gray-700 text-base">🚪 退団: ' + new Date(member.retirement_date).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'}) + '</p>' : '') +
+                        absenceHtml +
                     '</div>' +
                     '<div class="grid grid-cols-2 gap-2 mb-2">' +
                         statusButtons +
@@ -10038,31 +9775,34 @@ app.get('/members', (c) => {
                     }
                 }
                 
-                // 在籍年数計算（年度ベース：退団済みなら退団年度まで、現役なら現在年度まで）
-                let yearsOfService = null;
-                if (joinFiscalYear) {
-                    const endFiscalYear = retirementFiscalYear || currentFiscalYear;
-                    yearsOfService = endFiscalYear - joinFiscalYear + 1;
-                }
-                
                 // 欠席期間を年度範囲に変換
                 const absenceRanges = (absencePeriods[member.id] || []).map(absence => {
                     const startDate = new Date(absence.start_date);
-                    const startYear = startDate.getFullYear();
                     const startMonth = startDate.getMonth() + 1;
-                    const startFiscalYear = startMonth >= 4 ? startYear : startYear - 1;
-                    
+                    const startFiscalYear = startMonth >= 4 ? startDate.getFullYear() : startDate.getFullYear() - 1;
                     let endFiscalYear = currentFiscalYear;
-                    if (absence.end_date) {
+                    if (absence.end_date && absence.end_date !== '9999-12-31') {
                         const endDate = new Date(absence.end_date);
-                        const endYear = endDate.getFullYear();
                         const endMonth = endDate.getMonth() + 1;
-                        endFiscalYear = endMonth >= 4 ? endYear : endYear - 1;
+                        endFiscalYear = endMonth >= 4 ? endDate.getFullYear() : endDate.getFullYear() - 1;
                     }
                     return { start: startFiscalYear, end: endFiscalYear };
                 });
-                
-                // バッジ（年度ベースで満5年=5年度、満10年=10年度、満20年=20年度）
+
+                // 在籍年数計算（欠席期間を差し引く）
+                let yearsOfService = null;
+                if (joinFiscalYear) {
+                    const endFiscalYear = retirementFiscalYear || currentFiscalYear;
+                    const totalYears = endFiscalYear - joinFiscalYear + 1;
+                    const absenceYears = absenceRanges.reduce((sum, r) => {
+                        const s = Math.max(r.start, joinFiscalYear);
+                        const e = Math.min(r.end, endFiscalYear);
+                        return sum + Math.max(0, e - s + 1);
+                    }, 0);
+                    yearsOfService = totalYears - absenceYears;
+                }
+
+                // バッジ（実質在籍年数で判定）
                 let badge = '';
                 if (yearsOfService >= 20) badge = '🏆';
                 else if (yearsOfService >= 10) badge = '🥈';
@@ -10106,16 +9846,24 @@ app.get('/members', (c) => {
                         
                         if (isAbsent) {
                             cellClass += ' absence-period';
-                            cellContent = '🏝️欠席';
+                            cellContent = '欠席';
                         } else {
-                            const yearsOfService = year - data.joinFiscalYear + 1;
+                            const rawYears = year - data.joinFiscalYear + 1;
+                            const absYears = data.absenceRanges.reduce((sum, r) => {
+                                const s = Math.max(r.start, data.joinFiscalYear);
+                                const e = Math.min(r.end, year);
+                                return sum + Math.max(0, e - s + 1);
+                            }, 0);
+                            const yearsOfService = rawYears - absYears;
                             const age = data.currentAge ? (data.currentAge - (currentFiscalYear - year)) : null;
                             cellClass += ' bg-green-100';
                             cellContent = yearsOfService + '年';
                             if (age) cellContent += '<br>(' + age + '歳)';
                         }
                     } else {
-                        cellClass += ' bg-gray-50';
+                        cellClass += ' bg-white';
+                        const age = data.currentAge ? (data.currentAge - (currentFiscalYear - year)) : null;
+                        if (age && age > 0) cellContent = '<span style="color:#d1d5db;font-size:10px;">(' + age + '歳)</span>';
                     }
                     
                     rows.push('<td class="' + cellClass + '">' + cellContent + '</td>');
@@ -10179,9 +9927,24 @@ app.get('/members', (c) => {
                     }
                 }
                 
-                // 在籍年数計算
+                // 在籍年数計算（欠席差し引き）
                 const endFiscalYear = retirementFiscalYear || currentFiscalYear;
-                const yearsOfService = joinFiscalYear ? (endFiscalYear - joinFiscalYear + 1) : 0;
+                const memberAbsRanges = (absencePeriods[member.id] || []).map(a => {
+                    const sd = new Date(a.start_date); const sm = sd.getMonth() + 1;
+                    const sFY = sm >= 4 ? sd.getFullYear() : sd.getFullYear() - 1;
+                    let eFY = currentFiscalYear;
+                    if (a.end_date && a.end_date !== '9999-12-31') {
+                        const ed = new Date(a.end_date); const em = ed.getMonth() + 1;
+                        eFY = em >= 4 ? ed.getFullYear() : ed.getFullYear() - 1;
+                    }
+                    return { start: sFY, end: eFY };
+                });
+                const absYrs = memberAbsRanges.reduce((sum, r) => {
+                    const s = Math.max(r.start, joinFiscalYear || 0);
+                    const e = Math.min(r.end, endFiscalYear);
+                    return sum + Math.max(0, e - s + 1);
+                }, 0);
+                const yearsOfService = joinFiscalYear ? (endFiscalYear - joinFiscalYear + 1 - absYrs) : 0;
                 
                 return { 
                     member: member,
@@ -10202,56 +9965,50 @@ app.get('/members', (c) => {
             renderTimeline();
         }
 
-        // 指定年度の在籍者でソート：その年在籍者で退団が早い順
+        // 指定年度の在籍者でソート：その年在籍者を上に、在籍年数が長い順
         function sortByYear(targetYear) {
+            const today = new Date();
+            const currentFY = (today.getMonth() + 1) >= 4 ? today.getFullYear() : today.getFullYear() - 1;
+
             const activeStatus = members.map(member => {
                 let joinFiscalYear = null;
                 let retirementFiscalYear = null;
-                
+
                 if (member.join_date) {
                     const joinDate = new Date(member.join_date);
-                    const joinYear = joinDate.getFullYear();
                     const joinMonth = joinDate.getMonth() + 1;
-                    joinFiscalYear = joinMonth >= 4 ? joinYear : joinYear - 1;
+                    joinFiscalYear = joinMonth >= 4 ? joinDate.getFullYear() : joinDate.getFullYear() - 1;
                 }
-                
+
                 if (member.retirement_date && member.retirement_date !== 'null') {
                     const retireDate = new Date(member.retirement_date);
                     if (!isNaN(retireDate.getTime())) {
-                        const retireYear = retireDate.getFullYear();
                         const retireMonth = retireDate.getMonth() + 1;
-                        retirementFiscalYear = retireMonth >= 4 ? retireYear : retireYear - 1;
+                        retirementFiscalYear = retireMonth >= 4 ? retireDate.getFullYear() : retireDate.getFullYear() - 1;
                     }
                 }
-                
-                const wasActive = joinFiscalYear && targetYear >= joinFiscalYear && 
-                                (!retirementFiscalYear || targetYear <= retirementFiscalYear);
-                
-                return { 
-                    member: member, 
-                    wasActive: wasActive,
-                    retirementFiscalYear: retirementFiscalYear
-                };
+
+                // retirement_date未設定でもOB/退団(status!=1)なら現年度で打ち切り
+                if (!retirementFiscalYear && member.status && member.status !== 1) {
+                    retirementFiscalYear = currentFY;
+                }
+
+                const wasActive = joinFiscalYear !== null && targetYear >= joinFiscalYear &&
+                                  (!retirementFiscalYear || targetYear <= retirementFiscalYear);
+                const yearsOfService = joinFiscalYear !== null
+                    ? (retirementFiscalYear || currentFY) - joinFiscalYear + 1
+                    : 0;
+
+                return { member, wasActive, yearsOfService };
             });
-            
-            // ソート：在籍者を上に、退団が早い順（現役は最後）
+
+            // 在籍者を上に、在籍年数が長い順
             activeStatus.sort((a, b) => {
-                // 在籍状態で分ける
                 if (a.wasActive && !b.wasActive) return -1;
                 if (!a.wasActive && b.wasActive) return 1;
-                
-                // 両方在籍者：退団が早い順（nullは最後＝現役は最後）
-                if (a.wasActive && b.wasActive) {
-                    if (a.retirementFiscalYear && b.retirementFiscalYear) {
-                        return a.retirementFiscalYear - b.retirementFiscalYear;
-                    }
-                    if (a.retirementFiscalYear && !b.retirementFiscalYear) return -1;
-                    if (!a.retirementFiscalYear && b.retirementFiscalYear) return 1;
-                }
-                
-                return a.member.name.localeCompare(b.member.name, 'ja');
+                return b.yearsOfService - a.yearsOfService;
             });
-            
+
             members = activeStatus.map(item => item.member);
             renderTimeline();
         }
@@ -10529,10 +10286,10 @@ app.get('/members', (c) => {
                 
                 // メンバーごとにグループ化
                 for (const period of periods) {
-                    if (!absencePeriods[period.user_id]) {
-                        absencePeriods[period.user_id] = [];
+                    if (!absencePeriods[period.member_id]) {
+                        absencePeriods[period.member_id] = [];
                     }
-                    absencePeriods[period.user_id].push(period);
+                    absencePeriods[period.member_id].push(period);
                 }
                 
                 // データがないメンバーには空配列を設定
